@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS public.game_sessions (
   ended_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT check_session_counts CHECK (total_correct <= total_questions AND total_questions >= 0 AND total_correct >= 0),
-  CONSTRAINT check_session_status CHECK (status IN ('active', 'completed', 'abandoned'))
+  CONSTRAINT check_session_status CHECK (status IN ('active', 'completed'))
 );
 
 -- Enable RLS for game_sessions
