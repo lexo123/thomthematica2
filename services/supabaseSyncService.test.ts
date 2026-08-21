@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { syncGameSessionToSupabase, syncWishToSupabase, fetchChildWishes, fetchChildSessions } from './supabaseSyncService';
+import { syncGameSessionToSupabase, syncWishToSupabase, updateWishStatus, fetchChildWishes, fetchChildSessions } from './supabaseSyncService';
 import { GameMode } from '../types';
 import * as supabaseModule from '../lib/supabase';
 
-describe('supabaseSyncService', () => {
+describe('supabaseSyncService (Schema Alignment)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -12,10 +12,9 @@ describe('supabaseSyncService', () => {
     it('returns error when childId is missing', async () => {
       const result = await syncGameSessionToSupabase({
         childId: '',
-        mode: GameMode.Thomthematica,
-        level: 1,
-        correctCount: 10,
-        incorrectCount: 2,
+        gameMode: GameMode.Thomthematica,
+        totalQuestions: 40,
+        totalCorrect: 38,
       });
 
       expect(result.success).toBe(false);
@@ -27,24 +26,32 @@ describe('supabaseSyncService', () => {
 
       const result = await syncGameSessionToSupabase({
         childId: 'child-123',
-        mode: GameMode.Thomthematica,
-        level: 1,
-        correctCount: 10,
-        incorrectCount: 2,
+        gameMode: GameMode.Thomthematica,
+        totalQuestions: 40,
+        totalCorrect: 38,
       });
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Supabase client is not available');
     });
 
-    it('successfully inserts session data when Supabase is configured', async () => {
+    it('successfully maps and inserts session data according to approved DB schema', async () => {
       const mockSingle = vi.fn().mockResolvedValue({
-        data: { id: 'session-123', child_id: 'child-123', correct_count: 10 },
+        data: {
+          id: 'session-123',
+          child_id: 'child-123',
+          game_mode: 'thomthematica',
+          total_questions: 40,
+          total_correct: 40,
+          perfect_blocks_count: 4,
+          duration_seconds: 120,
+          status: 'completed',
+        },
         error: null,
       });
       const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockInsert = vi.fn().mockReturnValue({ select: mockSelect });
-      const mockFrom = vi.fn().mockReturnValue({ insert: mockInsert });
+      const mockUpsert = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockFrom = vi.fn().mockReturnValue({ upsert: mockUpsert });
 
       vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
         from: mockFrom,
@@ -52,20 +59,24 @@ describe('supabaseSyncService', () => {
 
       const result = await syncGameSessionToSupabase({
         childId: 'child-123',
-        mode: GameMode.Thomthematica,
-        level: 2,
-        correctCount: 10,
-        incorrectCount: 1,
+        gameMode: GameMode.Thomthematica,
+        totalQuestions: 40,
+        totalCorrect: 40,
+        perfectBlocksCount: 4,
+        durationSeconds: 120,
+        status: 'completed',
       });
 
       expect(mockFrom).toHaveBeenCalledWith('game_sessions');
-      expect(mockInsert).toHaveBeenCalledWith(
+      expect(mockUpsert).toHaveBeenCalledWith(
         expect.objectContaining({
           child_id: 'child-123',
-          mode: GameMode.Thomthematica,
-          level: 2,
-          correct_count: 10,
-          incorrect_count: 1,
+          game_mode: GameMode.Thomthematica,
+          total_questions: 40,
+          total_correct: 40,
+          perfect_blocks_count: 4,
+          duration_seconds: 120,
+          status: 'completed',
         })
       );
       expect(result.success).toBe(true);
@@ -78,6 +89,7 @@ describe('supabaseSyncService', () => {
       const result = await syncWishToSupabase({
         childId: 'child-123',
         wishText: '   ',
+        correctCount: 40,
       });
 
       expect(result.success).toBe(false);
@@ -88,20 +100,29 @@ describe('supabaseSyncService', () => {
       const result = await syncWishToSupabase({
         childId: '',
         wishText: 'LEGO Robot',
+        correctCount: 40,
       });
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('childId is required');
     });
 
-    it('successfully inserts wish when valid data provided', async () => {
+    it('successfully maps and inserts wish matching schema constraints (correct_count: 39 | 40, status: pending)', async () => {
       const mockSingle = vi.fn().mockResolvedValue({
-        data: { id: 'wish-123', wish_text: 'LEGO Robot', unlocked: true },
+        data: {
+          id: 'wish-123',
+          child_id: 'child-123',
+          wish_text: 'LEGO Robot',
+          correct_count: 40,
+          status: 'pending',
+          fulfilled_at: null,
+          created_at: new Date().toISOString(),
+        },
         error: null,
       });
       const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockInsert = vi.fn().mockReturnValue({ select: mockSelect });
-      const mockFrom = vi.fn().mockReturnValue({ insert: mockInsert });
+      const mockUpsert = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockFrom = vi.fn().mockReturnValue({ upsert: mockUpsert });
 
       vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
         from: mockFrom,
@@ -110,18 +131,43 @@ describe('supabaseSyncService', () => {
       const result = await syncWishToSupabase({
         childId: 'child-123',
         wishText: 'LEGO Robot',
+        correctCount: 40,
+        status: 'pending',
       });
 
       expect(mockFrom).toHaveBeenCalledWith('wishes');
-      expect(mockInsert).toHaveBeenCalledWith(
+      expect(mockUpsert).toHaveBeenCalledWith(
         expect.objectContaining({
           child_id: 'child-123',
           wish_text: 'LEGO Robot',
-          unlocked: true,
+          correct_count: 40,
+          status: 'pending',
+          fulfilled_at: null,
         })
       );
       expect(result.success).toBe(true);
       expect(result.data?.id).toBe('wish-123');
+    });
+  });
+
+  describe('updateWishStatus', () => {
+    it('updates wish status to fulfilled', async () => {
+      const mockEq = vi.fn().mockResolvedValue({ error: null });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await updateWishStatus('wish-123', 'fulfilled');
+      expect(mockFrom).toHaveBeenCalledWith('wishes');
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'fulfilled',
+        })
+      );
+      expect(result.success).toBe(true);
     });
   });
 

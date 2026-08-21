@@ -66,3 +66,27 @@ export interface Child {
   avatar_id: string;
   created_at: string;
 }
+
+export interface GameSession {
+  id: string;
+  child_id: string;
+  game_mode: string;
+  total_questions: number;
+  total_correct: number;
+  perfect_blocks_count: number;
+  duration_seconds: number;
+  status: 'active' | 'completed';
+  started_at: string;
+  ended_at?: string | null;
+  updated_at: string;
+}
+
+export interface Wish {
+  id: string;
+  child_id: string;
+  wish_text: string;
+  correct_count: 39 | 40;
+  status: 'pending' | 'fulfilled';
+  fulfilled_at?: string | null;
+  created_at: string;
+}
