@@ -68,7 +68,7 @@ export const useChildren = () => {
     fetchChildren();
   }, [fetchChildren]);
 
-  const addChild = async (name: string, avatarId: string = 'avatar_1', rewardTheme: string = 'default'): Promise<{ child: Child | null; error: Error | null }> => {
+  const addChild = async (name: string, avatarId: string = 'avatar_1'): Promise<{ child: Child | null; error: Error | null }> => {
     if (!user) {
       return { child: null, error: new Error('ავტორიზაცია აუცილებელია') };
     }
@@ -90,7 +90,6 @@ export const useChildren = () => {
           parent_id: user.id,
           name: trimmedName,
           avatar_id: avatarId,
-          reward_theme: rewardTheme,
         })
         .select()
         .single();

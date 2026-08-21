@@ -11,7 +11,7 @@ interface ChildContextType {
   error: string | null;
   setActiveChildId: (id: string | null) => void;
   setActiveChild: (child: Child | null) => void;
-  addChild: (name: string, avatarId?: string, rewardTheme?: string) => Promise<{ child: Child | null; error: Error | null }>;
+  addChild: (name: string, avatarId?: string) => Promise<{ child: Child | null; error: Error | null }>;
   fetchChildren: () => Promise<void>;
   showChildSelector: boolean;
   setShowChildSelector: (show: boolean) => void;
@@ -32,6 +32,7 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
   const [showChildSelector, setShowChildSelector] = useState<boolean>(false);
 
+  // When user logs out, clear active child state and storage
   useEffect(() => {
     if (!user) {
       setActiveChildIdState(null);
@@ -41,12 +42,14 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [user]);
 
+  // Sync activeChildId with actual children list
   useEffect(() => {
     if (!user || loading) return;
 
     if (childrenList.length > 0) {
       const exists = childrenList.some(c => c.id === activeChildId);
       if (!exists) {
+        // If stored active child doesn't exist (e.g. from previous user), pick the first one from this user's list
         const firstChild = childrenList[0];
         setActiveChildIdState(firstChild.id);
         if (typeof window !== 'undefined') {
@@ -54,6 +57,11 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
     } else {
+      // If user is authenticated but has 0 children, clear active child and prompt child selector modal
+      setActiveChildIdState(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(ACTIVE_CHILD_STORAGE_KEY);
+      }
       setShowChildSelector(true);
     }
   }, [user, childrenList, activeChildId, loading]);

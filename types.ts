@@ -64,6 +64,5 @@ export interface Child {
   parent_id: string;
   name: string;
   avatar_id: string;
-  reward_theme?: string;
   created_at: string;
 }
