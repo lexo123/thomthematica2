@@ -35,10 +35,8 @@ CREATE POLICY "Users can update their own profile"
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
-CREATE POLICY "Users can delete their own profile"
-  ON public.profiles
-  FOR DELETE
-  USING (auth.uid() = id);
+-- Note: DELETE policy for profiles is intentionally omitted on client-side RLS.
+-- Account deletion should only be executed via controlled administrative workflow (e.g. Edge Function deleting auth.users).
 
 -- ------------------------------------------------------------------------------
 -- 2. CHILDREN (Child Profiles owned by Parent)
@@ -192,7 +190,28 @@ CREATE POLICY "Parents can delete child wishes"
 CREATE INDEX IF NOT EXISTS idx_wishes_child_id ON public.wishes(child_id);
 
 -- ------------------------------------------------------------------------------
--- 5. AUTOMATIC PROFILE CREATION TRIGGER ON SIGNUP
+-- 5. AUTOMATIC TIMESTAMP TRIGGER FOR UPDATED_AT
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS set_game_sessions_updated_at ON public.game_sessions;
+CREATE TRIGGER set_game_sessions_updated_at
+  BEFORE UPDATE ON public.game_sessions
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS set_profiles_updated_at ON public.profiles;
+CREATE TRIGGER set_profiles_updated_at
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ------------------------------------------------------------------------------
+-- 6. AUTOMATIC PROFILE CREATION TRIGGER ON SIGNUP
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$

@@ -7,10 +7,13 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isConfigured: boolean;
+  isPasswordRecovery: boolean;
+  setIsPasswordRecovery: (value: boolean) => void;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,6 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabase();
@@ -36,8 +40,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    // 2. Auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // 2. Auth state change listener with PASSWORD_RECOVERY detection
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true);
+      }
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -100,10 +107,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: new Error('Supabase არ არის კონფიგურირებული') };
     }
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
       return { error: error ? new Error(error.message) : null };
     } catch (err: any) {
       return { error: new Error(err.message || 'პაროლის აღდგენის შეცდომა') };
+    }
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { error: new Error('Supabase არ არის კონფიგურირებული') };
+    }
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (!error) {
+        setIsPasswordRecovery(false);
+      }
+      return { error: error ? new Error(error.message) : null };
+    } catch (err: any) {
+      return { error: new Error(err.message || 'პაროლის განახლების შეცდომა') };
     }
   };
 
@@ -114,10 +141,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         session,
         loading,
         isConfigured: isSupabaseConfigured,
+        isPasswordRecovery,
+        setIsPasswordRecovery,
         signUp,
         signIn,
         signOut,
         resetPassword,
+        updatePassword,
       }}
     >
       {children}

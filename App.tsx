@@ -8,6 +8,7 @@ import { ColumnMultiplication } from './components/ColumnMultiplication';
 import { GeometryQuiz } from './components/GeometryQuiz';
 import { MathQuiz } from './components/MathQuiz';
 import { WishModal } from './components/WishModal';
+import { UpdatePasswordModal } from './components/UpdatePasswordModal';
 import {
   generateProblem,
   CORRECT_PHRASES,
@@ -322,6 +323,8 @@ const App: React.FC = () => {
           onSendWish={handleSendWish}
         />
       )}
+
+      <UpdatePasswordModal />
     </div>
   );
 };
