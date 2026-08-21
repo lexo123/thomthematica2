@@ -22,7 +22,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return (
+        window.location.hash.includes('type=recovery') ||
+        window.location.search.includes('type=recovery')
+      );
+    }
+    return false;
+  });
 
   useEffect(() => {
     const supabase = getSupabase();
@@ -31,16 +39,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    const checkRecoveryInUrl = () => {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (hash.includes('type=recovery') || search.includes('type=recovery')) {
+        setIsPasswordRecovery(true);
+      }
+    };
+    checkRecoveryInUrl();
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      checkRecoveryInUrl();
     }).catch(() => {
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      const isRecovery =
+        event === 'PASSWORD_RECOVERY' ||
+        hash.includes('type=recovery') ||
+        search.includes('type=recovery');
+
+      if (isRecovery) {
         setIsPasswordRecovery(true);
       }
       setSession(session);

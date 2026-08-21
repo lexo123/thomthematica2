@@ -37,10 +37,20 @@ export const UpdatePasswordModal: React.FC = () => {
           setSuccess(false);
           setNewPassword('');
           setConfirmPassword('');
+          if (typeof window !== 'undefined' && window.location.hash) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
         }, 2000);
       }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleClose = () => {
+    setIsPasswordRecovery(false);
+    if (typeof window !== 'undefined' && window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname);
     }
   };
 
@@ -51,7 +61,7 @@ export const UpdatePasswordModal: React.FC = () => {
         onClick={(e) => e.stopPropagation()}
       >
         <button
-          onClick={() => setIsPasswordRecovery(false)}
+          onClick={handleClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition-colors"
           aria-label="დახურვა"
         >
