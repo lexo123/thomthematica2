@@ -47,21 +47,20 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!user || loading) return;
 
     if (childrenList.length > 0) {
-      const exists = childrenList.some(c => c.id === activeChildId);
-      if (!exists) {
-        // If stored active child doesn't exist (e.g. from previous user), pick the first one from this user's list
-        const firstChild = childrenList[0];
-        setActiveChildIdState(firstChild.id);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(ACTIVE_CHILD_STORAGE_KEY, firstChild.id);
+      if (activeChildId) {
+        const stillExists = childrenList.some(c => c.id === activeChildId);
+        if (!stillExists) {
+          // If stored active child is invalid/deleted/from another user, clear and prompt selector
+          setActiveChildId(null);
+          setShowChildSelector(true);
         }
+      } else {
+        // Authenticated user with children but none currently selected
+        setShowChildSelector(true);
       }
     } else {
       // If user is authenticated but has 0 children, clear active child and prompt child selector modal
-      setActiveChildIdState(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(ACTIVE_CHILD_STORAGE_KEY);
-      }
+      setActiveChildId(null);
       setShowChildSelector(true);
     }
   }, [user, childrenList, activeChildId, loading]);
