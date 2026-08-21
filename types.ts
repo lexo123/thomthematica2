@@ -58,3 +58,12 @@ export type ColMultState = {
   r2: string[];
   res: string[];
 };
+
+export interface Child {
+  id: string;
+  parent_id: string;
+  name: string;
+  avatar_id: string;
+  reward_theme?: string;
+  created_at: string;
+}
