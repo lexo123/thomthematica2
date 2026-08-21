@@ -84,6 +84,12 @@ export const useChildren = () => {
     }
 
     try {
+      // Self-healing: Ensure parent profile exists in public.profiles table
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        full_name: user.user_metadata?.full_name || '',
+      }, { onConflict: 'id' });
+
       const { data, error: insertErr } = await supabase
         .from('children')
         .insert({

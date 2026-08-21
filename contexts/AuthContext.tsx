@@ -39,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // Check URL parameters directly on mount
     const checkRecoveryInUrl = () => {
       const hash = window.location.hash || '';
       const search = window.location.search || '';
@@ -48,15 +49,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     checkRecoveryInUrl();
 
+    // Helper to ensure profile exists in public.profiles
+    const ensureProfileExists = async (currentUser: User | null) => {
+      if (!currentUser || !supabase) return;
+      try {
+        await supabase.from('profiles').upsert({
+          id: currentUser.id,
+          full_name: currentUser.user_metadata?.full_name || '',
+        }, { onConflict: 'id' });
+      } catch (err) {
+        console.warn('Profile auto-sync skipped:', err);
+      }
+    };
+
+    // 1. Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
       setLoading(false);
       checkRecoveryInUrl();
+      if (currentUser) {
+        ensureProfileExists(currentUser);
+      }
     }).catch(() => {
       setLoading(false);
     });
 
+    // 2. Auth state change listener with robust PASSWORD_RECOVERY detection
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const hash = window.location.hash || '';
       const search = window.location.search || '';
@@ -69,8 +89,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsPasswordRecovery(true);
       }
       setSession(session);
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
       setLoading(false);
+      if (currentUser) {
+        ensureProfileExists(currentUser);
+      }
     });
 
     return () => {
