@@ -3,6 +3,7 @@ import { GameMode } from '../types';
 import { Button } from './Button';
 import { useAuth } from '../contexts/AuthContext';
 import { AuthModal } from './AuthModal';
+import { UpdatePasswordModal } from './UpdatePasswordModal';
 
 interface MainMenuProps {
   onSelectMode: (mode: GameMode) => void;
@@ -89,6 +90,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
       />
+
+      <UpdatePasswordModal />
     </div>
   );
 };
