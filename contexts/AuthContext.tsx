@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
+import { ensureProfileExists } from '../lib/ensureProfile';
 
 interface AuthContextType {
   user: User | null;
@@ -48,19 +49,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
     checkRecoveryInUrl();
-
-    // Helper to ensure profile exists in public.profiles
-    const ensureProfileExists = async (currentUser: User | null) => {
-      if (!currentUser || !supabase) return;
-      try {
-        await supabase.from('profiles').upsert({
-          id: currentUser.id,
-          full_name: currentUser.user_metadata?.full_name || '',
-        }, { onConflict: 'id' });
-      } catch (err) {
-        console.warn('Profile auto-sync skipped:', err);
-      }
-    };
 
     // 1. Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {

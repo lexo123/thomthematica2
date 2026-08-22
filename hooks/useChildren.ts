@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabase } from '../lib/supabase';
+import { ensureProfileExists } from '../lib/ensureProfile';
 import { Child } from '../types';
 
 export const CHILD_AVATARS: { id: string; emoji: string; label: string }[] = [
@@ -84,11 +85,8 @@ export const useChildren = () => {
     }
 
     try {
-      // Self-healing: Ensure parent profile exists in public.profiles table
-      await supabase.from('profiles').upsert({
-        id: user.id,
-        full_name: user.user_metadata?.full_name || '',
-      }, { onConflict: 'id' });
+      // Self-healing: Ensure parent profile exists safely without overwriting existing data
+      await ensureProfileExists(user);
 
       const { data, error: insertErr } = await supabase
         .from('children')
