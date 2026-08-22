@@ -1,12 +1,20 @@
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { GameMode } from '../types';
 import { sendGameStats, sendWish } from '../services/statsService';
+import { syncGameSessionToSupabase, syncWishToSupabase } from '../services/supabaseSyncService';
 
 /**
  * Time (in ms) to delay showing the Wish Modal upon completing 40 questions.
  * Gives the user time to see the answer feedback animation before the modal appears.
  */
 export const WISH_MODAL_DELAY_MS = 1500;
+
+export const generateSessionId = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'sess-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+};
 
 export interface GameSessionState {
   totalQuestions: number;
@@ -120,57 +128,189 @@ export function gameSessionReducer(state: GameSessionState, action: GameSessionA
   }
 }
 
-export const useGameSession = (gameMode: GameMode | null) => {
+export const useGameSession = (gameMode: GameMode | null, childId?: string | null) => {
   const [state, dispatch] = useReducer(gameSessionReducer, INITIAL_GAME_SESSION_STATE);
 
-  const latestStatsRef = useRef({
+  // Session ID lifecycle
+  const sessionIdRef = useRef<string>(generateSessionId());
+  const sessionStartedAtRef = useRef<string>(new Date().toISOString());
+  const sessionStartTimeMsRef = useRef<number>(Date.now());
+  const sessionChildIdRef = useRef<string | null>(childId || null);
+  const isCompletedRef = useRef<boolean>(false);
+  const guestSheetsSentRef = useRef<boolean>(false);
+
+  // Accurate running counts in refs to avoid React closure lag
+  const totalQuestionsRef = useRef<number>(0);
+  const totalCorrectRef = useRef<number>(0);
+  const perfectBlocksCountRef = useRef<number>(0);
+
+  // Latest mutable ref to state for flushing on unmount / navigation
+  const latestRef = useRef({
     gameMode,
-    totalQuestions: state.totalQuestions,
-    totalCorrect: state.totalCorrect,
-    sent: false
+    childId: sessionChildIdRef.current,
+    sessionId: sessionIdRef.current,
+    totalQuestions: 0,
+    totalCorrect: 0,
+    perfectBlocksCount: 0,
   });
 
   useEffect(() => {
-    latestStatsRef.current = {
+    totalQuestionsRef.current = state.totalQuestions;
+    totalCorrectRef.current = state.totalCorrect;
+    perfectBlocksCountRef.current = state.perfectBlocksCount;
+
+    latestRef.current = {
       gameMode,
+      childId: sessionChildIdRef.current,
+      sessionId: sessionIdRef.current,
       totalQuestions: state.totalQuestions,
       totalCorrect: state.totalCorrect,
-      sent: false
+      perfectBlocksCount: state.perfectBlocksCount,
     };
-  }, [gameMode, state.totalQuestions, state.totalCorrect]);
+  }, [gameMode, state.totalQuestions, state.totalCorrect, state.perfectBlocksCount]);
 
-  const flushStats = useCallback(() => {
-    const { gameMode: mode, totalQuestions, totalCorrect, sent } = latestStatsRef.current;
-    if (mode && totalQuestions > 0 && !sent) {
-      latestStatsRef.current.sent = true;
-      sendGameStats(mode, totalQuestions, totalCorrect);
+  // Synchronous or asynchronous flush of the current session on completion
+  const flushCompletedSession = useCallback(() => {
+    const { gameMode: mode, childId: currentChildId, sessionId, totalQuestions, totalCorrect, perfectBlocksCount } = latestRef.current;
+    
+    if (!mode || totalQuestions <= 0 || isCompletedRef.current) {
+      return;
+    }
+
+    isCompletedRef.current = true;
+    const durationSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTimeMsRef.current) / 1000));
+
+    if (currentChildId) {
+      // Authenticated child -> Supabase sync
+      syncGameSessionToSupabase({
+        id: sessionId,
+        childId: currentChildId,
+        gameMode: mode,
+        totalQuestions,
+        totalCorrect,
+        perfectBlocksCount,
+        durationSeconds,
+        status: 'completed',
+        startedAt: sessionStartedAtRef.current,
+        endedAt: new Date().toISOString(),
+      }).catch(err => {
+        console.warn('Failed to sync completed game session to Supabase:', err);
+      });
+    } else {
+      // Guest mode -> Google Sheets sync
+      if (!guestSheetsSentRef.current) {
+        guestSheetsSentRef.current = true;
+        sendGameStats(mode, totalQuestions, totalCorrect);
+      }
     }
   }, []);
+
+  // Handle childId switching according to rules (c) and (d)
+  const prevIncomingChildIdRef = useRef<string | null | undefined>(childId);
+  useEffect(() => {
+    const prevChildId = prevIncomingChildIdRef.current || null;
+    const nextChildId = childId || null;
+    prevIncomingChildIdRef.current = childId;
+
+    // If incoming childId hasn't changed, do nothing
+    if (prevChildId === nextChildId) {
+      return;
+    }
+
+    // Case 1: Switching from one authenticated child to another, or from auth to guest
+    if (prevChildId !== null) {
+      // Flush active session with old child and old sessionId
+      flushCompletedSession();
+
+      // Start new session
+      sessionIdRef.current = generateSessionId();
+      sessionStartedAtRef.current = new Date().toISOString();
+      sessionStartTimeMsRef.current = Date.now();
+      sessionChildIdRef.current = nextChildId;
+      totalQuestionsRef.current = 0;
+      totalCorrectRef.current = 0;
+      perfectBlocksCountRef.current = 0;
+      isCompletedRef.current = false;
+      guestSheetsSentRef.current = false;
+      dispatch({ type: 'RESET_SESSION' });
+      return;
+    }
+
+    // Case 2: Guest -> Authenticated transition during session (Rule d)
+    if (prevChildId === null && nextChildId !== null) {
+      // If game has not started yet (0 questions answered), adopt the new childId immediately
+      if (totalQuestionsRef.current === 0) {
+        sessionChildIdRef.current = nextChildId;
+      }
+      // If game is in progress (totalQuestions > 0), keep sessionChildIdRef as null (Guest)
+      // so ongoing guest session completes via Google Sheets. Next session will use nextChildId.
+    }
+  }, [childId, flushCompletedSession]);
 
   // Sync game stats on unmount or mode switch
   useEffect(() => {
     return () => {
-      flushStats();
+      flushCompletedSession();
     };
-  }, [gameMode, flushStats]);
+  }, [gameMode, flushCompletedSession]);
 
   // Sync game stats when user closes tab/window
   useEffect(() => {
     const handleBeforeUnload = () => {
-      flushStats();
+      flushCompletedSession();
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [flushStats]);
+  }, [flushCompletedSession]);
 
   const recordAnswer = useCallback((isCorrect: boolean): { isBlock40Completed: boolean } => {
     const currentRecent = state.recentAnswers || [];
     const updatedRecent = [...currentRecent, isCorrect].slice(-40);
     const isWishQualified = updatedRecent.length === 40 && updatedRecent.filter(Boolean).length >= 39;
 
+    totalQuestionsRef.current += 1;
+    if (isCorrect) {
+      totalCorrectRef.current += 1;
+    }
+    if (isWishQualified && updatedRecent.filter(Boolean).length === 40) {
+      perfectBlocksCountRef.current += 1;
+    }
+
+    const currentTotalQuestions = totalQuestionsRef.current;
+    const currentTotalCorrect = totalCorrectRef.current;
+    const currentPerfectBlocksCount = perfectBlocksCountRef.current;
+
+    // Update latestRef synchronously so any immediately following flush has exact numbers
+    latestRef.current = {
+      gameMode,
+      childId: sessionChildIdRef.current,
+      sessionId: sessionIdRef.current,
+      totalQuestions: currentTotalQuestions,
+      totalCorrect: currentTotalCorrect,
+      perfectBlocksCount: currentPerfectBlocksCount,
+    };
+
     dispatch({ type: 'RECORD_ANSWER', isCorrect });
+
+    // Auto-save every 10 questions for authenticated sessions (status: 'active')
+    if (sessionChildIdRef.current && gameMode && currentTotalQuestions > 0 && currentTotalQuestions % 10 === 0) {
+      const durationSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTimeMsRef.current) / 1000));
+      syncGameSessionToSupabase({
+        id: sessionIdRef.current,
+        childId: sessionChildIdRef.current,
+        gameMode,
+        totalQuestions: currentTotalQuestions,
+        totalCorrect: currentTotalCorrect,
+        perfectBlocksCount: currentPerfectBlocksCount,
+        durationSeconds,
+        status: 'active',
+        startedAt: sessionStartedAtRef.current,
+      }).catch(err => {
+        console.warn('Failed to auto-save game session to Supabase:', err);
+      });
+    }
 
     // Show wish modal ONLY if 39 or 40 questions were correct in the completed 40-question rolling window
     if (isWishQualified) {
@@ -180,19 +320,43 @@ export const useGameSession = (gameMode: GameMode | null) => {
     }
 
     return { isBlock40Completed: isWishQualified };
-  }, [state.recentAnswers]);
+  }, [state.recentAnswers, gameMode]);
 
   const handleWishSubmit = useCallback(async (): Promise<boolean> => {
-    if (!state.wishText.trim()) return false;
+    const trimmedWish = state.wishText.trim();
+    if (!trimmedWish) return false;
 
     dispatch({ type: 'SUBMIT_WISH_START' });
-    const success = await sendWish(state.wishText, state.lastCompletedBlockCorrectCount);
 
-    if (success) {
-      dispatch({ type: 'SUBMIT_WISH_SUCCESS' });
-      return true;
-    } else {
-      dispatch({ type: 'SUBMIT_WISH_ERROR', error: 'სურვილის გაგზავნა ვერ მოხერხდა' });
+    try {
+      if (sessionChildIdRef.current) {
+        // Authenticated child -> Supabase wish sync
+        const result = await syncWishToSupabase({
+          childId: sessionChildIdRef.current,
+          wishText: trimmedWish,
+          correctCount: state.lastCompletedBlockCorrectCount,
+        });
+
+        if (result.success) {
+          dispatch({ type: 'SUBMIT_WISH_SUCCESS' });
+          return true;
+        } else {
+          dispatch({ type: 'SUBMIT_WISH_ERROR', error: result.error || 'სურვილის გაგზავნა ვერ მოხერხდა' });
+          return false;
+        }
+      } else {
+        // Guest mode -> Google Sheets wish sync
+        const success = await sendWish(trimmedWish, state.lastCompletedBlockCorrectCount);
+        if (success) {
+          dispatch({ type: 'SUBMIT_WISH_SUCCESS' });
+          return true;
+        } else {
+          dispatch({ type: 'SUBMIT_WISH_ERROR', error: 'სურვილის გაგზავნა ვერ მოხერხდა' });
+          return false;
+        }
+      }
+    } catch (err: any) {
+      dispatch({ type: 'SUBMIT_WISH_ERROR', error: err?.message || 'სურვილის გაგზავნა ვერ მოხერხდა' });
       return false;
     }
   }, [state.wishText, state.lastCompletedBlockCorrectCount]);
@@ -210,12 +374,27 @@ export const useGameSession = (gameMode: GameMode | null) => {
   }, []);
 
   const resetSession = useCallback(() => {
-    flushStats();
+    // 1. Flush previous session
+    flushCompletedSession();
+
+    // 2. Generate a new session ID and reset session start time
+    sessionIdRef.current = generateSessionId();
+    sessionStartedAtRef.current = new Date().toISOString();
+    sessionStartTimeMsRef.current = Date.now();
+    sessionChildIdRef.current = childId || null;
+    totalQuestionsRef.current = 0;
+    totalCorrectRef.current = 0;
+    perfectBlocksCountRef.current = 0;
+    isCompletedRef.current = false;
+    guestSheetsSentRef.current = false;
+
+    // 3. Reset state
     dispatch({ type: 'RESET_SESSION' });
-  }, [flushStats]);
+  }, [flushCompletedSession, childId]);
 
   return {
     ...state,
+    sessionId: sessionIdRef.current,
     recordAnswer,
     handleWishSubmit,
     closeWishModal,
@@ -224,3 +403,4 @@ export const useGameSession = (gameMode: GameMode | null) => {
     resetSession,
   };
 };
+

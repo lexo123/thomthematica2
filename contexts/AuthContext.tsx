@@ -142,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: new Error('Supabase არ არის კონფიგურირებული') };
     }
     try {
+      // Use full URL without query/hash so subpath deployments (e.g. GitHub Pages /thomthematica2/) work correctly
       const redirectUrl = window.location.origin + window.location.pathname;
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectUrl,

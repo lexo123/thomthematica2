@@ -32,7 +32,7 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
   const [showChildSelector, setShowChildSelector] = useState<boolean>(false);
 
-  // When user logs out, clear active child state and storage
+  // When user logs out, clear active child
   useEffect(() => {
     if (!user) {
       setActiveChildIdState(null);
