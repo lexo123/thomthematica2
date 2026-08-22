@@ -143,7 +143,7 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     expect(syncGameSessionSpy).not.toHaveBeenCalled();
   });
 
-  it('Authenticated mode (childId !== null): syncs to Supabase and NOT to Google Sheets', () => {
+  it('Authenticated mode (childId !== null): syncs to Supabase and NOT to Google Sheets', async () => {
     const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
     const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
 
@@ -160,6 +160,9 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     expect(currentSessionId).toBeTruthy();
 
     unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     expect(syncGameSessionSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -174,7 +177,7 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     expect(sendGameStatsSpy).not.toHaveBeenCalled();
   });
 
-  it('Auto-save triggers every 10 questions with status: active and identical sessionId', () => {
+  it('Auto-save triggers every 10 questions with status: active and identical sessionId', async () => {
     const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
 
     const { result, unmount } = renderHook(
@@ -185,10 +188,11 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     const initialSessionId = result.current.sessionId;
 
     // Answer 10 questions
-    act(() => {
+    await act(async () => {
       for (let i = 0; i < 10; i++) {
         result.current.recordAnswer(true);
       }
+      await Promise.resolve();
     });
 
     expect(result.current.totalQuestions).toBe(10);
@@ -211,6 +215,9 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
 
     // Unmount -> status: completed with SAME sessionId
     unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     expect(syncGameSessionSpy).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -223,7 +230,7 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     );
   });
 
-  it('resetSession() flushes previous session and generates a new distinct sessionId', () => {
+  it('resetSession() flushes previous session and generates a new distinct sessionId', async () => {
     const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
 
     const { result } = renderHook(
@@ -238,8 +245,9 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
       result.current.recordAnswer(false);
     });
 
-    act(() => {
+    await act(async () => {
       result.current.resetSession();
+      await Promise.resolve();
     });
 
     expect(syncGameSessionSpy).toHaveBeenCalledWith(
@@ -258,7 +266,7 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     expect(result.current.totalQuestions).toBe(0);
   });
 
-  it('Child switch (childId change) flushes old child session as completed and starts new session for new child', () => {
+  it('Child switch (childId change) flushes old child session as completed and starts new session for new child', async () => {
     const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
 
     const { result, rerender, unmount } = renderHook(
@@ -274,7 +282,10 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     });
 
     // Switch to child-2
-    rerender({ mode: GameMode.Thomthematica, childId: 'child-2' });
+    await act(async () => {
+      rerender({ mode: GameMode.Thomthematica, childId: 'child-2' });
+      await Promise.resolve();
+    });
 
     expect(syncGameSessionSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -295,6 +306,9 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     });
 
     unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     expect(syncGameSessionSpy).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -395,6 +409,111 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     });
 
     expect(sendWishSpy).toHaveBeenCalledWith('Robot Toy', 0);
+  });
+
+  it('handles mid-session logout (childId: "child-abc" -> null): flushes old session as completed and starts new Guest session', async () => {
+    const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
+
+    const { result, rerender, unmount } = renderHook(
+      ({ mode, childId }: { mode: GameMode; childId: string | null }) => useGameSession(mode, childId),
+      { initialProps: { mode: GameMode.Thomthematica, childId: 'child-abc' } }
+    );
+
+    const oldAuthSessionId = result.current.sessionId;
+
+    act(() => {
+      result.current.recordAnswer(true);
+      result.current.recordAnswer(true);
+    });
+
+    // Parent logs out mid-session -> childId becomes null
+    await act(async () => {
+      rerender({ mode: GameMode.Thomthematica, childId: null });
+      await Promise.resolve();
+    });
+
+    // Old authenticated session was flushed to Supabase with status: 'completed'
+    expect(syncGameSessionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: oldAuthSessionId,
+        childId: 'child-abc',
+        totalQuestions: 2,
+        totalCorrect: 2,
+        status: 'completed',
+      })
+    );
+
+    // New session started with new sessionId and 0 questions
+    const newGuestSessionId = result.current.sessionId;
+    expect(newGuestSessionId).not.toBe(oldAuthSessionId);
+    expect(result.current.totalQuestions).toBe(0);
+
+    // Guest answers 1 question and unmounts
+    act(() => {
+      result.current.recordAnswer(true);
+    });
+
+    unmount();
+
+    // Guest session was flushed to Google Sheets
+    expect(sendGameStatsSpy).toHaveBeenCalledWith(GameMode.Thomthematica, 1, 1);
+  });
+
+  it('guarantees sequential FIFO execution of Supabase session syncs even if auto-save is delayed', async () => {
+    const callOrder: string[] = [];
+    let resolveAutoSavePromise: () => void = () => {};
+
+    const delayedAutoSavePromise = new Promise<{ success: boolean }>((resolve) => {
+      resolveAutoSavePromise = () => {
+        callOrder.push('auto-save-resolved');
+        resolve({ success: true });
+      };
+    });
+
+    vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockImplementation((session) => {
+      if (session.status === 'active') {
+        callOrder.push('auto-save-called');
+        return delayedAutoSavePromise;
+      }
+      if (session.status === 'completed') {
+        callOrder.push('completed-called');
+        return Promise.resolve({ success: true } as any);
+      }
+      return Promise.resolve({ success: true } as any);
+    });
+
+    const { result, unmount } = renderHook(
+      ({ mode, childId }) => useGameSession(mode, childId),
+      { initialProps: { mode: GameMode.Thomthematica, childId: 'child-abc' } }
+    );
+
+    // 1. Trigger auto-save at 10 questions
+    await act(async () => {
+      for (let i = 0; i < 10; i++) {
+        result.current.recordAnswer(true);
+      }
+      await Promise.resolve();
+    });
+
+    expect(callOrder).toEqual(['auto-save-called']);
+
+    // 2. Trigger completed sync immediately (e.g. unmount) before auto-save resolves
+    unmount();
+
+    // Because of FIFO queue, 'completed-called' is chained and waits for auto-save to resolve
+    expect(callOrder).toEqual(['auto-save-called']);
+
+    // 3. Resolve the auto-save promise
+    await act(async () => {
+      resolveAutoSavePromise();
+      // Allow promise microtasks to flush
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The final order is strictly auto-save-called -> auto-save-resolved -> completed-called
+    expect(callOrder).toEqual(['auto-save-called', 'auto-save-resolved', 'completed-called']);
   });
 });
 

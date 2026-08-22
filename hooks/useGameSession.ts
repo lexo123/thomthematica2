@@ -139,6 +139,18 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
   const isCompletedRef = useRef<boolean>(false);
   const guestSheetsSentRef = useRef<boolean>(false);
 
+  // Sequential Sync Queue to guarantee FIFO execution of Supabase session updates
+  const syncQueueRef = useRef<Promise<any>>(Promise.resolve());
+
+  const enqueueSync = useCallback((syncFn: () => Promise<any>) => {
+    syncQueueRef.current = syncQueueRef.current
+      .then(() => syncFn())
+      .catch(err => {
+        console.warn('Sync failed in sequential queue:', err);
+      });
+    return syncQueueRef.current;
+  }, []);
+
   // Accurate running counts in refs to avoid React closure lag
   const totalQuestionsRef = useRef<number>(0);
   const totalCorrectRef = useRef<number>(0);
@@ -181,21 +193,21 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     const durationSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTimeMsRef.current) / 1000));
 
     if (currentChildId) {
-      // Authenticated child -> Supabase sync
-      syncGameSessionToSupabase({
-        id: sessionId,
-        childId: currentChildId,
-        gameMode: mode,
-        totalQuestions,
-        totalCorrect,
-        perfectBlocksCount,
-        durationSeconds,
-        status: 'completed',
-        startedAt: sessionStartedAtRef.current,
-        endedAt: new Date().toISOString(),
-      }).catch(err => {
-        console.warn('Failed to sync completed game session to Supabase:', err);
-      });
+      // Authenticated child -> Supabase sync via sequential queue
+      enqueueSync(() =>
+        syncGameSessionToSupabase({
+          id: sessionId,
+          childId: currentChildId,
+          gameMode: mode,
+          totalQuestions,
+          totalCorrect,
+          perfectBlocksCount,
+          durationSeconds,
+          status: 'completed',
+          startedAt: sessionStartedAtRef.current,
+          endedAt: new Date().toISOString(),
+        })
+      );
     } else {
       // Guest mode -> Google Sheets sync
       if (!guestSheetsSentRef.current) {
@@ -297,19 +309,19 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     // Auto-save every 10 questions for authenticated sessions (status: 'active')
     if (sessionChildIdRef.current && gameMode && currentTotalQuestions > 0 && currentTotalQuestions % 10 === 0) {
       const durationSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTimeMsRef.current) / 1000));
-      syncGameSessionToSupabase({
-        id: sessionIdRef.current,
-        childId: sessionChildIdRef.current,
-        gameMode,
-        totalQuestions: currentTotalQuestions,
-        totalCorrect: currentTotalCorrect,
-        perfectBlocksCount: currentPerfectBlocksCount,
-        durationSeconds,
-        status: 'active',
-        startedAt: sessionStartedAtRef.current,
-      }).catch(err => {
-        console.warn('Failed to auto-save game session to Supabase:', err);
-      });
+      enqueueSync(() =>
+        syncGameSessionToSupabase({
+          id: sessionIdRef.current,
+          childId: sessionChildIdRef.current!,
+          gameMode,
+          totalQuestions: currentTotalQuestions,
+          totalCorrect: currentTotalCorrect,
+          perfectBlocksCount: currentPerfectBlocksCount,
+          durationSeconds,
+          status: 'active',
+          startedAt: sessionStartedAtRef.current,
+        })
+      );
     }
 
     // Show wish modal ONLY if 39 or 40 questions were correct in the completed 40-question rolling window
