@@ -642,6 +642,7 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
         status: 'completed',
       })
     );
+    expect(sendGameStatsSpy).not.toHaveBeenCalled(); // მხოლოდ Supabase-ს უნდა ჰქონდეს ჩანაწერი ამ ეტაპისთვის (Google Sheets არ უნდა გამოიძახოს)
 
     // 4. In new Kveshmicera session, counters should be reset to 0
     expect(result.current.totalQuestions).toBe(0);

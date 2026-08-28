@@ -247,43 +247,62 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     }
   }, [enqueueSync, getActiveDurationSeconds]);
 
-  // Handle childId switching according to rules (c) and (d)
-  const prevIncomingChildIdRef = useRef<string | null | undefined>(childId);
+  // Atomic combined transition effect for gameMode and childId
+  const prevGameModeRef = useRef<GameMode | null>(gameMode);
+  const prevChildIdRef = useRef<string | null | undefined>(childId);
+
   useEffect(() => {
-    const prevChildId = prevIncomingChildIdRef.current || null;
-    const nextChildId = childId || null;
-    prevIncomingChildIdRef.current = childId;
+    const prevMode = prevGameModeRef.current;
+    const nextMode = gameMode;
+    prevGameModeRef.current = nextMode;
 
-    // If incoming childId hasn't changed, do nothing
-    if (prevChildId === nextChildId) {
-      return;
-    }
+    const prevChild = prevChildIdRef.current || null;
+    const nextChild = childId || null;
+    prevChildIdRef.current = childId;
 
-    // Case 1: Switching from one authenticated child to another, or from auth to guest
-    if (prevChildId !== null) {
-      // Flush active session with previous mode and childId override to prevent stale latestRef pollution
-      flushCompletedSession({ mode: prevGameModeRef.current, childId: prevChildId });
+    const modeChanged = prevMode !== nextMode;
+    const childChanged = prevChild !== nextChild;
 
-      // Start new session
+    if (modeChanged) {
+      // 1. Mode changed (with or without childId change)
+      // Flush previous mode session with its original mode and childId
+      flushCompletedSession({ mode: prevMode, childId: prevChild });
+
+      // Reset everything for the new game mode & child
       sessionIdRef.current = generateSessionId();
-      sessionChildIdRef.current = nextChildId;
+      sessionChildIdRef.current = nextChild;
       isCompletedRef.current = false;
       resetActiveTimer();
       guestSheetsSentRef.current = false;
       dispatch({ type: 'RESET_SESSION' });
-      return;
+    } else if (childChanged) {
+      // 2. Mode stayed the same, but childId changed
+      if (prevChild !== null) {
+        // Case 1: Switching from one authenticated child to another, or from auth to guest
+        flushCompletedSession({ mode: prevMode, childId: prevChild });
+
+        // Start new session for the new child
+        sessionIdRef.current = generateSessionId();
+        sessionChildIdRef.current = nextChild;
+        isCompletedRef.current = false;
+        resetActiveTimer();
+        guestSheetsSentRef.current = false;
+        dispatch({ type: 'RESET_SESSION' });
+      } else if (nextChild !== null) {
+        // Case 2: Guest -> Authenticated transition during session (Rule d)
+        // If game has not started yet (0 questions answered), adopt the new childId immediately
+        if (totalQuestionsRef.current === 0) {
+          sessionChildIdRef.current = nextChild;
+        }
+        // If game is in progress (totalQuestions > 0), keep sessionChildIdRef as null (Guest)
+        // so ongoing guest session completes via Google Sheets. Next session will use nextChild.
+      }
     }
 
-    // Case 2: Guest -> Authenticated transition during session (Rule d)
-    if (prevChildId === null && nextChildId !== null) {
-      // If game has not started yet (0 questions answered), adopt the new childId immediately
-      if (totalQuestionsRef.current === 0) {
-        sessionChildIdRef.current = nextChildId;
-      }
-      // If game is in progress (totalQuestions > 0), keep sessionChildIdRef as null (Guest)
-      // so ongoing guest session completes via Google Sheets. Next session will use nextChildId.
-    }
-  }, [childId, flushCompletedSession, resetActiveTimer]);
+    return () => {
+      flushCompletedSession();
+    };
+  }, [gameMode, childId, flushCompletedSession, resetActiveTimer]);
 
   // Page Visibility API event listener to accurately pause/resume active play timer
   useEffect(() => {
@@ -305,30 +324,6 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     document.addEventListener('addEventListener' in document ? 'visibilitychange' : 'visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
-
-  // Sync game stats on unmount or mode switch with full reset logic
-  const prevGameModeRef = useRef<GameMode | null>(gameMode);
-  useEffect(() => {
-    const prevMode = prevGameModeRef.current;
-    prevGameModeRef.current = gameMode;
-
-    if (prevMode !== gameMode) {
-      // Flush previous mode session with explicit mode and childId overrides
-      flushCompletedSession({ mode: prevMode, childId: prevIncomingChildIdRef.current || null });
-
-      // Full reset for the new game mode
-      sessionIdRef.current = generateSessionId();
-      sessionChildIdRef.current = childId || null;
-      isCompletedRef.current = false;
-      resetActiveTimer();
-      guestSheetsSentRef.current = false;
-      dispatch({ type: 'RESET_SESSION' });
-    }
-
-    return () => {
-      flushCompletedSession();
-    };
-  }, [gameMode, childId, flushCompletedSession, resetActiveTimer]);
 
   // Sync game stats when user closes tab/window
   useEffect(() => {
