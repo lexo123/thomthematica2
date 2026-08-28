@@ -594,4 +594,74 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
       })
     );
   });
+
+  it('mode switch Thomthematica -> Kveshmicera flushes old session with Thomthematica gameMode, not kveshmicera', async () => {
+    const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
+
+    const { result, rerender } = renderHook(
+      ({ mode, childId }: { mode: GameMode | null; childId: string | null }) =>
+        useGameSession(mode, childId),
+      {
+        initialProps: {
+          mode: GameMode.Thomthematica,
+          childId: 'child-thom-1',
+        },
+      }
+    );
+
+    // 1. Play 1 answer in Thomthematica as authenticated child
+    act(() => {
+      result.current.recordAnswer(true);
+    });
+
+    expect(result.current.totalQuestions).toBe(1);
+    expect(result.current.totalCorrect).toBe(1);
+
+    // 2. Switch mode to Kveshmicera where childId is null (Phase 2.4a proof-of-concept formula)
+    act(() => {
+      rerender({
+        mode: GameMode.Kveshmicera,
+        childId: null,
+      });
+    });
+
+    // 3. Verify flush was called with Thomthematica and child-thom-1 (NOT kveshmicera)
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(syncGameSessionSpy).toHaveBeenCalledTimes(1);
+    expect(syncGameSessionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        childId: 'child-thom-1',
+        gameMode: GameMode.Thomthematica, // MUST be Thomthematica
+        totalQuestions: 1,
+        totalCorrect: 1,
+        status: 'completed',
+      })
+    );
+
+    // 4. In new Kveshmicera session, counters should be reset to 0
+    expect(result.current.totalQuestions).toBe(0);
+    expect(result.current.totalCorrect).toBe(0);
+
+    // 5. Answer 1 question in Kveshmicera (guest / childId null)
+    act(() => {
+      result.current.recordAnswer(true);
+    });
+    expect(result.current.totalQuestions).toBe(1);
+
+    // 6. Switching back to null/home flushes guest session to Google Sheets for Kveshmicera
+    act(() => {
+      rerender({
+        mode: null,
+        childId: null,
+      });
+    });
+
+    expect(sendGameStatsSpy).toHaveBeenCalledWith(GameMode.Kveshmicera, 1, 1);
+  });
 });
+

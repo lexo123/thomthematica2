@@ -9,6 +9,9 @@ import { GeometryQuiz } from './components/GeometryQuiz';
 import { MathQuiz } from './components/MathQuiz';
 import { WishModal } from './components/WishModal';
 import { UpdatePasswordModal } from './components/UpdatePasswordModal';
+import { ChildSelector } from './components/ChildSelector';
+import { useAuth } from './contexts/AuthContext';
+import { useChild } from './contexts/ChildContext';
 import {
   generateProblem,
   CORRECT_PHRASES,
@@ -24,6 +27,16 @@ import { useGameSession } from './hooks/useGameSession';
 const KVESH_FIRST_CELL_FOCUS_DELAY_MS = 120;
 
 const App: React.FC = () => {
+  const { user } = useAuth();
+  const {
+    childrenList,
+    activeChild,
+    activeChildId,
+    loading: childrenLoading,
+    setActiveChild,
+    addChild,
+  } = useChild();
+
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
   const [problem, setProblem] = useState<MathProblem | null>(null);
   const [userAnswer, setUserAnswer] = useState<string>('');
@@ -36,7 +49,13 @@ const App: React.FC = () => {
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [showRewardImage, setShowRewardImage] = useState<boolean>(false);
 
+  // Child selection modal state during active game mode blocker
+  const [showChildGateSelector, setShowChildGateSelector] = useState<boolean>(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Phase 2.4a Proof of Concept: only Thomthematica connects activeChildId
+  const sessionChildId = (gameMode === GameMode.Thomthematica && user) ? activeChildId : null;
 
   const {
     totalQuestions,
@@ -50,7 +69,11 @@ const App: React.FC = () => {
     closeWishModal,
     setWishText,
     resetSession,
-  } = useGameSession(gameMode);
+  } = useGameSession(gameMode, sessionChildId);
+
+  // Authenticated Child Gate: if logged in but activeChildId is null, block game screens
+  const isChildSelectionRequired = Boolean(user && !activeChildId);
+  const isGameScreenBlocked = Boolean(gameMode !== null && isChildSelectionRequired);
 
   const getRandomPhrase = useCallback((phrases: string[]) => {
     return phrases[Math.floor(Math.random() * phrases.length)];
@@ -86,16 +109,16 @@ const App: React.FC = () => {
   } = useColumnMultiplication(problem);
 
   useEffect(() => {
-    if (gameMode) {
+    if (gameMode && !isGameScreenBlocked) {
       setProblem(generateProblem(gameMode, questionsInBlock));
       if (gameMode === GameMode.ThomravlebisTabula) {
         startTimer();
       }
     }
-  }, [gameMode]);
+  }, [gameMode, isGameScreenBlocked]);
 
   useEffect(() => {
-    if (gameState === GameState.Playing) {
+    if (gameState === GameState.Playing && !isGameScreenBlocked) {
       if (gameMode === GameMode.Kveshmicera) {
         setTimeout(() => {
           if (problem) {
@@ -106,7 +129,7 @@ const App: React.FC = () => {
         inputRef.current?.focus();
       }
     }
-  }, [gameState, gameMode, problem, focusFirstCell]);
+  }, [gameState, gameMode, problem, focusFirstCell, isGameScreenBlocked]);
 
   const processAnswerResult = (isCorrect: boolean, actualUserAnswer: string) => {
     const shouldRecord = gameMode !== GameMode.Kveshmicera || !hasKveshFailedThisQuestion;
@@ -240,6 +263,51 @@ const App: React.FC = () => {
     return <MainMenu onSelectMode={(mode) => setGameMode(mode)} />;
   }
 
+  // If authenticated and no child is selected -> Block game screens with child selection gate
+  if (isGameScreenBlocked) {
+    return (
+      <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center justify-center p-4">
+        <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 text-center space-y-6 border-b-8 border-indigo-200">
+          <div className="text-5xl">👶</div>
+          <h2 className="text-2xl font-black text-indigo-950">
+            {childrenList.length === 0 ? 'დაამატეთ ბავშვის პროფილი' : 'აირჩიეთ ბავშვის პროფილი'}
+          </h2>
+          <p className="text-indigo-700 text-sm">
+            თამაშის დასაწყებად აუცილებელია ბავშვის პროფილის არჩევა.
+          </p>
+          <div className="space-y-3">
+            <Button
+              onClick={() => setShowChildGateSelector(true)}
+              className="w-full py-4 text-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg"
+            >
+              {childrenList.length === 0 ? '➕ პროფილის დამატება' : '🔄 პროფილის არჩევა'}
+            </Button>
+            <button
+              onClick={handleHomeClick}
+              className="w-full py-3 text-sm text-slate-500 hover:text-slate-700 font-semibold"
+            >
+              ← მთავარ მენიუში დაბრუნება
+            </button>
+          </div>
+        </div>
+
+        {showChildGateSelector && (
+          <ChildSelector
+            childrenList={childrenList}
+            activeChildId={activeChildId}
+            loading={childrenLoading}
+            onSelectChild={(child) => {
+              setActiveChild(child);
+              setShowChildGateSelector(false);
+            }}
+            onAddChild={addChild}
+            onClose={() => setShowChildGateSelector(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
   if (!problem) return <div className="min-h-screen flex items-center justify-center">იტვირთება...</div>;
 
   return (
@@ -284,6 +352,7 @@ const App: React.FC = () => {
                   ref={inputRef}
                   type="number"
                   inputMode="numeric"
+                  data-testid="quiz-answer-input"
                   value={userAnswer}
                   onChange={(e) => setUserAnswer(e.target.value)}
                   onFocus={(e) => e.target.select()}

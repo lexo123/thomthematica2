@@ -210,8 +210,10 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
   }, [gameMode, state.totalQuestions, state.totalCorrect, state.perfectBlocksCount]);
 
   // Synchronous or asynchronous flush of the current session on completion
-  const flushCompletedSession = useCallback(() => {
-    const { gameMode: mode, childId: currentChildId, sessionId, totalQuestions, totalCorrect, perfectBlocksCount } = latestRef.current;
+  const flushCompletedSession = useCallback((override?: { mode?: GameMode | null; childId?: string | null }) => {
+    const mode = override?.mode !== undefined ? override.mode : latestRef.current.gameMode;
+    const currentChildId = override?.childId !== undefined ? override.childId : latestRef.current.childId;
+    const { sessionId, totalQuestions, totalCorrect, perfectBlocksCount } = latestRef.current;
     
     if (!mode || totalQuestions <= 0 || isCompletedRef.current) {
       return;
@@ -259,8 +261,8 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
 
     // Case 1: Switching from one authenticated child to another, or from auth to guest
     if (prevChildId !== null) {
-      // Flush active session with old child and old sessionId
-      flushCompletedSession();
+      // Flush active session with previous mode and childId override to prevent stale latestRef pollution
+      flushCompletedSession({ mode: prevGameModeRef.current, childId: prevChildId });
 
       // Start new session
       sessionIdRef.current = generateSessionId();
@@ -300,16 +302,33 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('addEventListener' in document ? 'visibilitychange' : 'visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // Sync game stats on unmount or mode switch
+  // Sync game stats on unmount or mode switch with full reset logic
+  const prevGameModeRef = useRef<GameMode | null>(gameMode);
   useEffect(() => {
+    const prevMode = prevGameModeRef.current;
+    prevGameModeRef.current = gameMode;
+
+    if (prevMode !== gameMode) {
+      // Flush previous mode session with explicit mode and childId overrides
+      flushCompletedSession({ mode: prevMode, childId: prevIncomingChildIdRef.current || null });
+
+      // Full reset for the new game mode
+      sessionIdRef.current = generateSessionId();
+      sessionChildIdRef.current = childId || null;
+      isCompletedRef.current = false;
+      resetActiveTimer();
+      guestSheetsSentRef.current = false;
+      dispatch({ type: 'RESET_SESSION' });
+    }
+
     return () => {
       flushCompletedSession();
     };
-  }, [gameMode, flushCompletedSession]);
+  }, [gameMode, childId, flushCompletedSession, resetActiveTimer]);
 
   // Sync game stats when user closes tab/window
   useEffect(() => {
