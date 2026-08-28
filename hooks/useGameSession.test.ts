@@ -515,5 +515,83 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     // The final order is strictly auto-save-called -> auto-save-resolved -> completed-called
     expect(callOrder).toEqual(['auto-save-called', 'auto-save-resolved', 'completed-called']);
   });
-});
 
+  it('accurately calculates active play duration using Page Visibility API (excluding background/hidden time)', async () => {
+    const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+
+    // Mock Date.now to control time progression
+    let currentTime = 1000000;
+    vi.spyOn(Date, 'now').mockImplementation(() => currentTime);
+
+    // Mock document.visibilityState
+    let mockVisibilityState: DocumentVisibilityState = 'visible';
+    Object.defineProperty(document, 'visibilityState', {
+      get: () => mockVisibilityState,
+      configurable: true,
+    });
+
+    const { result, unmount } = renderHook(
+      ({ mode, childId }) => useGameSession(mode, childId),
+      { initialProps: { mode: GameMode.Thomthematica, childId: 'child-abc' } }
+    );
+
+    // 1. Play active for 5 seconds (5000ms)
+    act(() => {
+      result.current.recordAnswer(true);
+    });
+    currentTime += 5000; // 5s active
+
+    // 2. Child switches tab / background -> hidden for 20 minutes (1200000ms)
+    act(() => {
+      mockVisibilityState = 'hidden';
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    currentTime += 1200000; // 20 mins hidden in background
+
+    // 3. Child returns to tab -> visible
+    act(() => {
+      mockVisibilityState = 'visible';
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    // 4. Play active for 9 more questions over 7 seconds (7000ms) -> triggers auto-save at 10 total
+    currentTime += 7000; // 7s active
+
+    await act(async () => {
+      for (let i = 0; i < 9; i++) {
+        result.current.recordAnswer(true);
+      }
+      await Promise.resolve();
+    });
+
+    // Total active play time so far = 5s + 7s = 12s (background 1200s is completely excluded)
+    expect(result.current.totalQuestions).toBe(10);
+    expect(syncGameSessionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        childId: 'child-abc',
+        totalQuestions: 10,
+        durationSeconds: 12,
+        status: 'active',
+      })
+    );
+
+    // 5. Play 3 more seconds active (3000ms) and finish session (unmount)
+    currentTime += 3000; // 3s active
+
+    unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Total final active duration = 12s + 3s = 15s (Wall-clock was 1215s!)
+    expect(syncGameSessionSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        childId: 'child-abc',
+        totalQuestions: 10,
+        durationSeconds: 15,
+        status: 'completed',
+      })
+    );
+  });
+});

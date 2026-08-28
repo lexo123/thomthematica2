@@ -137,6 +137,34 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
   const sessionStartTimeMsRef = useRef<number>(Date.now());
   const sessionChildIdRef = useRef<string | null>(childId || null);
   const isCompletedRef = useRef<boolean>(false);
+
+  // Active play duration tracking (accumulated active ms + last resume timestamp)
+  const accumulatedActiveMsRef = useRef<number>(0);
+  const lastActiveResumeMsRef = useRef<number>(Date.now());
+  const isTabVisibleRef = useRef<boolean>(
+    typeof document !== 'undefined' ? document.visibilityState !== 'hidden' : true
+  );
+
+  const getActiveDurationSeconds = useCallback((): number => {
+    let totalActiveMs = accumulatedActiveMsRef.current;
+    if (isTabVisibleRef.current) {
+      totalActiveMs += Date.now() - lastActiveResumeMsRef.current;
+    }
+    return Math.max(0, Math.floor(totalActiveMs / 1000));
+  }, []);
+
+  const resetActiveTimer = useCallback(() => {
+    accumulatedActiveMsRef.current = 0;
+    lastActiveResumeMsRef.current = Date.now();
+    isTabVisibleRef.current =
+      typeof document !== 'undefined' ? document.visibilityState !== 'hidden' : true;
+    sessionStartedAtRef.current = new Date().toISOString();
+    sessionStartTimeMsRef.current = Date.now();
+    totalQuestionsRef.current = 0;
+    totalCorrectRef.current = 0;
+    perfectBlocksCountRef.current = 0;
+  }, []);
+
   const guestSheetsSentRef = useRef<boolean>(false);
 
   // Sequential Sync Queue to guarantee FIFO execution of Supabase session updates
@@ -190,7 +218,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     }
 
     isCompletedRef.current = true;
-    const durationSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTimeMsRef.current) / 1000));
+    const durationSeconds = getActiveDurationSeconds();
 
     if (currentChildId) {
       // Authenticated child -> Supabase sync via sequential queue
@@ -215,7 +243,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
         sendGameStats(mode, totalQuestions, totalCorrect);
       }
     }
-  }, []);
+  }, [enqueueSync, getActiveDurationSeconds]);
 
   // Handle childId switching according to rules (c) and (d)
   const prevIncomingChildIdRef = useRef<string | null | undefined>(childId);
@@ -236,13 +264,9 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
 
       // Start new session
       sessionIdRef.current = generateSessionId();
-      sessionStartedAtRef.current = new Date().toISOString();
-      sessionStartTimeMsRef.current = Date.now();
       sessionChildIdRef.current = nextChildId;
-      totalQuestionsRef.current = 0;
-      totalCorrectRef.current = 0;
-      perfectBlocksCountRef.current = 0;
       isCompletedRef.current = false;
+      resetActiveTimer();
       guestSheetsSentRef.current = false;
       dispatch({ type: 'RESET_SESSION' });
       return;
@@ -257,7 +281,28 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
       // If game is in progress (totalQuestions > 0), keep sessionChildIdRef as null (Guest)
       // so ongoing guest session completes via Google Sheets. Next session will use nextChildId.
     }
-  }, [childId, flushCompletedSession]);
+  }, [childId, flushCompletedSession, resetActiveTimer]);
+
+  // Page Visibility API event listener to accurately pause/resume active play timer
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState === 'hidden') {
+        if (isTabVisibleRef.current) {
+          accumulatedActiveMsRef.current += Date.now() - lastActiveResumeMsRef.current;
+          isTabVisibleRef.current = false;
+        }
+      } else {
+        if (!isTabVisibleRef.current) {
+          lastActiveResumeMsRef.current = Date.now();
+          isTabVisibleRef.current = true;
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Sync game stats on unmount or mode switch
   useEffect(() => {
@@ -308,7 +353,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
 
     // Auto-save every 10 questions for authenticated sessions (status: 'active')
     if (sessionChildIdRef.current && gameMode && currentTotalQuestions > 0 && currentTotalQuestions % 10 === 0) {
-      const durationSeconds = Math.max(0, Math.floor((Date.now() - sessionStartTimeMsRef.current) / 1000));
+      const durationSeconds = getActiveDurationSeconds();
       enqueueSync(() =>
         syncGameSessionToSupabase({
           id: sessionIdRef.current,
@@ -332,7 +377,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     }
 
     return { isBlock40Completed: isWishQualified };
-  }, [state.recentAnswers, gameMode]);
+  }, [state.recentAnswers, gameMode, enqueueSync, getActiveDurationSeconds]);
 
   const handleWishSubmit = useCallback(async (): Promise<boolean> => {
     const trimmedWish = state.wishText.trim();
@@ -391,18 +436,14 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
 
     // 2. Generate a new session ID and reset session start time
     sessionIdRef.current = generateSessionId();
-    sessionStartedAtRef.current = new Date().toISOString();
-    sessionStartTimeMsRef.current = Date.now();
     sessionChildIdRef.current = childId || null;
-    totalQuestionsRef.current = 0;
-    totalCorrectRef.current = 0;
-    perfectBlocksCountRef.current = 0;
     isCompletedRef.current = false;
+    resetActiveTimer();
     guestSheetsSentRef.current = false;
 
     // 3. Reset state
     dispatch({ type: 'RESET_SESSION' });
-  }, [flushCompletedSession, childId]);
+  }, [flushCompletedSession, childId, resetActiveTimer]);
 
   return {
     ...state,
@@ -415,4 +456,3 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     resetSession,
   };
 };
-
