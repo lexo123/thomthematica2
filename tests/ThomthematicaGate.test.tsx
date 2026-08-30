@@ -70,7 +70,7 @@ describe('Phase 2.4a App.tsx Authenticated Child Gate & Mode Wiring', () => {
 
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
       childrenList: [
-        { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', age: 7, avatar_url: null, created_at: '' },
+        { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', avatar_id: 'avatar_1', created_at: '2026-01-01T00:00:00Z' },
       ],
       activeChild: null,
       activeChildId: null,
@@ -88,10 +88,50 @@ describe('Phase 2.4a App.tsx Authenticated Child Gate & Mode Wiring', () => {
     const thomModeBtn = screen.getByText('თომთემატიკა');
     fireEvent.click(thomModeBtn);
 
-    // Should show the Child Selection Gate
+    // Should show the Child Selection Gate (with existing child)
     expect(screen.getByText('აირჩიეთ ბავშვის პროფილი')).toBeDefined();
     expect(screen.getByText('თამაშის დასაწყებად აუცილებელია ბავშვის პროფილის არჩევა.')).toBeDefined();
     expect(screen.getByText('🔄 პროფილის არჩევა')).toBeDefined();
+
+    // Game input must NOT be mounted
+    expect(screen.queryByTestId('quiz-answer-input')).toBeNull();
+  });
+
+  it('shows add child prompt when authenticated user has empty childrenList', async () => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
+      user: { id: 'parent-123', email: 'parent@example.com' } as any,
+      session: {} as any,
+      loading: false,
+      loginWithOtp: vi.fn(),
+      verifyOtp: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    vi.spyOn(ChildContext, 'useChild').mockReturnValue({
+      childrenList: [],
+      activeChild: null,
+      activeChildId: null,
+      loading: false,
+      setActiveChild: vi.fn(),
+      addChild: vi.fn(),
+      updateChild: vi.fn(),
+      deleteChild: vi.fn(),
+      refreshChildren: vi.fn(),
+    });
+
+    render(<App />);
+
+    // Click Thomthematica game mode
+    const thomModeBtn = screen.getByText('თომთემატიკა');
+    fireEvent.click(thomModeBtn);
+
+    // Should show "დაამატეთ ბავშვის პროფილი" and "➕ პროფილის დამატება"
+    expect(screen.getByText('დაამატეთ ბავშვის პროფილი')).toBeDefined();
+    expect(screen.getByText('➕ პროფილის დამატება')).toBeDefined();
+
+    // Should NOT show "აირჩიეთ..." or "🔄 პროფილის არჩევა"
+    expect(screen.queryByText('აირჩიეთ ბავშვის პროფილი')).toBeNull();
+    expect(screen.queryByText('🔄 პროფილის არჩევა')).toBeNull();
 
     // Game input must NOT be mounted
     expect(screen.queryByTestId('quiz-answer-input')).toBeNull();
@@ -111,9 +151,9 @@ describe('Phase 2.4a App.tsx Authenticated Child Gate & Mode Wiring', () => {
 
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
       childrenList: [
-        { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', age: 7, avatar_url: null, created_at: '' },
+        { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', avatar_id: 'avatar_1', created_at: '2026-01-01T00:00:00Z' },
       ],
-      activeChild: { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', age: 7, avatar_url: null, created_at: '' },
+      activeChild: { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', avatar_id: 'avatar_1', created_at: '2026-01-01T00:00:00Z' },
       activeChildId: 'child-1',
       loading: false,
       setActiveChild: vi.fn(),
