@@ -300,7 +300,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     }
 
     return () => {
-      flushCompletedSession();
+      flushCompletedSession({ mode: nextMode, childId: nextChild });
     };
   }, [gameMode, childId, flushCompletedSession, resetActiveTimer]);
 
