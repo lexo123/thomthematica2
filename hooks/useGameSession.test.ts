@@ -664,5 +664,152 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
 
     expect(sendGameStatsSpy).toHaveBeenCalledWith(GameMode.Kveshmicera, 1, 1);
   });
+
+  it('authenticated user + unchanged childId (modeChanged === true, childChanged === false): flushes old mode session and starts new mode session under same childId without double flush', async () => {
+    const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
+
+    const { result, rerender } = renderHook(
+      ({ mode, childId }: { mode: GameMode | null; childId: string | null }) =>
+        useGameSession(mode, childId),
+      {
+        initialProps: {
+          mode: GameMode.Thomthematica,
+          childId: 'child-persistent-1',
+        },
+      }
+    );
+
+    const initialSessionId = result.current.sessionId;
+
+    // 1. Play 2 questions in Thomthematica as child-persistent-1
+    act(() => {
+      result.current.recordAnswer(true);
+      result.current.recordAnswer(false);
+    });
+
+    expect(result.current.totalQuestions).toBe(2);
+    expect(result.current.totalCorrect).toBe(1);
+
+    // 2. Mode switch to Kveshmicera with SAME childId ('child-persistent-1')
+    act(() => {
+      rerender({
+        mode: GameMode.Kveshmicera,
+        childId: 'child-persistent-1',
+      });
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // 3. Verify old session (Thomthematica) was flushed exactly once to Supabase
+    expect(syncGameSessionSpy).toHaveBeenCalledTimes(1);
+    expect(syncGameSessionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: initialSessionId,
+        childId: 'child-persistent-1',
+        gameMode: GameMode.Thomthematica,
+        totalQuestions: 2,
+        totalCorrect: 1,
+        status: 'completed',
+      })
+    );
+    // MUST NOT call Google Sheets
+    expect(sendGameStatsSpy).not.toHaveBeenCalled();
+
+    // 4. In new Kveshmicera session, a new distinct sessionId is created and state is reset
+    const newSessionId = result.current.sessionId;
+    expect(newSessionId).not.toBe(initialSessionId);
+    expect(result.current.totalQuestions).toBe(0);
+    expect(result.current.totalCorrect).toBe(0);
+
+    // 5. Play 1 question in new Kveshmicera session
+    act(() => {
+      result.current.recordAnswer(true);
+    });
+    expect(result.current.totalQuestions).toBe(1);
+    expect(result.current.totalCorrect).toBe(1);
+
+    // 6. Mode switch to Gethometria with same childId
+    act(() => {
+      rerender({
+        mode: GameMode.Gethometria,
+        childId: 'child-persistent-1',
+      });
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // 7. Verify Kveshmicera session was flushed as completed
+    expect(syncGameSessionSpy).toHaveBeenCalledTimes(2);
+    expect(syncGameSessionSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: newSessionId,
+        childId: 'child-persistent-1',
+        gameMode: GameMode.Kveshmicera,
+        totalQuestions: 1,
+        totalCorrect: 1,
+        status: 'completed',
+      })
+    );
+    expect(sendGameStatsSpy).not.toHaveBeenCalled();
+  });
+
+  it('mode switch pair ThomravlebisTabula <-> Gethometria preserves respective modes and childIds', async () => {
+    const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
+
+    const { result, rerender } = renderHook(
+      ({ mode, childId }: { mode: GameMode | null; childId: string | null }) =>
+        useGameSession(mode, childId),
+      {
+        initialProps: {
+          mode: GameMode.ThomravlebisTabula,
+          childId: 'child-table-1',
+        },
+      }
+    );
+
+    const tableSessionId = result.current.sessionId;
+
+    act(() => {
+      result.current.recordAnswer(true);
+    });
+
+    // Switch to Gethometria
+    act(() => {
+      rerender({
+        mode: GameMode.Gethometria,
+        childId: 'child-table-1',
+      });
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(syncGameSessionSpy).toHaveBeenCalledTimes(1);
+    expect(syncGameSessionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: tableSessionId,
+        childId: 'child-table-1',
+        gameMode: GameMode.ThomravlebisTabula,
+        totalQuestions: 1,
+        totalCorrect: 1,
+        status: 'completed',
+      })
+    );
+    expect(sendGameStatsSpy).not.toHaveBeenCalled();
+
+    // Reset verified on Gethometria
+    expect(result.current.totalQuestions).toBe(0);
+    expect(result.current.sessionId).not.toBe(tableSessionId);
+  });
 });
 

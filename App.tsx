@@ -54,8 +54,8 @@ const App: React.FC = () => {
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Phase 2.4a Proof of Concept: only Thomthematica connects activeChildId
-  const sessionChildId = (gameMode === GameMode.Thomthematica && user) ? activeChildId : null;
+  // Phase 2.4b: activeChildId connected across all game modes for authenticated users
+  const sessionChildId = user ? activeChildId : null;
 
   const {
     totalQuestions,
