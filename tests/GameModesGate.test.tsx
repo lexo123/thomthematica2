@@ -6,14 +6,8 @@ import App from '../App';
 import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
 import * as supabaseSyncService from '../services/supabaseSyncService';
-import * as statsService from '../services/statsService';
 
-vi.mock('../services/statsService', () => ({
-  sendGameStats: vi.fn().mockResolvedValue(true),
-  sendWish: vi.fn().mockResolvedValue(true),
-}));
-
-describe('Phase 2.4b Game Modes Gate & activeChildId Propagation', () => {
+describe('Phase 2.5 Game Modes Gate & activeChildId Propagation', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -28,6 +22,38 @@ describe('Phase 2.4b Game Modes Gate & activeChildId Propagation', () => {
     { name: 'გეთომეტრია 📐', expectedMode: 'gethometria' },
     { name: 'ქვეშმიწერით გამრავლება ✍️', expectedMode: 'kveshmicera' },
   ];
+
+  it.each(gameModesList)('blocks $name when unauthenticated user tries to enter', async ({ name }) => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
+      user: null,
+      session: null,
+      loading: false,
+      loginWithOtp: vi.fn(),
+      verifyOtp: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    vi.spyOn(ChildContext, 'useChild').mockReturnValue({
+      childrenList: [],
+      activeChild: null,
+      activeChildId: null,
+      loading: false,
+      setActiveChild: vi.fn(),
+      addChild: vi.fn(),
+      updateChild: vi.fn(),
+      deleteChild: vi.fn(),
+      refreshChildren: vi.fn(),
+    });
+
+    render(<App />);
+
+    const modeBtn = screen.getByText(name);
+    fireEvent.click(modeBtn);
+
+    // Auth gate should block
+    expect(screen.getByText('ავტორიზაცია აუცილებელია')).toBeDefined();
+    expect(screen.getByText('🔑 შესვლა / რეგისტრაცია')).toBeDefined();
+  });
 
   it.each(gameModesList)('blocks $name when authenticated user has no active child selected', async ({ name }) => {
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
@@ -58,46 +84,13 @@ describe('Phase 2.4b Game Modes Gate & activeChildId Propagation', () => {
     const modeBtn = screen.getByText(name);
     fireEvent.click(modeBtn);
 
-    // Gate should block
+    // Child gate should block
     expect(screen.getByText('აირჩიეთ ბავშვის პროფილი')).toBeDefined();
     expect(screen.getByText('🔄 პროფილის არჩევა')).toBeDefined();
   });
 
-  it.each(gameModesList)('allows Guest user to access $name without Gate blocker', async ({ name }) => {
-    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
-      user: null,
-      session: null,
-      loading: false,
-      loginWithOtp: vi.fn(),
-      verifyOtp: vi.fn(),
-      signOut: vi.fn(),
-    });
-
-    vi.spyOn(ChildContext, 'useChild').mockReturnValue({
-      childrenList: [],
-      activeChild: null,
-      activeChildId: null,
-      loading: false,
-      setActiveChild: vi.fn(),
-      addChild: vi.fn(),
-      updateChild: vi.fn(),
-      deleteChild: vi.fn(),
-      refreshChildren: vi.fn(),
-    });
-
-    render(<App />);
-
-    const modeBtn = screen.getByText(name);
-    fireEvent.click(modeBtn);
-
-    // Gate should NOT appear
-    expect(screen.queryByText('აირჩიეთ ბავშვის პროფილი')).toBeNull();
-    expect(screen.queryByText('დაამატეთ ბავშვის პროფილი')).toBeNull();
-  });
-
   it('End-to-End DOM test on Kveshmicera with authenticated active child (Click -> Answer -> Home -> Supabase flush)', async () => {
     const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
-    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
 
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: { id: 'parent-123', email: 'parent@example.com' } as any,
@@ -164,60 +157,5 @@ describe('Phase 2.4b Game Modes Gate & activeChildId Propagation', () => {
         status: 'completed',
       })
     );
-
-    // Verify Google Sheets was NOT called
-    expect(sendGameStatsSpy).not.toHaveBeenCalled();
-  });
-
-  it('Guest regression test: Kveshmicera syncs to Google Sheets when played by guest', async () => {
-    const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
-    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
-
-    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
-      user: null,
-      session: null,
-      loading: false,
-      loginWithOtp: vi.fn(),
-      verifyOtp: vi.fn(),
-      signOut: vi.fn(),
-    });
-
-    vi.spyOn(ChildContext, 'useChild').mockReturnValue({
-      childrenList: [],
-      activeChild: null,
-      activeChildId: null,
-      loading: false,
-      setActiveChild: vi.fn(),
-      addChild: vi.fn(),
-      updateChild: vi.fn(),
-      deleteChild: vi.fn(),
-      refreshChildren: vi.fn(),
-    });
-
-    render(<App />);
-
-    // 1. Open Gethometria as Guest
-    const gethoModeBtn = screen.getByText('გეთომეტრია 📐');
-    fireEvent.click(gethoModeBtn);
-
-    // 2. Answer question
-    const input = screen.getByTestId('quiz-answer-input') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: '12' } });
-    fireEvent.click(screen.getByText('შემოწმება'));
-
-    const nextBtn = screen.getByRole('button', { name: /შემდეგი|თავიდან სცადე/ });
-    fireEvent.click(nextBtn);
-
-    // 3. Return home
-    const homeBtn = screen.getByTitle('მთავარი მენიუ');
-    fireEvent.click(homeBtn);
-
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 50));
-    });
-
-    // 4. Verify Google Sheets sync called, Supabase NOT called
-    expect(sendGameStatsSpy).toHaveBeenCalledWith('gethometria', 1, expect.any(Number));
-    expect(syncGameSessionSpy).not.toHaveBeenCalled();
   });
 });

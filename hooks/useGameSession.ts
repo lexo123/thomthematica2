@@ -1,6 +1,5 @@
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { GameMode } from '../types';
-import { sendGameStats, sendWish } from '../services/statsService';
 import { syncGameSessionToSupabase, syncWishToSupabase } from '../services/supabaseSyncService';
 
 /**
@@ -165,8 +164,6 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     perfectBlocksCountRef.current = 0;
   }, []);
 
-  const guestSheetsSentRef = useRef<boolean>(false);
-
   // Sequential Sync Queue to guarantee FIFO execution of Supabase session updates
   const syncQueueRef = useRef<Promise<any>>(Promise.resolve());
 
@@ -238,12 +235,6 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
           endedAt: new Date().toISOString(),
         })
       );
-    } else {
-      // Guest mode -> Google Sheets sync
-      if (!guestSheetsSentRef.current) {
-        guestSheetsSentRef.current = true;
-        sendGameStats(mode, totalQuestions, totalCorrect);
-      }
     }
   }, [enqueueSync, getActiveDurationSeconds]);
 
@@ -273,12 +264,11 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
       sessionChildIdRef.current = nextChild;
       isCompletedRef.current = false;
       resetActiveTimer();
-      guestSheetsSentRef.current = false;
       dispatch({ type: 'RESET_SESSION' });
     } else if (childChanged) {
       // 2. Mode stayed the same, but childId changed
       if (prevChild !== null) {
-        // Case 1: Switching from one authenticated child to another, or from auth to guest
+        // Switching from one child to another (or logout)
         flushCompletedSession({ mode: prevMode, childId: prevChild });
 
         // Start new session for the new child
@@ -286,16 +276,18 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
         sessionChildIdRef.current = nextChild;
         isCompletedRef.current = false;
         resetActiveTimer();
-        guestSheetsSentRef.current = false;
         dispatch({ type: 'RESET_SESSION' });
       } else if (nextChild !== null) {
-        // Case 2: Guest -> Authenticated transition during session (Rule d)
-        // If game has not started yet (0 questions answered), adopt the new childId immediately
+        // Previous was null, new child adopted
         if (totalQuestionsRef.current === 0) {
           sessionChildIdRef.current = nextChild;
+        } else {
+          sessionIdRef.current = generateSessionId();
+          sessionChildIdRef.current = nextChild;
+          isCompletedRef.current = false;
+          resetActiveTimer();
+          dispatch({ type: 'RESET_SESSION' });
         }
-        // If game is in progress (totalQuestions > 0), keep sessionChildIdRef as null (Guest)
-        // so ongoing guest session completes via Google Sheets. Next session will use nextChild.
       }
     }
 
@@ -416,15 +408,8 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
           return false;
         }
       } else {
-        // Guest mode -> Google Sheets wish sync
-        const success = await sendWish(trimmedWish, state.lastCompletedBlockCorrectCount);
-        if (success) {
-          dispatch({ type: 'SUBMIT_WISH_SUCCESS' });
-          return true;
-        } else {
-          dispatch({ type: 'SUBMIT_WISH_ERROR', error: 'სურვილის გაგზავნა ვერ მოხერხდა' });
-          return false;
-        }
+        dispatch({ type: 'SUBMIT_WISH_ERROR', error: 'სურვილის გასაგზავნად აირჩიეთ ბავშვის პროფილი' });
+        return false;
       }
     } catch (err: any) {
       dispatch({ type: 'SUBMIT_WISH_ERROR', error: err?.message || 'სურვილის გაგზავნა ვერ მოხერხდა' });
@@ -453,7 +438,6 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     sessionChildIdRef.current = childId || null;
     isCompletedRef.current = false;
     resetActiveTimer();
-    guestSheetsSentRef.current = false;
 
     // 3. Reset state
     dispatch({ type: 'RESET_SESSION' });

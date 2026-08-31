@@ -19,7 +19,7 @@
 
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS
 - **Testing:** Vitest
-- **Backend / Storage Integration:** Google Apps Script & Google Sheets API
+- **Backend / Storage Integration:** Supabase (PostgreSQL, Auth, RLS)
 - **Deployment:** GitHub Pages / GitHub Actions
 
 ---
@@ -28,9 +28,10 @@
 
 ```
 ├── components/          # UI კომპონენტები (Header, MainMenu, MathQuiz, GeometryQuiz, ColumnMultiplication, etc.)
+├── contexts/            # React Contexts (AuthContext, ChildContext)
 ├── hooks/               # Custom React Hooks (useTimer, useColumnMultiplication, useGameSession)
 ├── data/                # სტატიკური მონაცემები (rewards)
-├── services/            # გარე სერვისები (problemGenerator, statsService)
+├── services/            # სერვისები (problemGenerator, supabaseSyncService)
 ├── utils/               # მათემატიკური გამოთვლები და დამხმარე ფუნქციები (mathUtils, columnMultiplication)
 ├── types.ts             # TypeScript ტიპები და ინტერფეისები
 ├── App.tsx              # აპლიკაციის ძირითადი ორკესტრაცია

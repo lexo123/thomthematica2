@@ -7,12 +7,7 @@ import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
 import * as supabaseSyncService from '../services/supabaseSyncService';
 
-vi.mock('../services/statsService', () => ({
-  sendGameStats: vi.fn().mockResolvedValue(true),
-  sendWish: vi.fn().mockResolvedValue(true),
-}));
-
-describe('Phase 2.4a App.tsx Authenticated Child Gate & Mode Wiring', () => {
+describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -21,8 +16,7 @@ describe('Phase 2.4a App.tsx Authenticated Child Gate & Mode Wiring', () => {
     cleanup();
   });
 
-
-  it('allows guest user to open game modes without child gate blocker', async () => {
+  it('blocks unauthenticated user from opening game modes with Auth Gate blocker', async () => {
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: null,
       session: null,
@@ -50,12 +44,12 @@ describe('Phase 2.4a App.tsx Authenticated Child Gate & Mode Wiring', () => {
     const thomModeBtn = screen.getByText('თომთემატიკა');
     fireEvent.click(thomModeBtn);
 
-    // Should NOT show child gate blocker
-    expect(screen.queryByText('აირჩიეთ ბავშვის პროფილი')).toBeNull();
-    expect(screen.queryByText('დაამატეთ ბავშვის პროფილი')).toBeNull();
+    // Should show Auth Gate blocker
+    expect(screen.getByText('ავტორიზაცია აუცილებელია')).toBeDefined();
+    expect(screen.getByText('🔑 შესვლა / რეგისტრაცია')).toBeDefined();
 
-    // Should show game problem UI
-    expect(screen.getByTestId('quiz-answer-input')).toBeDefined();
+    // Should NOT show game problem UI
+    expect(screen.queryByTestId('quiz-answer-input')).toBeNull();
   });
 
   it('blocks game screens for authenticated user without active child selected', async () => {

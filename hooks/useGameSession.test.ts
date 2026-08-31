@@ -9,7 +9,6 @@ import {
   generateSessionId,
 } from './useGameSession';
 import { GameMode } from '../types';
-import * as statsService from '../services/statsService';
 import * as supabaseSyncService from '../services/supabaseSyncService';
 
 describe('gameSessionReducer (40-question rolling window)', () => {
@@ -120,31 +119,7 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     expect(id1).not.toBe(id2);
   });
 
-  it('Guest mode (childId === null): syncs to Google Sheets and NOT to Supabase on session end', () => {
-    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
-    const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
-
-    const { result, unmount } = renderHook(
-      ({ mode, childId }) => useGameSession(mode, childId),
-      { initialProps: { mode: GameMode.Thomthematica, childId: null } }
-    );
-
-    act(() => {
-      result.current.recordAnswer(true);
-      result.current.recordAnswer(true);
-    });
-
-    expect(result.current.totalQuestions).toBe(2);
-    expect(result.current.totalCorrect).toBe(2);
-
-    unmount();
-
-    expect(sendGameStatsSpy).toHaveBeenCalledWith(GameMode.Thomthematica, 2, 2);
-    expect(syncGameSessionSpy).not.toHaveBeenCalled();
-  });
-
-  it('Authenticated mode (childId !== null): syncs to Supabase and NOT to Google Sheets', async () => {
-    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
+  it('Authenticated mode (childId !== null): syncs to Supabase on session unmount', async () => {
     const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
 
     const { result, unmount } = renderHook(
@@ -174,7 +149,6 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
         status: 'completed',
       })
     );
-    expect(sendGameStatsSpy).not.toHaveBeenCalled();
   });
 
   it('Auto-save triggers every 10 questions with status: active and identical sessionId', async () => {
@@ -321,33 +295,6 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     );
   });
 
-  it('Guest -> Authenticated mid-session transition (Rule d): keeps ongoing session in Guest mode', () => {
-    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
-    const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
-
-    const { result, rerender, unmount } = renderHook(
-      ({ mode, childId }: { mode: GameMode; childId: string | null }) => useGameSession(mode, childId),
-      { initialProps: { mode: GameMode.Thomthematica, childId: null } }
-    );
-
-    // Guest plays 3 questions
-    act(() => {
-      result.current.recordAnswer(true);
-      result.current.recordAnswer(true);
-      result.current.recordAnswer(false);
-    });
-
-    // Parent logs in mid-game (childId becomes 'child-new')
-    rerender({ mode: GameMode.Thomthematica, childId: 'child-new' });
-
-    // Session completes
-    unmount();
-
-    // Ongoing guest session completed via Google Sheets, NOT Supabase
-    expect(sendGameStatsSpy).toHaveBeenCalledWith(GameMode.Thomthematica, 3, 2);
-    expect(syncGameSessionSpy).not.toHaveBeenCalled();
-  });
-
   it('Supabase sync network errors are caught gracefully and do not crash the game', async () => {
     vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockRejectedValue(new Error('Network offline'));
 
@@ -368,11 +315,9 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     expect(result.current.totalQuestions).toBe(10);
   });
 
-  it('Wish submit delegates to syncWishToSupabase for authenticated child and sendWish for Guest', async () => {
+  it('Wish submit delegates to syncWishToSupabase for authenticated child', async () => {
     const syncWishSpy = vi.spyOn(supabaseSyncService, 'syncWishToSupabase').mockResolvedValue({ success: true } as any);
-    const sendWishSpy = vi.spyOn(statsService, 'sendWish').mockResolvedValue(true);
 
-    // 1. Authenticated
     const { result: authHook } = renderHook(
       ({ mode, childId }) => useGameSession(mode, childId),
       { initialProps: { mode: GameMode.Thomthematica, childId: 'child-abc' } }
@@ -392,28 +337,10 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
         wishText: 'LEGO Set',
       })
     );
-    expect(sendWishSpy).not.toHaveBeenCalled();
-
-    // 2. Guest
-    const { result: guestHook } = renderHook(
-      ({ mode, childId }) => useGameSession(mode, childId),
-      { initialProps: { mode: GameMode.Thomthematica, childId: null } }
-    );
-
-    act(() => {
-      guestHook.current.setWishText('Robot Toy');
-    });
-
-    await act(async () => {
-      await guestHook.current.handleWishSubmit();
-    });
-
-    expect(sendWishSpy).toHaveBeenCalledWith('Robot Toy', 0);
   });
 
-  it('handles mid-session logout (childId: "child-abc" -> null): flushes old session as completed and starts new Guest session', async () => {
+  it('handles child profile change (childId: "child-abc" -> "child-def"): flushes old session as completed and starts new session', async () => {
     const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
-    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
 
     const { result, rerender, unmount } = renderHook(
       ({ mode, childId }: { mode: GameMode; childId: string | null }) => useGameSession(mode, childId),
@@ -427,9 +354,9 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
       result.current.recordAnswer(true);
     });
 
-    // Parent logs out mid-session -> childId becomes null
+    // Child profile changed mid-session
     await act(async () => {
-      rerender({ mode: GameMode.Thomthematica, childId: null });
+      rerender({ mode: GameMode.Thomthematica, childId: 'child-def' });
       await Promise.resolve();
     });
 
@@ -445,19 +372,30 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     );
 
     // New session started with new sessionId and 0 questions
-    const newGuestSessionId = result.current.sessionId;
-    expect(newGuestSessionId).not.toBe(oldAuthSessionId);
+    const newSessionId = result.current.sessionId;
+    expect(newSessionId).not.toBe(oldAuthSessionId);
     expect(result.current.totalQuestions).toBe(0);
 
-    // Guest answers 1 question and unmounts
+    // New child answers 1 question and unmounts
     act(() => {
       result.current.recordAnswer(true);
     });
 
     unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
 
-    // Guest session was flushed to Google Sheets
-    expect(sendGameStatsSpy).toHaveBeenCalledWith(GameMode.Thomthematica, 1, 1);
+    expect(syncGameSessionSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: newSessionId,
+        childId: 'child-def',
+        gameMode: GameMode.Thomthematica,
+        totalQuestions: 1,
+        totalCorrect: 1,
+        status: 'completed',
+      })
+    );
   });
 
   it('guarantees sequential FIFO execution of Supabase session syncs even if auto-save is delayed', async () => {
@@ -595,79 +533,8 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
     );
   });
 
-  it('mode switch Thomthematica -> Kveshmicera flushes old session with Thomthematica gameMode, not kveshmicera', async () => {
-    const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
-    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
-
-    const { result, rerender } = renderHook(
-      ({ mode, childId }: { mode: GameMode | null; childId: string | null }) =>
-        useGameSession(mode, childId),
-      {
-        initialProps: {
-          mode: GameMode.Thomthematica,
-          childId: 'child-thom-1',
-        },
-      }
-    );
-
-    // 1. Play 1 answer in Thomthematica as authenticated child
-    act(() => {
-      result.current.recordAnswer(true);
-    });
-
-    expect(result.current.totalQuestions).toBe(1);
-    expect(result.current.totalCorrect).toBe(1);
-
-    // 2. Switch mode to Kveshmicera where childId is null (Phase 2.4a proof-of-concept formula)
-    act(() => {
-      rerender({
-        mode: GameMode.Kveshmicera,
-        childId: null,
-      });
-    });
-
-    // 3. Verify flush was called with Thomthematica and child-thom-1 (NOT kveshmicera)
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(syncGameSessionSpy).toHaveBeenCalledTimes(1);
-    expect(syncGameSessionSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        childId: 'child-thom-1',
-        gameMode: GameMode.Thomthematica, // MUST be Thomthematica
-        totalQuestions: 1,
-        totalCorrect: 1,
-        status: 'completed',
-      })
-    );
-    expect(sendGameStatsSpy).not.toHaveBeenCalled(); // მხოლოდ Supabase-ს უნდა ჰქონდეს ჩანაწერი ამ ეტაპისთვის (Google Sheets არ უნდა გამოიძახოს)
-
-    // 4. In new Kveshmicera session, counters should be reset to 0
-    expect(result.current.totalQuestions).toBe(0);
-    expect(result.current.totalCorrect).toBe(0);
-
-    // 5. Answer 1 question in Kveshmicera (guest / childId null)
-    act(() => {
-      result.current.recordAnswer(true);
-    });
-    expect(result.current.totalQuestions).toBe(1);
-
-    // 6. Switching back to null/home flushes guest session to Google Sheets for Kveshmicera
-    act(() => {
-      rerender({
-        mode: null,
-        childId: null,
-      });
-    });
-
-    expect(sendGameStatsSpy).toHaveBeenCalledWith(GameMode.Kveshmicera, 1, 1);
-  });
-
   it('authenticated user + unchanged childId (modeChanged === true, childChanged === false): flushes old mode session and starts new mode session under same childId without double flush', async () => {
     const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
-    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
 
     const { result, rerender } = renderHook(
       ({ mode, childId }: { mode: GameMode | null; childId: string | null }) =>
@@ -716,8 +583,6 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
         status: 'completed',
       })
     );
-    // MUST NOT call Google Sheets
-    expect(sendGameStatsSpy).not.toHaveBeenCalled();
 
     // 4. In new Kveshmicera session, a new distinct sessionId is created and state is reset
     const newSessionId = result.current.sessionId;
@@ -757,12 +622,10 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
         status: 'completed',
       })
     );
-    expect(sendGameStatsSpy).not.toHaveBeenCalled();
   });
 
   it('mode switch pair ThomravlebisTabula <-> Gethometria preserves respective modes and childIds', async () => {
     const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
-    const sendGameStatsSpy = vi.spyOn(statsService, 'sendGameStats').mockResolvedValue(true as any);
 
     const { result, rerender } = renderHook(
       ({ mode, childId }: { mode: GameMode | null; childId: string | null }) =>
@@ -805,7 +668,6 @@ describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
         status: 'completed',
       })
     );
-    expect(sendGameStatsSpy).not.toHaveBeenCalled();
 
     // Reset verified on Gethometria
     expect(result.current.totalQuestions).toBe(0);

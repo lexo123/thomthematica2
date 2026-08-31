@@ -10,6 +10,7 @@ import { MathQuiz } from './components/MathQuiz';
 import { WishModal } from './components/WishModal';
 import { UpdatePasswordModal } from './components/UpdatePasswordModal';
 import { ChildSelector } from './components/ChildSelector';
+import { AuthModal } from './components/AuthModal';
 import { useAuth } from './contexts/AuthContext';
 import { useChild } from './contexts/ChildContext';
 import {
@@ -51,10 +52,11 @@ const App: React.FC = () => {
 
   // Child selection modal state during active game mode blocker
   const [showChildGateSelector, setShowChildGateSelector] = useState<boolean>(false);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Phase 2.4b: activeChildId connected across all game modes for authenticated users
+  // Phase 2.5: activeChildId connected across all game modes for authenticated users
   const sessionChildId = user ? activeChildId : null;
 
   const {
@@ -71,9 +73,10 @@ const App: React.FC = () => {
     resetSession,
   } = useGameSession(gameMode, sessionChildId);
 
-  // Authenticated Child Gate: if logged in but activeChildId is null, block game screens
+  // Phase 2.5 Gate: block game screens if not logged in OR if logged in without an active child profile
+  const isAuthRequired = !user;
   const isChildSelectionRequired = Boolean(user && !activeChildId);
-  const isGameScreenBlocked = Boolean(gameMode !== null && isChildSelectionRequired);
+  const isGameScreenBlocked = Boolean(gameMode !== null && (isAuthRequired || isChildSelectionRequired));
 
   const getRandomPhrase = useCallback((phrases: string[]) => {
     return phrases[Math.floor(Math.random() * phrases.length)];
@@ -263,8 +266,44 @@ const App: React.FC = () => {
     return <MainMenu onSelectMode={(mode) => setGameMode(mode)} />;
   }
 
-  // If authenticated and no child is selected -> Block game screens with child selection gate
+  // Block game screens if unauthenticated or no child selected
   if (isGameScreenBlocked) {
+    if (isAuthRequired) {
+      return (
+        <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 text-center space-y-6 border-b-8 border-indigo-200">
+            <div className="text-5xl">🔒</div>
+            <h2 className="text-2xl font-black text-indigo-950">
+              ავტორიზაცია აუცილებელია
+            </h2>
+            <p className="text-indigo-700 text-sm">
+              თამაშის დასაწყებად გაიარეთ ავტორიზაცია მშობლის ანგარიშით.
+            </p>
+            <div className="space-y-3">
+              <Button
+                onClick={() => setShowAuthModal(true)}
+                className="w-full py-4 text-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg"
+              >
+                🔑 შესვლა / რეგისტრაცია
+              </Button>
+              <button
+                onClick={handleHomeClick}
+                className="w-full py-3 text-sm text-slate-500 hover:text-slate-700 font-semibold"
+              >
+                ← მთავარ მენიუში დაბრუნება
+              </button>
+            </div>
+          </div>
+
+          <AuthModal
+            isOpen={showAuthModal}
+            onClose={() => setShowAuthModal(false)}
+          />
+        </div>
+      );
+    }
+
+    // Authenticated user without active child
     return (
       <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center justify-center p-4">
         <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 text-center space-y-6 border-b-8 border-indigo-200">

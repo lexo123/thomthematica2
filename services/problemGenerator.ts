@@ -18,8 +18,6 @@ export const INCORRECT_PHRASES = [
 
 export const TIME_LIMIT = 10;
 
-export const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbyh3gS70bV2SOdC-wNqUYtkhh4pw8wgeE3ywnJvbGZEuv83x-X9urjVX24O8l3MsZB62w/exec";
-
 export const IRREGULAR_QUADRILATERALS: ShapeVariant[] = [
   { points: "10,20 90,10 70,90 20,70", texts: [{x:"50", y:"10", anchor:"middle"}, {x:"90", y:"55"}, {x:"45", y:"95", anchor:"middle"}, {x:"5", y:"45", anchor:"end"}] },
   { points: "20,10 80,30 90,80 10,90", texts: [{x:"50", y:"15", anchor:"middle"}, {x:"95", y:"55"}, {x:"50", y:"95", anchor:"middle"}, {x:"5", y:"50", anchor:"end"}] },

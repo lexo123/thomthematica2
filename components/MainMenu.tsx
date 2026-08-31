@@ -38,7 +38,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
             {user ? (
               <span className="truncate">👤 {user.user_metadata?.full_name || user.email}</span>
             ) : (
-              <span>🎮 სტუმარი</span>
+              <span>🔒 ავტორიზაცია</span>
             )}
           </div>
 
