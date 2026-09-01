@@ -268,7 +268,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     } else if (childChanged) {
       // 2. Mode stayed the same, but childId changed
       if (prevChild !== null) {
-        // Switching from one child to another (or logout)
+        // Switching from one authenticated child to another (or logout)
         flushCompletedSession({ mode: prevMode, childId: prevChild });
 
         // Start new session for the new child
@@ -278,16 +278,8 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
         resetActiveTimer();
         dispatch({ type: 'RESET_SESSION' });
       } else if (nextChild !== null) {
-        // Previous was null, new child adopted
-        if (totalQuestionsRef.current === 0) {
-          sessionChildIdRef.current = nextChild;
-        } else {
-          sessionIdRef.current = generateSessionId();
-          sessionChildIdRef.current = nextChild;
-          isCompletedRef.current = false;
-          resetActiveTimer();
-          dispatch({ type: 'RESET_SESSION' });
-        }
+        // Adopt selected child
+        sessionChildIdRef.current = nextChild;
       }
     }
 
