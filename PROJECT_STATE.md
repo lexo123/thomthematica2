@@ -23,7 +23,7 @@ React/TypeScript საგანმანათლებლო მათემ�
 ### Phase 2.1: Child Profiles & Selector ✅
 - ChildContext.tsx — activeChildId-ის ერთადერთი წყარო, localStorage persistence
 - Self-healing validation — თუ activeChildId აღარ არსებობს childrenList-ში, სუფთავდება
-- ChildSelector.tsx — "ვინ თამაშობს?" UI
+- ChildSelector.tsx — "ვინ თამაშობს?" UI, Guest Mode-ისთვის არ ჩნდება
 
 ### Phase 2.2: Sync Service ✅
 - services/supabaseSyncService.ts — schema-ს ველების ზუსტი მთხვევა (game_mode, total_questions, total_correct, perfect_blocks_count, status, correct_count, fulfilled_at)
@@ -34,16 +34,21 @@ hooks/useGameSession.ts-ში:
 - sessionId lifecycle: იქმნება ერთხელ, თანმიმდევრულად გადაეცემა auto-save-სა და completion sync-ს
 - Sequential FIFO sync queue (enqueueSync) — race condition-ის გამორიცხვა
 - Page Visibility API-ზე დაფუძნებული active play duration (background დრო არ ითვლება)
+- Guest ↔ Authenticated გარდამავალი მდგომარეობების წესები (mid-session logout/login არ ურევს სესიებს)
 - ნაპოვნი და გასწორებული ბაგი: ცალკეული [gameMode] და [childId] ეფექტები აორმაგებდნენ flush-ს ერთდროული mode+child ცვლილებისას → გაერთიანდა ერთ ატომურ [gameMode, childId] ეფექტში, flushCompletedSession(override) პარამეტრით (არა latestRef-ზე დამოკიდებული)
 - Cleanup ფუნქციაც დეტერმინისტულია (nextMode/nextChild closure-ში დაკავებული, არა latestRef-ზე დამოკიდებული)
 
 ### Phase 2.4a: activeChildId → Thomthematica (POC) ✅
 - sessionChildId = (gameMode === Thomthematica && user) ? activeChildId : null
 - Child Selection Gate: isGameScreenBlocked = Boolean(gameMode !== null && user && !activeChildId)
+- ThomthematicaGate.test.tsx — 4 ტესტი (0 children / children but none selected / active child / guest)
 
 ### Phase 2.4b: activeChildId → ყველა Game Mode ✅
 - sessionChildId = user ? activeChildId : null (განზოგადებული, 1 ხაზი)
 - ოთხივე რეჟიმი (Thomthematica, ThomravlebisTabula, Gethometria, Kveshmicera) დაკავშირებულია
+- tests/GameModesGate.test.tsx — gate + guest-access ტესტები ოთხივე რეჟიმზე (it.each)
+- modeChanged: true, childChanged: false სცენარი (იგივე ბავშვი, mode switch) — ცალკე ტესტირებული
+- E2E DOM ტესტები Kveshmicera-სა და Gethometria-ზეც (არა მხოლოდ Thomthematica)
 - 63/63 ტესტი, 0 TypeScript შეცდომა, production build წარმატებული
 
 ### Phase 2.5: Migration Gate Closure — Guest Mode-ის სრული მოცილება (Variant A) ✅
