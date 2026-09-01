@@ -106,7 +106,7 @@ describe('gameSessionReducer (40-question rolling window)', () => {
   });
 });
 
-describe('useGameSession (Phase 2.3 Supabase & Guest Sync)', () => {
+describe('useGameSession (Supabase Sync)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
