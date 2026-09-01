@@ -1,6 +1,6 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: Phase 2.4b დასრულების შემდეგ_
+_ბოლო განახლება: Phase 2.5 დასრულების შემდეგ_
 
 ## Repo
 https://github.com/lexo123/thomthematica2
@@ -23,7 +23,7 @@ React/TypeScript საგანმანათლებლო მათემ�
 ### Phase 2.1: Child Profiles & Selector ✅
 - ChildContext.tsx — activeChildId-ის ერთადერთი წყარო, localStorage persistence
 - Self-healing validation — თუ activeChildId აღარ არსებობს childrenList-ში, სუფთავდება
-- ChildSelector.tsx — "ვინ თამაშობს?" UI, Guest Mode-ისთვის არ ჩნდება
+- ChildSelector.tsx — "ვინ თამაშობს?" UI
 
 ### Phase 2.2: Sync Service ✅
 - services/supabaseSyncService.ts — schema-ს ველების ზუსტი მთხვევა (game_mode, total_questions, total_correct, perfect_blocks_count, status, correct_count, fulfilled_at)
@@ -34,36 +34,40 @@ hooks/useGameSession.ts-ში:
 - sessionId lifecycle: იქმნება ერთხელ, თანმიმდევრულად გადაეცემა auto-save-სა და completion sync-ს
 - Sequential FIFO sync queue (enqueueSync) — race condition-ის გამორიცხვა
 - Page Visibility API-ზე დაფუძნებული active play duration (background დრო არ ითვლება)
-- Guest ↔ Authenticated გარდამავალი მდგომარეობების წესები (mid-session logout/login არ ურევს სესიებს)
 - ნაპოვნი და გასწორებული ბაგი: ცალკეული [gameMode] და [childId] ეფექტები აორმაგებდნენ flush-ს ერთდროული mode+child ცვლილებისას → გაერთიანდა ერთ ატომურ [gameMode, childId] ეფექტში, flushCompletedSession(override) პარამეტრით (არა latestRef-ზე დამოკიდებული)
 - Cleanup ფუნქციაც დეტერმინისტულია (nextMode/nextChild closure-ში დაკავებული, არა latestRef-ზე დამოკიდებული)
 
 ### Phase 2.4a: activeChildId → Thomthematica (POC) ✅
 - sessionChildId = (gameMode === Thomthematica && user) ? activeChildId : null
 - Child Selection Gate: isGameScreenBlocked = Boolean(gameMode !== null && user && !activeChildId)
-- ThomthematicaGate.test.tsx — 4 ტესტი (0 children / children but none selected / active child / guest)
 
 ### Phase 2.4b: activeChildId → ყველა Game Mode ✅
 - sessionChildId = user ? activeChildId : null (განზოგადებული, 1 ხაზი)
 - ოთხივე რეჟიმი (Thomthematica, ThomravlebisTabula, Gethometria, Kveshmicera) დაკავშირებულია
-- tests/GameModesGate.test.tsx — gate + guest-access ტესტები ოთხივე რეჟიმზე (it.each)
-- modeChanged: true, childChanged: false სცენარი (იგივე ბავშვი, mode switch) — ცალკე ტესტირებული
-- E2E DOM ტესტები Kveshmicera-სა და Gethometria-ზეც (არა მხოლოდ Thomthematica)
 - 63/63 ტესტი, 0 TypeScript შეცდომა, production build წარმატებული
+
+### Phase 2.5: Migration Gate Closure — Guest Mode-ის სრული მოცილება (Variant A) ✅
+- Guest Mode მთლიანად გაუქმებულია — ყველა მომხმარებელი გადის authenticated flow-ით
+- App.tsx: isGameScreenBlocked გაფართოვდა — თამაშის რეჟიმი დაბლოკილია როგორც !user (Auth blocking screen, AuthModal-ის გახსნის call-to-action-ით), ასევე user && !activeChildId (არსებული Child Selection Gate)
+- services/statsService.ts (Google Apps Script/Google Sheets sync) — ფიზიკურად წაშლილია
+- useGameSession.ts — Guest-specific Google Sheets sync path-ები მოცილდა; დამატებით გასწორდა Guest-transition branch, ხოლო protected Session ID lifecycle/FIFO queue/auto-save/completion architecture შენარჩუნებულია.
+- **Migration Gate-ის საბოლოო architecture decision**: `thomthematica2`-ს Google Apps Script public-write endpoint-ზე აღარ აქვს არანაირი დამოკიდებულება — არც source-ში, არც production build bundle-ში, არც runtime-ში (დამოუკიდებლად ვერიფიცირებული). **Endpoint განზრახ რჩება აქტიური**, რადგან მას იყენებს ცალკე, `thomthematica2`-ის scope-ის მიღმა მდგომი legacy `thomthematica` (ერთ-ბავშვიანი) აპლიკაცია. Phase 2.5-ის security objective — public-write endpoint-ზე დამოკიდებულების მოცილება multi-user აპლიკაციისთვის — მიღწეულია decoupling-ით, არა endpoint-ის ფიზიკური shutdown-ით.
+- Tests: 63 → 59. 4 Guest-specific tests წაიშალა; 3 tests გადაიწერა login-required behavior-ზე; 56 baseline tests უცვლელი დარჩა. Final: 59/59 passed.
+- Verification (დამოუკიდებელი, Claude-ის მხრიდან, fresh clone-ზე): TypeScript 0 errors, 59/59 tests passed, production build successful, `script.google.com` reference არსად (source-ში და build bundle-ში), Guest access production-ზე ხელით დადასტურებულია დაბლოკილად, 2–3 რეალური authenticated სესია ხელით ვერიფიცირებულია Supabase-ში (correct data persistence)
 
 ## საკვანძო არქიტექტურული გადაწყვეტილებები (არ შეიცვალოს განხილვის გარეშე)
 
 - DB schema: ზუსტად 4 table (profiles, children, game_sessions, wishes). answers, progress, statistics, achievements ცხრილები განზრახ არ არსებობს (derived/calculated დონეზეა გადაწყვეტილი).
 - useGameSession(gameMode, childId) — hook mode-აგნოსტიკურია, აღარ საჭიროებს mode-სპეციფიკურ ცვლილებებს ახალი game mode-ის დამატებისას.
-- Guest Mode: სრულად დამოუკიდებელი ChildContext-ისგან, sync მიდის statsService.ts-ით (Google Apps Script) — Google Sheets-ის public-write endpoint ჯერ ღიაა Guest-ისთვის.
-- Authenticated Mode: sync მიდის supabaseSyncService.ts-ით, RLS-ით დაცული.
+- **Guest Mode არ არსებობს (Phase 2.5, Variant A)** — ყველა მომხმარებელი აუცილებლად authenticated უნდა იყოს Game Screen-ის მისაღწევად.
+- Authenticated Mode: sync მიდის supabaseSyncService.ts-ით, RLS-ით დაცული — ეს არის ერთადერთი sync გზა.
+- **Google Apps Script public-write endpoint** — `thomthematica2` აღარ არის დამოკიდებული ამ endpoint-ზე. Endpoint განზრახ რჩება აქტიური, მხოლოდ ცალკე legacy `thomthematica` (ერთ-ბავშვიანი) აპლიკაციისთვის — ეს scope-ის მიღმაა და thomthematica2-ის Phase-ებზე გავლენას აღარ ახდენს. Google Apps Script public-write endpoint remains active as a legacy dependency of the separate `thomthematica` application. It is no longer a source, build, or runtime dependency of `thomthematica2`.
 - 40-question rolling window (მათემატიკური wish-qualification ლოგიკა) — ხელუხლებელია მთელი ამ პროცესის განმავლობაში, არცერთხელ არ შეცვლილა.
 
 ## ცნობილი, განზრახ გადადებული საკითხები
 
-- Google Apps Script public-write endpoint — ღიაა Guest Mode-ისთვის; დაიხურება მხოლოდ Migration Gates-ის სრული დაკმაყოფილების შემდეგ (Auth ✅, Child Profiles ✅, game_sessions sync ✅, wishes sync ✅, ტესტები ✅, საჭიროა: 2-3 რეალური სესიის ხელით end-to-end შემოწმება).
 - Reward images per-child theme — children.reward_theme schema-ში ჯერ არ დამატებულა (დაგეგმილია, მაგრამ ჯერ არ განხორციელებულა).
-- Parent Dashboard / სტატისტიკის ვიზუალიზაცია — არ დაწყებულა, დაგეგმილია მომავალ ფაზად.
+- Parent Dashboard / სტატისტიკის ვიზუალიზაცია — არ დაწყებულა, დაგეგმილია მომავალ ფაზად (Phase 3).
 - Active play duration — Page Visibility API-ით უკვე გამართულია (Phase 2.3), დამატებითი idle-timeout არ არის საჭირო ამ ეტაპზე.
 
 ## Workflow (როგორ ვმუშაობთ)
@@ -75,4 +79,5 @@ hooks/useGameSession.ts-ში:
 5. ყოველი ფაზის დასრულებისას (ტესტები მწვანე, typecheck სუფთა, build წარმატებული) ეს დოკუმენტი განახლდება.
 
 ## შემდეგი ნაბიჯი
-[აქ ჩაწერე შემდეგი დაგეგმილი ფაზა, როცა გადაწყვეტთ]
+[Phase 3: Parent Dashboard — ჯერ არ დაწყებულა, დაგეგმვა საჭიროებს ცალკე sign-off-ს]
+
