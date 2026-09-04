@@ -210,3 +210,60 @@ export const fetchChildSessions = async (childId: string): Promise<{ data: GameS
     return { data: null, error: err.message || 'Error fetching game sessions' };
   }
 };
+
+/**
+ * Fetches completed game session statistics for aggregate metrics calculation.
+ * Intentionally unbounded by limit to cover full history, but with narrow column-scope.
+ */
+export const fetchChildSessionsForAggregate = async (
+  childId: string
+): Promise<{ data: Pick<GameSession, 'total_questions' | 'total_correct' | 'perfect_blocks_count' | 'status'>[] | null; error: string | null }> => {
+  if (!childId) return { data: [], error: null };
+
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: 'Supabase not configured' };
+
+  try {
+    const { data, error } = await supabase
+      .from('game_sessions')
+      .select('total_questions, total_correct, perfect_blocks_count, status')
+      .eq('child_id', childId)
+      .eq('status', 'completed');
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+    return { data: (data as Pick<GameSession, 'total_questions' | 'total_correct' | 'perfect_blocks_count' | 'status'>[]) || [], error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message || 'Error fetching game sessions for aggregate' };
+  }
+};
+
+/**
+ * Fetches recent game sessions with a limit (default 20) ordered by started_at descending.
+ */
+export const fetchChildSessionsRecent = async (
+  childId: string,
+  limit: number = 20
+): Promise<{ data: GameSession[] | null; error: string | null }> => {
+  if (!childId) return { data: [], error: null };
+
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: 'Supabase not configured' };
+
+  try {
+    const { data, error } = await supabase
+      .from('game_sessions')
+      .select('*')
+      .eq('child_id', childId)
+      .order('started_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+    return { data: (data as GameSession[]) || [], error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message || 'Error fetching recent game sessions' };
+  }
+};

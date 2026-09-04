@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { syncGameSessionToSupabase, syncWishToSupabase, updateWishStatus, fetchChildWishes, fetchChildSessions } from './supabaseSyncService';
+import {
+  syncGameSessionToSupabase,
+  syncWishToSupabase,
+  updateWishStatus,
+  fetchChildWishes,
+  fetchChildSessions,
+  fetchChildSessionsForAggregate,
+  fetchChildSessionsRecent,
+} from './supabaseSyncService';
 import { GameMode } from '../types';
 import * as supabaseModule from '../lib/supabase';
 
@@ -177,6 +185,114 @@ describe('supabaseSyncService (Schema Alignment)', () => {
       const sessions = await fetchChildSessions('');
       expect(wishes.data).toEqual([]);
       expect(sessions.data).toEqual([]);
+    });
+  });
+
+  describe('fetchChildSessionsForAggregate', () => {
+    it('returns empty array when childId is empty', async () => {
+      const result = await fetchChildSessionsForAggregate('');
+      expect(result.data).toEqual([]);
+      expect(result.error).toBeNull();
+    });
+
+    it('returns error when Supabase query returns an error', async () => {
+      const mockEqStatus = vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Failed to fetch aggregate' },
+      });
+      const mockEqChild = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqChild });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await fetchChildSessionsForAggregate('child-123');
+      expect(mockFrom).toHaveBeenCalledWith('game_sessions');
+      expect(mockSelect).toHaveBeenCalledWith('total_questions, total_correct, perfect_blocks_count, status');
+      expect(mockEqChild).toHaveBeenCalledWith('child_id', 'child-123');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'completed');
+      expect(result.data).toBeNull();
+      expect(result.error).toBe('Failed to fetch aggregate');
+    });
+
+    it('returns correct data shape on successful fetch', async () => {
+      const sampleData = [
+        { total_questions: 40, total_correct: 38, perfect_blocks_count: 0, status: 'completed' },
+        { total_questions: 40, total_correct: 40, perfect_blocks_count: 1, status: 'completed' },
+      ];
+      const mockEqStatus = vi.fn().mockResolvedValue({
+        data: sampleData,
+        error: null,
+      });
+      const mockEqChild = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqChild });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await fetchChildSessionsForAggregate('child-123');
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual(sampleData);
+    });
+  });
+
+  describe('fetchChildSessionsRecent', () => {
+    it('returns empty array when childId is empty', async () => {
+      const result = await fetchChildSessionsRecent('');
+      expect(result.data).toEqual([]);
+      expect(result.error).toBeNull();
+    });
+
+    it('returns error when Supabase query returns an error', async () => {
+      const mockLimit = vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Failed to fetch recent sessions' },
+      });
+      const mockOrder = vi.fn().mockReturnValue({ limit: mockLimit });
+      const mockEq = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await fetchChildSessionsRecent('child-123', 10);
+      expect(mockFrom).toHaveBeenCalledWith('game_sessions');
+      expect(mockSelect).toHaveBeenCalledWith('*');
+      expect(mockEq).toHaveBeenCalledWith('child_id', 'child-123');
+      expect(mockOrder).toHaveBeenCalledWith('started_at', { ascending: false });
+      expect(mockLimit).toHaveBeenCalledWith(10);
+      expect(result.data).toBeNull();
+      expect(result.error).toBe('Failed to fetch recent sessions');
+    });
+
+    it('returns correct data shape on successful fetch with default and custom limits', async () => {
+      const sampleSessions = [
+        { id: 's1', child_id: 'child-123', game_mode: 'thomthematica', started_at: '2026-09-04T10:00:00Z' },
+        { id: 's2', child_id: 'child-123', game_mode: 'kveshmicera', started_at: '2026-09-04T09:00:00Z' },
+      ];
+      const mockLimit = vi.fn().mockResolvedValue({
+        data: sampleSessions,
+        error: null,
+      });
+      const mockOrder = vi.fn().mockReturnValue({ limit: mockLimit });
+      const mockEq = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await fetchChildSessionsRecent('child-123'); // default limit 20
+      expect(mockLimit).toHaveBeenCalledWith(20);
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual(sampleSessions);
     });
   });
 });
