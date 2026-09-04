@@ -30,12 +30,12 @@ export const useChildDashboard = (childId: string | null): UseChildDashboardRetu
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const activeChildIdRef = useRef(childId);
-  activeChildIdRef.current = childId;
+  const requestIdRef = useRef(0);
 
   const fetchDashboardData = useCallback(async () => {
     const currentTargetChildId = childId;
     if (!currentTargetChildId) {
+      requestIdRef.current += 1; // Invalidate any in-flight request
       setStats(null);
       setRecentSessions([]);
       setWishes([]);
@@ -43,6 +43,8 @@ export const useChildDashboard = (childId: string | null): UseChildDashboardRetu
       setError(null);
       return;
     }
+
+    const thisRequestId = ++requestIdRef.current; // Unique ID for this fetch cycle
 
     setLoading(true);
     setError(null);
@@ -53,8 +55,8 @@ export const useChildDashboard = (childId: string | null): UseChildDashboardRetu
       fetchChildWishes(currentTargetChildId),
     ]);
 
-    // Discard stale responses if childId changed while fetch was in-flight
-    if (activeChildIdRef.current !== currentTargetChildId) {
+    // Only the latest fetch response is applied; stale responses are ignored
+    if (thisRequestId !== requestIdRef.current) {
       return;
     }
 

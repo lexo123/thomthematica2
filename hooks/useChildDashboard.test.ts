@@ -235,4 +235,78 @@ describe('useChildDashboard (Parent Dashboard Orchestration Hook)', () => {
 
     expect(aggregateSpy).toHaveBeenCalledTimes(2);
   });
+
+  it('ignores stale out-of-order responses when switching childId A -> B -> A (request generation counter)', async () => {
+    let resolveF1Aggregate: (val: any) => void;
+    const f1Promise = new Promise((resolve) => {
+      resolveF1Aggregate = resolve;
+    });
+
+    let resolveF2Aggregate: (val: any) => void;
+    const f2Promise = new Promise((resolve) => {
+      resolveF2Aggregate = resolve;
+    });
+
+    vi.spyOn(supabaseSyncService, 'fetchChildSessionsRecent').mockResolvedValue({
+      data: [],
+      error: null,
+    });
+    vi.spyOn(supabaseSyncService, 'fetchChildWishes').mockResolvedValue({
+      data: [],
+      error: null,
+    });
+
+    let callCount = 0;
+    vi.spyOn(supabaseSyncService, 'fetchChildSessionsForAggregate').mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        // F1: childId = 'child-A' (deferred)
+        return f1Promise as any;
+      }
+      if (callCount === 2) {
+        // F2: childId = 'child-B' (deferred)
+        return f2Promise as any;
+      }
+      if (callCount === 3) {
+        // F3: childId = 'child-A' again (resolves immediately with distinct 999 total_questions)
+        return Promise.resolve({
+          data: [{ total_questions: 999, total_correct: 999, perfect_blocks_count: 5, status: 'completed' as const }],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: [], error: null });
+    });
+
+    const { result, rerender } = renderHook(({ id }) => useChildDashboard(id), {
+      initialProps: { id: 'child-A' as string | null },
+    });
+
+    // F1 is in-flight. Switch to child-B (triggers F2)
+    rerender({ id: 'child-B' });
+
+    // Switch back to child-A (triggers F3)
+    rerender({ id: 'child-A' });
+
+    // F3 resolves immediately. Wait for stats to reflect F3 (999)
+    await waitFor(() => {
+      expect(result.current.stats?.totalQuestions).toBe(999);
+    });
+
+    // Now resolve F1 (old initial child-A fetch) with total_questions: 111
+    await act(async () => {
+      resolveF1Aggregate!({
+        data: [{ total_questions: 111, total_correct: 111, perfect_blocks_count: 1, status: 'completed' as const }],
+        error: null,
+      });
+      // Also resolve F2 so no pending dangling promises
+      resolveF2Aggregate!({
+        data: [{ total_questions: 222, total_correct: 222, perfect_blocks_count: 1, status: 'completed' as const }],
+        error: null,
+      });
+    });
+
+    // Assert that result.current.stats still shows F3 data (999), and was NOT overwritten by stale F1 (111)
+    expect(result.current.stats?.totalQuestions).toBe(999);
+    expect(result.current.stats?.completedSessionCount).toBe(1);
+  });
 });
