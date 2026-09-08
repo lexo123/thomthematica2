@@ -35,8 +35,8 @@ jobs:
 
       - name: Typecheck & Test
         run: |
-          npm run typecheck || true
-          npm test || true
+          npm run typecheck
+          npm test
 
       - name: Build
         run: npm run build
