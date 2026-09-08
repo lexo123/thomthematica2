@@ -267,3 +267,33 @@ export const fetchChildSessionsRecent = async (
     return { data: null, error: err.message || 'Error fetching recent game sessions' };
   }
 };
+
+/**
+ * Fetches completed game session data grouped-ready for per-game-mode breakdown.
+ * Narrow column-scope, DB-level filtered to status='completed'.
+ * `status` is intentionally included in the select for the same double-safety
+ * client-side re-filter pattern used by deriveDashboardStats().
+ */
+export const fetchChildSessionsGameModeBreakdown = async (
+  childId: string
+): Promise<{ data: Pick<GameSession, 'game_mode' | 'total_questions' | 'total_correct' | 'status'>[] | null; error: string | null }> => {
+  if (!childId) return { data: [], error: null };
+
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: 'Supabase not configured' };
+
+  try {
+    const { data, error } = await supabase
+      .from('game_sessions')
+      .select('game_mode, total_questions, total_correct, status')
+      .eq('child_id', childId)
+      .eq('status', 'completed');
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+    return { data: (data as Pick<GameSession, 'game_mode' | 'total_questions' | 'total_correct' | 'status'>[]) || [], error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message || 'Error fetching game mode breakdown' };
+  }
+};

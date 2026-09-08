@@ -28,6 +28,7 @@ describe('ParentDashboard UI Component', () => {
       stats: null,
       recentSessions: [],
       wishes: [],
+      gameModeBreakdown: {},
       loading: false,
       error: null,
       refetch: mockRefetch,
@@ -46,6 +47,7 @@ describe('ParentDashboard UI Component', () => {
       stats: null,
       recentSessions: [],
       wishes: [],
+      gameModeBreakdown: {},
       loading: true,
       error: null,
       refetch: mockRefetch,
@@ -62,6 +64,7 @@ describe('ParentDashboard UI Component', () => {
       stats: null,
       recentSessions: [],
       wishes: [],
+      gameModeBreakdown: {},
       loading: false,
       error: 'ქსელის შეცდომა',
       refetch: mockRefetch,
@@ -83,6 +86,7 @@ describe('ParentDashboard UI Component', () => {
       stats: null,
       recentSessions: [],
       wishes: [],
+      gameModeBreakdown: {},
       loading: false,
       error: null,
       refetch: mockRefetch,
@@ -105,6 +109,7 @@ describe('ParentDashboard UI Component', () => {
       },
       recentSessions: [],
       wishes: [],
+      gameModeBreakdown: {},
       loading: false,
       error: null,
       refetch: mockRefetch,
@@ -127,6 +132,7 @@ describe('ParentDashboard UI Component', () => {
       },
       recentSessions: [],
       wishes: [],
+      gameModeBreakdown: {},
       loading: false,
       error: null,
       refetch: mockRefetch,
@@ -192,6 +198,7 @@ describe('ParentDashboard UI Component', () => {
           created_at: '2026-09-04T11:00:00Z',
         },
       ],
+      gameModeBreakdown: {},
       loading: false,
       error: null,
       refetch: mockRefetch,
@@ -260,6 +267,7 @@ describe('ParentDashboard UI Component', () => {
               created_at: '2026-09-04T10:00:00Z',
             },
           ],
+          gameModeBreakdown: {},
           loading: false,
           error: null,
           refetch: mockRefetch,
@@ -298,6 +306,7 @@ describe('ParentDashboard UI Component', () => {
               created_at: '2026-09-05T10:00:00Z',
             },
           ],
+          gameModeBreakdown: {},
           loading: false,
           error: null,
           refetch: mockRefetch,
@@ -307,6 +316,7 @@ describe('ParentDashboard UI Component', () => {
         stats: null,
         recentSessions: [],
         wishes: [],
+        gameModeBreakdown: {},
         loading: false,
         error: null,
         refetch: mockRefetch,
@@ -427,6 +437,7 @@ describe('ParentDashboard UI Component', () => {
       },
       recentSessions: [],
       wishes: [],
+      gameModeBreakdown: {},
       loading: false,
       error: null,
       refetch: mockRefetch,
@@ -459,6 +470,138 @@ describe('ParentDashboard UI Component', () => {
     // Game mode selection works identically
     fireEvent.click(thomModeBtn);
     expect(onSelectMode).toHaveBeenCalledWith('thomthematica');
+  });
+
+  // 11. Game Mode Breakdown rendering with populated data
+  it('renders game mode breakdown section with formatted stats when data is populated', () => {
+    vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
+      stats: {
+        completedSessionCount: 3,
+        totalQuestions: 100,
+        totalCorrect: 95,
+        accuracyPercent: 95,
+        perfectBlocksCount: 1,
+      },
+      recentSessions: [],
+      wishes: [],
+      gameModeBreakdown: {
+        thomthematica: {
+          sessionCount: 2,
+          totalQuestions: 80,
+          totalCorrect: 76,
+          accuracyPercent: 95,
+        },
+        gethometria: {
+          sessionCount: 1,
+          totalQuestions: 20,
+          totalCorrect: 19,
+          accuracyPercent: 95,
+        },
+        custom_unrecognized_mode: {
+          sessionCount: 1,
+          totalQuestions: 10,
+          totalCorrect: 8,
+          accuracyPercent: 80,
+        },
+      },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
+
+    // Section title
+    expect(screen.getByText('🎮 თამაშის რეჟიმები')).toBeDefined();
+
+    // Standard mapped mode labels
+    expect(screen.getByText('თომთემატიკა')).toBeDefined();
+    expect(screen.getByText('76/80')).toBeDefined();
+    expect(screen.getByText('სესიები: 2 • სიზუსტე: 95.0%')).toBeDefined();
+
+    expect(screen.getByText('გეთომეტრია')).toBeDefined();
+    expect(screen.getByText('19/20')).toBeDefined();
+    expect(screen.getByText('სესიები: 1 • სიზუსტე: 95.0%')).toBeDefined();
+
+    // Raw unrecognized mode fallback
+    expect(screen.getByText('custom_unrecognized_mode')).toBeDefined();
+    expect(screen.getByText('8/10')).toBeDefined();
+    expect(screen.getByText('სესიები: 1 • სიზუსტე: 80.0%')).toBeDefined();
+  });
+
+  // 12. Game Mode Breakdown empty state when gameModeBreakdown is empty
+  it('renders empty-state message when gameModeBreakdown is empty', () => {
+    vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
+      stats: {
+        completedSessionCount: 1,
+        totalQuestions: 40,
+        totalCorrect: 38,
+        accuracyPercent: 95,
+        perfectBlocksCount: 0,
+      },
+      recentSessions: [],
+      wishes: [],
+      gameModeBreakdown: {},
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
+
+    expect(screen.getByText('🎮 თამაშის რეჟიმები')).toBeDefined();
+    expect(screen.getByText('რეჟიმების სტატისტიკა არ მოიძებნა')).toBeDefined();
+  });
+
+  // 13. Game Mode Breakdown does NOT render in non-populated states
+  it('does not render game mode breakdown in loading, error, or empty-sessions states', () => {
+    // 1. Loading
+    const { rerender } = render(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
+    vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
+      stats: null,
+      recentSessions: [],
+      wishes: [],
+      gameModeBreakdown: {
+        thomthematica: { sessionCount: 1, totalQuestions: 40, totalCorrect: 40, accuracyPercent: 100 },
+      },
+      loading: true,
+      error: null,
+      refetch: mockRefetch,
+    });
+    rerender(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
+    expect(screen.queryByText('🎮 თამაშის რეჟიმები')).toBeNull();
+
+    // 2. Error
+    vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
+      stats: null,
+      recentSessions: [],
+      wishes: [],
+      gameModeBreakdown: {},
+      loading: false,
+      error: 'Some DB error',
+      refetch: mockRefetch,
+    });
+    rerender(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
+    expect(screen.queryByText('🎮 თამაშის რეჟიმები')).toBeNull();
+
+    // 3. Empty sessions
+    vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
+      stats: {
+        completedSessionCount: 0,
+        totalQuestions: 0,
+        totalCorrect: 0,
+        accuracyPercent: null,
+        perfectBlocksCount: 0,
+      },
+      recentSessions: [],
+      wishes: [],
+      gameModeBreakdown: {},
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+    rerender(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
+    expect(screen.queryByText('🎮 თამაშის რეჟიმები')).toBeNull();
   });
 });
 

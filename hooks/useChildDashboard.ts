@@ -5,12 +5,18 @@ import {
   fetchChildSessionsForAggregate,
   fetchChildSessionsRecent,
   fetchChildWishes,
+  fetchChildSessionsGameModeBreakdown,
 } from '../services/supabaseSyncService';
+import {
+  GameModeBreakdown,
+  deriveGameModeBreakdown,
+} from '../services/deriveGameModeBreakdown';
 
 export interface UseChildDashboardReturn {
   stats: DashboardStats | null;
   recentSessions: GameSession[];
   wishes: Wish[];
+  gameModeBreakdown: GameModeBreakdown;
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -27,6 +33,7 @@ export const useChildDashboard = (childId: string | null): UseChildDashboardRetu
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentSessions, setRecentSessions] = useState<GameSession[]>([]);
   const [wishes, setWishes] = useState<Wish[]>([]);
+  const [gameModeBreakdown, setGameModeBreakdown] = useState<GameModeBreakdown>({});
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +46,7 @@ export const useChildDashboard = (childId: string | null): UseChildDashboardRetu
       setStats(null);
       setRecentSessions([]);
       setWishes([]);
+      setGameModeBreakdown({});
       setLoading(false);
       setError(null);
       return;
@@ -49,10 +57,11 @@ export const useChildDashboard = (childId: string | null): UseChildDashboardRetu
     setLoading(true);
     setError(null);
 
-    const [aggregateResult, recentResult, wishesResult] = await Promise.allSettled([
+    const [aggregateResult, recentResult, wishesResult, breakdownResult] = await Promise.allSettled([
       fetchChildSessionsForAggregate(currentTargetChildId),
       fetchChildSessionsRecent(currentTargetChildId, 20),
       fetchChildWishes(currentTargetChildId),
+      fetchChildSessionsGameModeBreakdown(currentTargetChildId),
     ]);
 
     // Only the latest fetch response is applied; stale responses are ignored
@@ -95,6 +104,17 @@ export const useChildDashboard = (childId: string | null): UseChildDashboardRetu
       errors.push(wishesResult.reason?.message || 'Failed to fetch wishes');
     }
 
+    // 4. Game Mode Breakdown
+    if (breakdownResult.status === 'fulfilled') {
+      if (breakdownResult.value.error) {
+        errors.push(breakdownResult.value.error);
+      } else {
+        setGameModeBreakdown(deriveGameModeBreakdown(breakdownResult.value.data || []));
+      }
+    } else {
+      errors.push(breakdownResult.reason?.message || 'Failed to fetch game mode breakdown');
+    }
+
     if (errors.length > 0) {
       setError(errors.join('; '));
     } else {
@@ -112,6 +132,7 @@ export const useChildDashboard = (childId: string | null): UseChildDashboardRetu
     stats,
     recentSessions,
     wishes,
+    gameModeBreakdown,
     loading,
     error,
     refetch: fetchDashboardData,

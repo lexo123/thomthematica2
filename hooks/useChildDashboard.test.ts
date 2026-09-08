@@ -7,6 +7,10 @@ import * as supabaseSyncService from '../services/supabaseSyncService';
 describe('useChildDashboard (Parent Dashboard Orchestration Hook)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(supabaseSyncService, 'fetchChildSessionsGameModeBreakdown').mockResolvedValue({
+      data: [],
+      error: null,
+    });
   });
 
   it('remains in idle state without executing any queries when childId is null', async () => {
@@ -308,5 +312,90 @@ describe('useChildDashboard (Parent Dashboard Orchestration Hook)', () => {
     // Assert that result.current.stats still shows F3 data (999), and was NOT overwritten by stale F1 (111)
     expect(result.current.stats?.totalQuestions).toBe(999);
     expect(result.current.stats?.completedSessionCount).toBe(1);
+  });
+
+  it('populates gameModeBreakdown when fetchChildSessionsGameModeBreakdown succeeds', async () => {
+    vi.spyOn(supabaseSyncService, 'fetchChildSessionsForAggregate').mockResolvedValue({
+      data: [],
+      error: null,
+    });
+    vi.spyOn(supabaseSyncService, 'fetchChildSessionsRecent').mockResolvedValue({
+      data: [],
+      error: null,
+    });
+    vi.spyOn(supabaseSyncService, 'fetchChildWishes').mockResolvedValue({
+      data: [],
+      error: null,
+    });
+    const breakdownSpy = vi.spyOn(supabaseSyncService, 'fetchChildSessionsGameModeBreakdown').mockResolvedValue({
+      data: [
+        { game_mode: 'thomthematica', total_questions: 40, total_correct: 38, status: 'completed' as const },
+        { game_mode: 'thomthematica', total_questions: 40, total_correct: 40, status: 'completed' as const },
+        { game_mode: 'gethometria', total_questions: 20, total_correct: 19, status: 'completed' as const },
+      ],
+      error: null,
+    });
+
+    const { result } = renderHook(() => useChildDashboard('child-1'));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(breakdownSpy).toHaveBeenCalledWith('child-1');
+    expect(result.current.error).toBeNull();
+    expect(result.current.gameModeBreakdown).toEqual({
+      thomthematica: {
+        sessionCount: 2,
+        totalQuestions: 80,
+        totalCorrect: 78,
+        accuracyPercent: 97.5,
+      },
+      gethometria: {
+        sessionCount: 1,
+        totalQuestions: 20,
+        totalCorrect: 19,
+        accuracyPercent: 95,
+      },
+    });
+  });
+
+  it('handles breakdown fetch error or rejection gracefully without corrupting other state', async () => {
+    vi.spyOn(supabaseSyncService, 'fetchChildSessionsForAggregate').mockResolvedValue({
+      data: [
+        { total_questions: 40, total_correct: 40, perfect_blocks_count: 1, status: 'completed' as const },
+      ],
+      error: null,
+    });
+    vi.spyOn(supabaseSyncService, 'fetchChildSessionsRecent').mockResolvedValue({
+      data: [],
+      error: null,
+    });
+    vi.spyOn(supabaseSyncService, 'fetchChildWishes').mockResolvedValue({
+      data: [],
+      error: null,
+    });
+    vi.spyOn(supabaseSyncService, 'fetchChildSessionsGameModeBreakdown').mockResolvedValue({
+      data: null,
+      error: 'Breakdown query failed',
+    });
+
+    const { result } = renderHook(() => useChildDashboard('child-1'));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // Error from breakdown is captured
+    expect(result.current.error).toBe('Breakdown query failed');
+    // Stats remain intact thanks to Promise.allSettled
+    expect(result.current.stats).toEqual({
+      completedSessionCount: 1,
+      totalQuestions: 40,
+      totalCorrect: 40,
+      accuracyPercent: 100,
+      perfectBlocksCount: 1,
+    });
+    expect(result.current.gameModeBreakdown).toEqual({});
   });
 });

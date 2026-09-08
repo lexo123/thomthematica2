@@ -7,6 +7,7 @@ import {
   fetchChildSessions,
   fetchChildSessionsForAggregate,
   fetchChildSessionsRecent,
+  fetchChildSessionsGameModeBreakdown,
 } from './supabaseSyncService';
 import { GameMode } from '../types';
 import * as supabaseModule from '../lib/supabase';
@@ -293,6 +294,58 @@ describe('supabaseSyncService (Schema Alignment)', () => {
       expect(mockLimit).toHaveBeenCalledWith(20);
       expect(result.error).toBeNull();
       expect(result.data).toEqual(sampleSessions);
+    });
+  });
+
+  describe('fetchChildSessionsGameModeBreakdown', () => {
+    it('returns empty array when childId is empty', async () => {
+      const result = await fetchChildSessionsGameModeBreakdown('');
+      expect(result.data).toEqual([]);
+      expect(result.error).toBeNull();
+    });
+
+    it('returns error when Supabase query returns an error', async () => {
+      const mockEqStatus = vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Failed to fetch game mode breakdown' },
+      });
+      const mockEqChild = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqChild });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await fetchChildSessionsGameModeBreakdown('child-123');
+      expect(mockFrom).toHaveBeenCalledWith('game_sessions');
+      expect(mockSelect).toHaveBeenCalledWith('game_mode, total_questions, total_correct, status');
+      expect(mockEqChild).toHaveBeenCalledWith('child_id', 'child-123');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'completed');
+      expect(result.data).toBeNull();
+      expect(result.error).toBe('Failed to fetch game mode breakdown');
+    });
+
+    it('returns correct data shape on successful fetch', async () => {
+      const sampleData = [
+        { game_mode: 'thomthematica', total_questions: 40, total_correct: 38, status: 'completed' },
+        { game_mode: 'gethometria', total_questions: 20, total_correct: 20, status: 'completed' },
+      ];
+      const mockEqStatus = vi.fn().mockResolvedValue({
+        data: sampleData,
+        error: null,
+      });
+      const mockEqChild = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqChild });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await fetchChildSessionsGameModeBreakdown('child-123');
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual(sampleData);
     });
   });
 });

@@ -9,7 +9,7 @@ interface ParentDashboardProps {
 
 export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClose }) => {
   // Hook rules: unconditionally called regardless of childId value
-  const { stats, recentSessions, wishes, loading, error, refetch } = useChildDashboard(childId);
+  const { stats, recentSessions, wishes, gameModeBreakdown = {}, loading, error, refetch } = useChildDashboard(childId);
 
   // Explicit rendering priority chain (stats is nullable)
   // 1. childId === null -> "ბავშვი არ არის არჩეული"
@@ -232,7 +232,44 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClo
         )}
       </div>
 
-      {/* 4. Wishes (all, no truncation/slice) */}
+      {/* 4. Game Mode Breakdown */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-black text-indigo-900 flex items-center gap-1.5">
+          🎮 თამაშის რეჟიმები
+        </h3>
+        {Object.keys(gameModeBreakdown).length === 0 ? (
+          <div className="text-sm text-gray-500 italic bg-gray-50 p-4 rounded-2xl text-center">
+            რეჟიმების სტატისტიკა არ მოიძებნა
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            {Object.entries(gameModeBreakdown).map(([modeKey, entry]) => {
+              const label = getGameModeLabel(modeKey);
+              const accuracyDisplay =
+                entry.accuracyPercent !== null ? `${entry.accuracyPercent.toFixed(1)}%` : '—';
+
+              return (
+                <div
+                  key={modeKey}
+                  className="flex justify-between items-center bg-gray-50 hover:bg-gray-100 p-3 rounded-2xl border border-gray-200/70 text-sm transition-all"
+                >
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-gray-800 truncate">{label}</span>
+                    <span className="text-xs text-gray-400">
+                      სესიები: {entry.sessionCount} • სიზუსტე: {accuracyDisplay}
+                    </span>
+                  </div>
+                  <div className="font-black text-indigo-900 bg-white px-2.5 py-1 rounded-xl border border-gray-200 shadow-sm shrink-0">
+                    {entry.totalCorrect}/{entry.totalQuestions}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 5. Wishes (all, no truncation/slice) */}
       <div className="space-y-3">
         <h3 className="text-lg font-black text-indigo-900 flex items-center gap-1.5">
           🎁 სურვილები ({wishes.length})
