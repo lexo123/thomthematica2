@@ -1,18 +1,11 @@
 import React from 'react';
 import { useChildDashboard } from '../hooks/useChildDashboard';
-import { GameMode } from '../types';
+import { getGameModeLabel } from '../utils/gameModeLabels';
 
 interface ParentDashboardProps {
   childId: string | null;
   onClose: () => void;
 }
-
-const GAME_MODE_LABELS: Record<string, string> = {
-  [GameMode.Thomthematica]: 'თომთემატიკა',
-  [GameMode.ThomravlebisTabula]: 'თომრავლების ტაბულა',
-  [GameMode.Gethometria]: 'გეთომეტრია',
-  [GameMode.Kveshmicera]: 'ქვეშმიწერით გამრავლება',
-};
 
 export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClose }) => {
   // Hook rules: unconditionally called regardless of childId value
@@ -218,7 +211,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClo
                     minute: '2-digit',
                   })
                 : '—';
-              const modeLabel = GAME_MODE_LABELS[s.game_mode] || s.game_mode;
+              const modeLabel = getGameModeLabel(s.game_mode);
 
               return (
                 <div
