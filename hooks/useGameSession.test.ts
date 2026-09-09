@@ -793,6 +793,84 @@ describe('useGameSession (Supabase Sync)', () => {
         }
       );
     });
+
+    it('after visibilitychange to hidden (persistCurrentSession), subsequent auto-save at question 10 still fires normally (Round 2 regression guard)', async () => {
+      const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+
+      const { result } = renderHook(
+        ({ mode, childId }) => useGameSession(mode, childId),
+        { initialProps: { mode: GameMode.Thomthematica, childId: 'child-regression-1' } }
+      );
+
+      const initialSessionId = result.current.sessionId;
+
+      // 1-4 კითხვა
+      act(() => {
+        for (let i = 0; i < 4; i++) {
+          result.current.recordAnswer(true);
+        }
+      });
+
+      // Simulate visibilitychange -> hidden (persistCurrentSession, status: 'active', keepalive)
+      act(() => {
+        Object.defineProperty(document, 'visibilityState', {
+          value: 'hidden',
+          writable: true,
+          configurable: true,
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // დავადასტუროთ, hidden-ის persist მოხდა
+      expect(syncGameSessionSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ id: initialSessionId, status: 'active', totalQuestions: 4 }),
+        { transport: 'keepalive', accessToken: 'mock-access-token' }
+      );
+
+      // Restore visibilityState (ბავშვი ბრუნდება აპში)
+      act(() => {
+        Object.defineProperty(document, 'visibilityState', {
+          value: 'visible',
+          writable: true,
+          configurable: true,
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      // განაგრძობს იმავე session-ში, კიდევ 6 კითხვა (სულ 10 — auto-save ტრიგერის ზღვარი)
+      await act(async () => {
+        for (let i = 0; i < 6; i++) {
+          result.current.recordAnswer(true);
+        }
+        await Promise.resolve();
+      });
+
+      expect(result.current.totalQuestions).toBe(10);
+
+      // 🔑 ძირითადი assertion: auto-save (default transport, status: 'active') ნორმალურად ისვრება,
+      // იმავე sessionId-ით — ეს დაადასტურებს, რომ isCompletedRef 'hidden'-ის შემდეგ არასწორად არ დაფიქსირდა.
+      expect(syncGameSessionSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: initialSessionId,
+          childId: 'child-regression-1',
+          totalQuestions: 10,
+          totalCorrect: 10,
+          status: 'active',
+        })
+      );
+
+      // Restore visibilityState (test-cleanup)
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
+        writable: true,
+        configurable: true,
+      });
+    });
   });
 
   describe('Rolling-window Persistence (localStorage integration)', () => {
@@ -839,4 +917,5 @@ describe('useGameSession (Supabase Sync)', () => {
     });
   });
 });
+
 
