@@ -1,4 +1,4 @@
-import { getSupabase } from '../lib/supabase';
+import { getSupabase, cleanUrl, cleanKey } from '../lib/supabase';
 import { GameMode, GameSession, Wish } from '../types';
 
 export interface GameSessionPayload {
@@ -14,6 +14,11 @@ export interface GameSessionPayload {
   endedAt?: string | null;
 }
 
+export interface SyncSessionOptions {
+  transport?: 'default' | 'keepalive';
+  accessToken?: string | null;
+}
+
 export interface WishSyncPayload {
   id?: string;
   childId: string;
@@ -27,18 +32,15 @@ export interface WishSyncPayload {
 /**
  * Saves or updates a game session in the Supabase game_sessions table.
  * Uses exact schema column names: game_mode, total_questions, total_correct, perfect_blocks_count, duration_seconds, status.
+ * Supports keepalive transport via fetch for beforeunload and visibilitychange events.
  * If Supabase is not configured or childId is missing (e.g. Guest mode), returns clean error without throwing.
  */
 export const syncGameSessionToSupabase = async (
-  session: GameSessionPayload
+  session: GameSessionPayload,
+  options?: SyncSessionOptions
 ): Promise<{ success: boolean; data?: GameSession; error?: string }> => {
   if (!session.childId) {
     return { success: false, error: 'childId is required' };
-  }
-
-  const supabase = getSupabase();
-  if (!supabase) {
-    return { success: false, error: 'Supabase client is not available' };
   }
 
   const totalQuestions = Math.max(0, session.totalQuestions);
@@ -59,6 +61,36 @@ export const syncGameSessionToSupabase = async (
 
   if (session.id) {
     payload.id = session.id;
+  }
+
+  if (options?.transport === 'keepalive') {
+    if (!options.accessToken) {
+      return { success: false, error: 'No cached access token available for keepalive sync' };
+    }
+    try {
+      const res = await fetch(`${cleanUrl}/rest/v1/game_sessions`, {
+        method: 'POST',
+        headers: {
+          'apikey': cleanKey,
+          'Authorization': `Bearer ${options.accessToken}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates,return=minimal',
+        },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      });
+      return {
+        success: res.ok,
+        error: res.ok ? undefined : `keepalive sync failed: ${res.status}`,
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'keepalive sync error' };
+    }
+  }
+
+  const supabase = getSupabase();
+  if (!supabase) {
+    return { success: false, error: 'Supabase client is not available' };
   }
 
   try {

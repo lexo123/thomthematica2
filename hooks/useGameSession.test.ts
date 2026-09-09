@@ -10,6 +10,16 @@ import {
 } from './useGameSession';
 import { GameMode } from '../types';
 import * as supabaseSyncService from '../services/supabaseSyncService';
+import { saveGameProgress, loadGameProgress } from '../services/gameProgressStorage';
+
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    session: { access_token: 'mock-access-token' },
+    user: null,
+    loading: false,
+    isConfigured: true,
+  }),
+}));
 
 describe('gameSessionReducer (40-question rolling window)', () => {
   it('should correctly store lastCompletedBlockCorrectCount for a 40/40 perfect block and reset window', () => {
@@ -672,6 +682,161 @@ describe('useGameSession (Supabase Sync)', () => {
     // Reset verified on Gethometria
     expect(result.current.totalQuestions).toBe(0);
     expect(result.current.sessionId).not.toBe(tableSessionId);
+  });
+
+  describe('RESTORE_PROGRESS reducer action', () => {
+    it('restores recentAnswers and correctly derives questionsInBlock40 and correctInBlock40', () => {
+      const initial = INITIAL_GAME_SESSION_STATE;
+      const recentAnswers = [true, false, true, true, false];
+      const next = gameSessionReducer(initial, {
+        type: 'RESTORE_PROGRESS',
+        recentAnswers,
+      });
+
+      expect(next.recentAnswers).toEqual(recentAnswers);
+      expect(next.questionsInBlock40).toBe(5);
+      expect(next.correctInBlock40).toBe(3);
+      expect(next.totalQuestions).toBe(0);
+      expect(next.totalCorrect).toBe(0);
+    });
+  });
+
+  describe('Lifecycle Events & Keepalive Transport', () => {
+    it('triggers keepalive sync with status: active on visibilitychange to hidden', async () => {
+      const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+
+      const { result } = renderHook(
+        ({ mode, childId }) => useGameSession(mode, childId),
+        { initialProps: { mode: GameMode.Thomthematica, childId: 'child-keepalive-1' } }
+      );
+
+      act(() => {
+        result.current.recordAnswer(true);
+      });
+
+      const currentSessionId = result.current.sessionId;
+
+      // Simulate visibilitychange to hidden
+      act(() => {
+        Object.defineProperty(document, 'visibilityState', {
+          value: 'hidden',
+          writable: true,
+          configurable: true,
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(syncGameSessionSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: currentSessionId,
+          childId: 'child-keepalive-1',
+          gameMode: GameMode.Thomthematica,
+          status: 'active',
+          totalQuestions: 1,
+          totalCorrect: 1,
+        }),
+        {
+          transport: 'keepalive',
+          accessToken: 'mock-access-token',
+        }
+      );
+
+      // Restore visibilityState
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('triggers keepalive sync with status: completed on beforeunload event', async () => {
+      const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+
+      const { result } = renderHook(
+        ({ mode, childId }) => useGameSession(mode, childId),
+        { initialProps: { mode: GameMode.Thomthematica, childId: 'child-unload-1' } }
+      );
+
+      act(() => {
+        result.current.recordAnswer(true);
+      });
+
+      const currentSessionId = result.current.sessionId;
+
+      // Simulate beforeunload
+      act(() => {
+        window.dispatchEvent(new Event('beforeunload'));
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(syncGameSessionSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: currentSessionId,
+          childId: 'child-unload-1',
+          gameMode: GameMode.Thomthematica,
+          status: 'completed',
+          totalQuestions: 1,
+          totalCorrect: 1,
+        }),
+        {
+          transport: 'keepalive',
+          accessToken: 'mock-access-token',
+        }
+      );
+    });
+  });
+
+  describe('Rolling-window Persistence (localStorage integration)', () => {
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    it('persists answers to localStorage on recordAnswer and clears on 40/40 completion', () => {
+      const { result } = renderHook(
+        ({ mode, childId }) => useGameSession(mode, childId),
+        { initialProps: { mode: GameMode.Thomthematica, childId: 'child-roll-1' } }
+      );
+
+      act(() => {
+        result.current.recordAnswer(true);
+        result.current.recordAnswer(false);
+      });
+
+      const loaded = loadGameProgress('child-roll-1', GameMode.Thomthematica);
+      expect(loaded).toEqual([true, false]);
+
+      // Complete 40 answers with >=39 correct to achieve wish qualification
+      act(() => {
+        for (let i = 0; i < 38; i++) {
+          result.current.recordAnswer(true);
+        }
+      });
+
+      // Window completed, localStorage cleared for this child and mode
+      expect(loadGameProgress('child-roll-1', GameMode.Thomthematica)).toBeNull();
+    });
+
+    it('restores rolling-window progress from localStorage on initial mount', () => {
+      saveGameProgress('child-restore-1', GameMode.Thomthematica, [true, true, false]);
+
+      const { result } = renderHook(
+        ({ mode, childId }) => useGameSession(mode, childId),
+        { initialProps: { mode: GameMode.Thomthematica, childId: 'child-restore-1' } }
+      );
+
+      expect(result.current.recentAnswers).toEqual([true, true, false]);
+      expect(result.current.questionsInBlock40).toBe(3);
+      expect(result.current.correctInBlock40).toBe(2);
+    });
   });
 });
 

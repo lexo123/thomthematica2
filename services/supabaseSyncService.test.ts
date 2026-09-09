@@ -91,6 +91,92 @@ describe('supabaseSyncService (Schema Alignment)', () => {
       expect(result.success).toBe(true);
       expect(result.data?.id).toBe('session-123');
     });
+
+    it('returns error when keepalive transport is used without an accessToken', async () => {
+      const result = await syncGameSessionToSupabase(
+        {
+          childId: 'child-123',
+          gameMode: GameMode.Thomthematica,
+          totalQuestions: 10,
+          totalCorrect: 10,
+        },
+        { transport: 'keepalive' }
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('No cached access token available for keepalive sync');
+    });
+
+    it('uses fetch with keepalive: true when keepalive transport is specified with accessToken', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        status: 201,
+      } as any);
+
+      const result = await syncGameSessionToSupabase(
+        {
+          id: 'sess-abc',
+          childId: 'child-123',
+          gameMode: GameMode.Thomthematica,
+          totalQuestions: 10,
+          totalCorrect: 9,
+          status: 'completed',
+        },
+        { transport: 'keepalive', accessToken: 'test-token-123' }
+      );
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/rest/v1/game_sessions'),
+        expect.objectContaining({
+          method: 'POST',
+          keepalive: true,
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-token-123',
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=minimal',
+          }),
+          body: expect.stringContaining('"child_id":"child-123"'),
+        })
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it('returns error when keepalive fetch fails', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 500,
+      } as any);
+
+      const result = await syncGameSessionToSupabase(
+        {
+          childId: 'child-123',
+          gameMode: GameMode.Thomthematica,
+          totalQuestions: 5,
+          totalCorrect: 5,
+        },
+        { transport: 'keepalive', accessToken: 'test-token-123' }
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('keepalive sync failed: 500');
+    });
+
+    it('returns error when keepalive fetch throws exception', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Network error'));
+
+      const result = await syncGameSessionToSupabase(
+        {
+          childId: 'child-123',
+          gameMode: GameMode.Thomthematica,
+          totalQuestions: 5,
+          totalCorrect: 5,
+        },
+        { transport: 'keepalive', accessToken: 'test-token-123' }
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Network error');
+    });
   });
 
   describe('syncWishToSupabase', () => {

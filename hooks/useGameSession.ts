@@ -1,6 +1,12 @@
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { GameMode } from '../types';
 import { syncGameSessionToSupabase, syncWishToSupabase } from '../services/supabaseSyncService';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  saveGameProgress,
+  loadGameProgress,
+  clearGameProgress,
+} from '../services/gameProgressStorage';
 
 /**
  * Time (in ms) to delay showing the Wish Modal upon completing 40 questions.
@@ -40,6 +46,7 @@ type GameSessionAction =
   | { type: 'SUBMIT_WISH_START' }
   | { type: 'SUBMIT_WISH_SUCCESS' }
   | { type: 'SUBMIT_WISH_ERROR'; error: string }
+  | { type: 'RESTORE_PROGRESS'; recentAnswers: boolean[] }
   | { type: 'RESET_SESSION' };
 
 export const INITIAL_GAME_SESSION_STATE: GameSessionState = {
@@ -101,6 +108,16 @@ export function gameSessionReducer(state: GameSessionState, action: GameSessionA
       };
     }
 
+    case 'RESTORE_PROGRESS': {
+      const answers = action.recentAnswers || [];
+      return {
+        ...state,
+        recentAnswers: answers,
+        questionsInBlock40: answers.length,
+        correctInBlock40: answers.filter(Boolean).length,
+      };
+    }
+
     case 'CLEAR_FEEDBACK':
       return { ...state, feedback: null };
 
@@ -129,6 +146,13 @@ export function gameSessionReducer(state: GameSessionState, action: GameSessionA
 
 export const useGameSession = (gameMode: GameMode | null, childId?: string | null) => {
   const [state, dispatch] = useReducer(gameSessionReducer, INITIAL_GAME_SESSION_STATE);
+
+  // Synchronously cache access_token from AuthContext for keepalive requests on beforeunload/visibilitychange
+  const { session } = useAuth();
+  const latestSessionTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    latestSessionTokenRef.current = session?.access_token || null;
+  }, [session]);
 
   // Session ID lifecycle
   const sessionIdRef = useRef<string>(generateSessionId());
@@ -180,6 +204,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
   const totalQuestionsRef = useRef<number>(0);
   const totalCorrectRef = useRef<number>(0);
   const perfectBlocksCountRef = useRef<number>(0);
+  const recentAnswersRef = useRef<boolean[]>([]);
 
   // Latest mutable ref to state for flushing on unmount / navigation
   const latestRef = useRef({
@@ -195,6 +220,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     totalQuestionsRef.current = state.totalQuestions;
     totalCorrectRef.current = state.totalCorrect;
     perfectBlocksCountRef.current = state.perfectBlocksCount;
+    recentAnswersRef.current = state.recentAnswers;
 
     latestRef.current = {
       gameMode,
@@ -204,25 +230,33 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
       totalCorrect: state.totalCorrect,
       perfectBlocksCount: state.perfectBlocksCount,
     };
-  }, [gameMode, state.totalQuestions, state.totalCorrect, state.perfectBlocksCount]);
+  }, [gameMode, state.totalQuestions, state.totalCorrect, state.perfectBlocksCount, state.recentAnswers]);
 
   // Synchronous or asynchronous flush of the current session on completion
-  const flushCompletedSession = useCallback((override?: { mode?: GameMode | null; childId?: string | null }) => {
-    const mode = override?.mode !== undefined ? override.mode : latestRef.current.gameMode;
-    const currentChildId = override?.childId !== undefined ? override.childId : latestRef.current.childId;
-    const { sessionId, totalQuestions, totalCorrect, perfectBlocksCount } = latestRef.current;
-    
-    if (!mode || totalQuestions <= 0 || isCompletedRef.current) {
-      return;
-    }
+  const flushCompletedSession = useCallback(
+    (override?: {
+      mode?: GameMode | null;
+      childId?: string | null;
+      transport?: 'default' | 'keepalive';
+    }) => {
+      const mode = override?.mode !== undefined ? override.mode : latestRef.current.gameMode;
+      const currentChildId = override?.childId !== undefined ? override.childId : latestRef.current.childId;
+      const { sessionId, totalQuestions, totalCorrect, perfectBlocksCount } = latestRef.current;
+      
+      if (!mode || totalQuestions <= 0 || isCompletedRef.current) {
+        return;
+      }
 
-    isCompletedRef.current = true;
-    const durationSeconds = getActiveDurationSeconds();
+      isCompletedRef.current = true;
+      const durationSeconds = getActiveDurationSeconds();
 
-    if (currentChildId) {
-      // Authenticated child -> Supabase sync via sequential queue
-      enqueueSync(() =>
-        syncGameSessionToSupabase({
+      if (currentChildId) {
+        // Authenticated child -> Supabase sync via sequential queue
+        const syncOptions = override?.transport === 'keepalive'
+          ? { transport: 'keepalive' as const, accessToken: latestSessionTokenRef.current }
+          : undefined;
+
+        const sessionPayload = {
           id: sessionId,
           childId: currentChildId,
           gameMode: mode,
@@ -230,13 +264,58 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
           totalCorrect,
           perfectBlocksCount,
           durationSeconds,
-          status: 'completed',
+          status: 'completed' as const,
           startedAt: sessionStartedAtRef.current,
           endedAt: new Date().toISOString(),
-        })
+        };
+
+        enqueueSync(() =>
+          syncOptions
+            ? syncGameSessionToSupabase(sessionPayload, syncOptions)
+            : syncGameSessionToSupabase(sessionPayload)
+        );
+      }
+    },
+    [enqueueSync, getActiveDurationSeconds]
+  );
+
+  // Background persistence when tab is hidden or backgrounded (does NOT complete session)
+  const persistCurrentSession = useCallback(
+    (override?: { transport?: 'default' | 'keepalive' }) => {
+      const mode = latestRef.current.gameMode;
+      const currentChildId = latestRef.current.childId;
+      const { sessionId, totalQuestions, totalCorrect, perfectBlocksCount } = latestRef.current;
+
+      if (!mode || totalQuestions <= 0 || isCompletedRef.current || !currentChildId) {
+        return;
+      }
+
+      const durationSeconds = getActiveDurationSeconds();
+
+      const syncOptions = override?.transport === 'keepalive'
+        ? { transport: 'keepalive' as const, accessToken: latestSessionTokenRef.current }
+        : undefined;
+
+      const sessionPayload = {
+        id: sessionId,
+        childId: currentChildId,
+        gameMode: mode,
+        totalQuestions,
+        totalCorrect,
+        perfectBlocksCount,
+        durationSeconds,
+        status: 'active' as const,
+        startedAt: sessionStartedAtRef.current,
+      };
+
+      enqueueSync(() =>
+        syncOptions
+          ? syncGameSessionToSupabase(sessionPayload, syncOptions)
+          : syncGameSessionToSupabase(sessionPayload)
       );
-    }
-  }, [enqueueSync, getActiveDurationSeconds]);
+    },
+    [enqueueSync, getActiveDurationSeconds]
+  );
 
   // Atomic combined transition effect for gameMode and childId
   const prevGameModeRef = useRef<GameMode | null>(gameMode);
@@ -264,7 +343,17 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
       sessionChildIdRef.current = nextChild;
       isCompletedRef.current = false;
       resetActiveTimer();
+      recentAnswersRef.current = [];
       dispatch({ type: 'RESET_SESSION' });
+
+      // Restore rolling-window progress if available for the new mode and child
+      if (nextChild && nextMode) {
+        const saved = loadGameProgress(nextChild, nextMode);
+        if (saved && saved.length > 0) {
+          recentAnswersRef.current = saved;
+          dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: saved });
+        }
+      }
     } else if (childChanged) {
       // 2. Mode stayed the same, but childId changed
       if (prevChild !== null) {
@@ -276,10 +365,26 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
         sessionChildIdRef.current = nextChild;
         isCompletedRef.current = false;
         resetActiveTimer();
+        recentAnswersRef.current = [];
         dispatch({ type: 'RESET_SESSION' });
+
+        if (nextChild && nextMode) {
+          const saved = loadGameProgress(nextChild, nextMode);
+          if (saved && saved.length > 0) {
+            recentAnswersRef.current = saved;
+            dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: saved });
+          }
+        }
       } else if (nextChild !== null) {
         // Adopt selected child
         sessionChildIdRef.current = nextChild;
+        if (nextMode) {
+          const saved = loadGameProgress(nextChild, nextMode);
+          if (saved && saved.length > 0) {
+            recentAnswersRef.current = saved;
+            dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: saved });
+          }
+        }
       }
     }
 
@@ -288,7 +393,21 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     };
   }, [gameMode, childId, flushCompletedSession, resetActiveTimer]);
 
+  // Restore rolling-window progress on initial mount if gameMode and childId are present
+  const initialProgressLoadedRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (!initialProgressLoadedRef.current && gameMode && childId) {
+      initialProgressLoadedRef.current = true;
+      const saved = loadGameProgress(childId, gameMode);
+      if (saved && saved.length > 0) {
+        recentAnswersRef.current = saved;
+        dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: saved });
+      }
+    }
+  }, [gameMode, childId]);
+
   // Page Visibility API event listener to accurately pause/resume active play timer
+  // and persist active progress on tab hide
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (typeof document === 'undefined') return;
@@ -297,6 +416,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
           accumulatedActiveMsRef.current += Date.now() - lastActiveResumeMsRef.current;
           isTabVisibleRef.current = false;
         }
+        persistCurrentSession({ transport: 'keepalive' });
       } else {
         if (!isTabVisibleRef.current) {
           lastActiveResumeMsRef.current = Date.now();
@@ -305,14 +425,14 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
       }
     };
 
-    document.addEventListener('addEventListener' in document ? 'visibilitychange' : 'visibilitychange', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
+  }, [persistCurrentSession]);
 
   // Sync game stats when user closes tab/window
   useEffect(() => {
     const handleBeforeUnload = () => {
-      flushCompletedSession();
+      flushCompletedSession({ transport: 'keepalive' });
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
@@ -321,9 +441,11 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
   }, [flushCompletedSession]);
 
   const recordAnswer = useCallback((isCorrect: boolean): { isBlock40Completed: boolean } => {
-    const currentRecent = state.recentAnswers || [];
+    const currentRecent = recentAnswersRef.current || [];
     const updatedRecent = [...currentRecent, isCorrect].slice(-40);
     const isWishQualified = updatedRecent.length === 40 && updatedRecent.filter(Boolean).length >= 39;
+
+    recentAnswersRef.current = isWishQualified ? [] : updatedRecent;
 
     totalQuestionsRef.current += 1;
     if (isCorrect) {
@@ -348,6 +470,15 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     };
 
     dispatch({ type: 'RECORD_ANSWER', isCorrect });
+
+    // Persist rolling-window progress in localStorage for authenticated sessions
+    if (sessionChildIdRef.current && gameMode) {
+      if (isWishQualified) {
+        clearGameProgress(sessionChildIdRef.current, gameMode);
+      } else {
+        saveGameProgress(sessionChildIdRef.current, gameMode, updatedRecent);
+      }
+    }
 
     // Auto-save every 10 questions for authenticated sessions (status: 'active')
     if (sessionChildIdRef.current && gameMode && currentTotalQuestions > 0 && currentTotalQuestions % 10 === 0) {
@@ -422,18 +553,24 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
   }, []);
 
   const resetSession = useCallback(() => {
-    // 1. Flush previous session
+    // 1. Clear saved progress from localStorage for current child and gameMode
+    if (sessionChildIdRef.current && gameMode) {
+      clearGameProgress(sessionChildIdRef.current, gameMode);
+    }
+
+    // 2. Flush previous session
     flushCompletedSession();
 
-    // 2. Generate a new session ID and reset session start time
+    // 3. Generate a new session ID and reset session start time
     sessionIdRef.current = generateSessionId();
     sessionChildIdRef.current = childId || null;
     isCompletedRef.current = false;
     resetActiveTimer();
 
-    // 3. Reset state
+    // 4. Reset state
+    recentAnswersRef.current = [];
     dispatch({ type: 'RESET_SESSION' });
-  }, [flushCompletedSession, childId, resetActiveTimer]);
+  }, [flushCompletedSession, childId, gameMode, resetActiveTimer]);
 
   return {
     ...state,

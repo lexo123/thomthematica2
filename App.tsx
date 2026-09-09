@@ -109,6 +109,7 @@ const App: React.FC = () => {
     resetColMultState,
     registerCellRef,
     focusFirstCell,
+    registerSubmitHandler,
   } = useColumnMultiplication(problem);
 
   useEffect(() => {
@@ -214,6 +215,10 @@ const App: React.FC = () => {
 
     processAnswerResult(isCorrect, actualUserAnswer);
   };
+
+  useEffect(() => {
+    registerSubmitHandler(handleSubmit);
+  }, [registerSubmitHandler, handleSubmit]);
 
   const handleNext = (force: boolean = false) => {
     if (showWishModal && !force) return;

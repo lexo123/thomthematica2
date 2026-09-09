@@ -22,6 +22,13 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
   // React Ref Map for idiomatic input cell focus management without DOM getElementById
   const cellRefsMap = useRef<Map<string, HTMLInputElement>>(new Map());
 
+  // Ref-based registration pattern for submitting answer on Enter in final cell
+  const submitHandlerRef = useRef<(() => void) | null>(null);
+
+  const registerSubmitHandler = useCallback((fn: () => void) => {
+    submitHandlerRef.current = fn;
+  }, []);
+
   const registerCellRef = useCallback((row: string, colIndex: number, el: HTMLInputElement | null) => {
     const key = `${row}-${colIndex}`;
     if (el) {
@@ -132,6 +139,8 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
         setTimeout(() => {
           focusCell(nextCell.row, nextCell.col);
         }, CELL_FOCUS_DELAY_MS);
+      } else if (e.key === 'Enter' && currentIndex === sequence.length - 1) {
+        submitHandlerRef.current?.();
       }
       return;
     }
@@ -193,6 +202,7 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
     isColMultFilled,
     resetColMultState,
     registerCellRef,
-    focusFirstCell
+    focusFirstCell,
+    registerSubmitHandler,
   };
 };
