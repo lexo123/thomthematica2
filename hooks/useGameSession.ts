@@ -7,6 +7,7 @@ import {
   loadGameProgress,
   clearGameProgress,
 } from '../services/gameProgressStorage';
+import { getWishBlockSize, getWishQualificationThreshold } from '../utils/wishBlockSize';
 
 /**
  * Time (in ms) to delay showing the Wish Modal upon completing 40 questions.
@@ -39,7 +40,7 @@ export interface GameSessionState {
 }
 
 type GameSessionAction =
-  | { type: 'RECORD_ANSWER'; isCorrect: boolean }
+  | { type: 'RECORD_ANSWER'; isCorrect: boolean; blockSize?: number }
   | { type: 'CLEAR_FEEDBACK' }
   | { type: 'SET_SHOW_WISH_MODAL'; show: boolean }
   | { type: 'SET_WISH_TEXT'; text: string }
@@ -70,16 +71,18 @@ export function gameSessionReducer(state: GameSessionState, action: GameSessionA
   switch (action.type) {
     case 'RECORD_ANSWER': {
       const isCorrect = action.isCorrect;
+      const blockSize = action.blockSize ?? 40;
+      const threshold = getWishQualificationThreshold(blockSize);
       const newTotalQuestions = state.totalQuestions + 1;
       const newTotalCorrect = state.totalCorrect + (isCorrect ? 1 : 0);
       const newStreakCount = isCorrect ? state.streakCount + 1 : 0;
       
       const currentRecent = state.recentAnswers || [];
-      const updatedRecentAnswers = [...currentRecent, isCorrect].slice(-40);
+      const updatedRecentAnswers = [...currentRecent, isCorrect].slice(-blockSize);
       const windowSize = updatedRecentAnswers.length;
       const correctInWindow = updatedRecentAnswers.filter(Boolean).length;
 
-      const isWishQualified = windowSize === 40 && correctInWindow >= 39;
+      const isWishQualified = windowSize === blockSize && correctInWindow >= threshold;
 
       let nextRecentAnswers = updatedRecentAnswers;
       let lastCompletedBlockCorrectCount = state.lastCompletedBlockCorrectCount;
@@ -87,10 +90,10 @@ export function gameSessionReducer(state: GameSessionState, action: GameSessionA
 
       if (isWishQualified) {
         lastCompletedBlockCorrectCount = correctInWindow;
-        if (correctInWindow === 40) {
+        if (correctInWindow === blockSize) {
           perfectBlocksCount += 1;
         }
-        // Reset sliding window after achieving a qualified 40-question block
+        // Reset sliding window after achieving a qualified block
         nextRecentAnswers = [];
       }
 
@@ -350,8 +353,10 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
       if (nextChild && nextMode) {
         const saved = loadGameProgress(nextChild, nextMode);
         if (saved && saved.length > 0) {
-          recentAnswersRef.current = saved;
-          dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: saved });
+          const blockSize = getWishBlockSize(nextMode);
+          const trimmed = saved.slice(-blockSize);
+          recentAnswersRef.current = trimmed;
+          dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: trimmed });
         }
       }
     } else if (childChanged) {
@@ -371,8 +376,10 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
         if (nextChild && nextMode) {
           const saved = loadGameProgress(nextChild, nextMode);
           if (saved && saved.length > 0) {
-            recentAnswersRef.current = saved;
-            dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: saved });
+            const blockSize = getWishBlockSize(nextMode);
+            const trimmed = saved.slice(-blockSize);
+            recentAnswersRef.current = trimmed;
+            dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: trimmed });
           }
         }
       } else if (nextChild !== null) {
@@ -381,8 +388,10 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
         if (nextMode) {
           const saved = loadGameProgress(nextChild, nextMode);
           if (saved && saved.length > 0) {
-            recentAnswersRef.current = saved;
-            dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: saved });
+            const blockSize = getWishBlockSize(nextMode);
+            const trimmed = saved.slice(-blockSize);
+            recentAnswersRef.current = trimmed;
+            dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: trimmed });
           }
         }
       }
@@ -400,8 +409,10 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
       initialProgressLoadedRef.current = true;
       const saved = loadGameProgress(childId, gameMode);
       if (saved && saved.length > 0) {
-        recentAnswersRef.current = saved;
-        dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: saved });
+        const blockSize = getWishBlockSize(gameMode);
+        const trimmed = saved.slice(-blockSize);
+        recentAnswersRef.current = trimmed;
+        dispatch({ type: 'RESTORE_PROGRESS', recentAnswers: trimmed });
       }
     }
   }, [gameMode, childId]);
@@ -441,9 +452,11 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
   }, [flushCompletedSession]);
 
   const recordAnswer = useCallback((isCorrect: boolean): { isBlock40Completed: boolean } => {
+    const blockSize = getWishBlockSize(gameMode);
+    const threshold = getWishQualificationThreshold(blockSize);
     const currentRecent = recentAnswersRef.current || [];
-    const updatedRecent = [...currentRecent, isCorrect].slice(-40);
-    const isWishQualified = updatedRecent.length === 40 && updatedRecent.filter(Boolean).length >= 39;
+    const updatedRecent = [...currentRecent, isCorrect].slice(-blockSize);
+    const isWishQualified = updatedRecent.length === blockSize && updatedRecent.filter(Boolean).length >= threshold;
 
     recentAnswersRef.current = isWishQualified ? [] : updatedRecent;
 
@@ -451,7 +464,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
     if (isCorrect) {
       totalCorrectRef.current += 1;
     }
-    if (isWishQualified && updatedRecent.filter(Boolean).length === 40) {
+    if (isWishQualified && updatedRecent.filter(Boolean).length === blockSize) {
       perfectBlocksCountRef.current += 1;
     }
 
@@ -469,7 +482,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
       perfectBlocksCount: currentPerfectBlocksCount,
     };
 
-    dispatch({ type: 'RECORD_ANSWER', isCorrect });
+    dispatch({ type: 'RECORD_ANSWER', isCorrect, blockSize });
 
     // Persist rolling-window progress in localStorage for authenticated sessions
     if (sessionChildIdRef.current && gameMode) {
@@ -498,7 +511,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
       );
     }
 
-    // Show wish modal ONLY if 39 or 40 questions were correct in the completed 40-question rolling window
+    // Show wish modal ONLY if (blockSize - 1) or blockSize questions were correct in the completed rolling window
     if (isWishQualified) {
       setTimeout(() => {
         dispatch({ type: 'SET_SHOW_WISH_MODAL', show: true });
@@ -575,6 +588,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
   return {
     ...state,
     sessionId: sessionIdRef.current,
+    blockSize: getWishBlockSize(gameMode),
     recordAnswer,
     handleWishSubmit,
     closeWishModal,

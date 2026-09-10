@@ -603,5 +603,47 @@ describe('ParentDashboard UI Component', () => {
     rerender(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
     expect(screen.queryByText('🎮 თამაშის რეჟიმები')).toBeNull();
   });
+
+  it('correctly formats wish badges for 20-block sizes (20/20 perfect and 19/20 near-perfect)', () => {
+    vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
+      stats: {
+        completedSessionCount: 1,
+        totalQuestions: 20,
+        totalCorrect: 20,
+        accuracyPercent: 100.0,
+        perfectBlocksCount: 1,
+      },
+      recentSessions: [],
+      wishes: [
+        {
+          id: 'w-20-perfect',
+          child_id: 'child-1',
+          wish_text: 'რობოტი',
+          correct_count: 20,
+          status: 'fulfilled',
+          created_at: '2026-09-10T10:00:00Z',
+        },
+        {
+          id: 'w-20-near',
+          child_id: 'child-1',
+          wish_text: 'თვითმფრინავი',
+          correct_count: 19,
+          status: 'pending',
+          created_at: '2026-09-10T11:00:00Z',
+        },
+      ],
+      gameModeBreakdown: {},
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
+
+    expect(screen.getByText('⭐ 20/20 ბლოკი')).toBeDefined();
+    expect(screen.getByText('🎯 19/20 ბლოკი')).toBeDefined();
+    expect(screen.getByText('✨ რობოტი')).toBeDefined();
+    expect(screen.getByText('✨ თვითმფრინავი')).toBeDefined();
+  });
 });
 

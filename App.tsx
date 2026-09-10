@@ -63,6 +63,7 @@ const App: React.FC = () => {
     totalQuestions,
     totalCorrect,
     lastCompletedBlockCorrectCount,
+    blockSize,
     showWishModal,
     wishText,
     wishSubmitting,
@@ -430,6 +431,7 @@ const App: React.FC = () => {
       {showWishModal && (
         <WishModal 
           lastCompletedBlockCorrectCount={lastCompletedBlockCorrectCount}
+          blockSize={blockSize}
           wishText={wishText}
           isSendingWish={wishSubmitting}
           onWishTextChange={setWishText}

@@ -23,7 +23,7 @@ export interface WishSyncPayload {
   id?: string;
   childId: string;
   wishText: string;
-  correctCount: 39 | 40 | number;
+  correctCount: 19 | 20 | 39 | 40 | number;
   status?: 'pending' | 'fulfilled';
   fulfilledAt?: string | null;
   createdAt?: string;
@@ -132,8 +132,11 @@ export const syncWishToSupabase = async (
     return { success: false, error: 'Supabase client is not available' };
   }
 
-  // Schema constraint: correct_count IN (39, 40)
-  const validCorrectCount = wish.correctCount === 39 ? 39 : 40;
+  // Schema constraint: correct_count IN (19, 20, 39, 40) — allows 19/20 for Kveshmicera (DB migration pending, Commit #5B)
+  const ALLOWED_CORRECT_COUNTS = [19, 20, 39, 40];
+  const validCorrectCount = ALLOWED_CORRECT_COUNTS.includes(wish.correctCount)
+    ? wish.correctCount
+    : 40;
   const status = wish.status || 'pending';
 
   const payload: Record<string, any> = {

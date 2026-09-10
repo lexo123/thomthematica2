@@ -85,7 +85,7 @@ export interface Wish {
   id: string;
   child_id: string;
   wish_text: string;
-  correct_count: 39 | 40;
+  correct_count: 19 | 20 | 39 | 40;
   status: 'pending' | 'fulfilled';
   fulfilled_at?: string | null;
   created_at: string;

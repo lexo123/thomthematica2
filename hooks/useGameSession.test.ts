@@ -116,6 +116,57 @@ describe('gameSessionReducer (40-question rolling window)', () => {
   });
 });
 
+describe('gameSessionReducer (20-question rolling window for Kveshmicera)', () => {
+  it('should correctly store lastCompletedBlockCorrectCount for a 20/20 perfect block and reset window', () => {
+    let state: GameSessionState = INITIAL_GAME_SESSION_STATE;
+
+    // Simulate 20 correct answers with blockSize: 20
+    for (let i = 0; i < 20; i++) {
+      state = gameSessionReducer(state, { type: 'RECORD_ANSWER', isCorrect: true, blockSize: 20 });
+    }
+
+    expect(state.totalQuestions).toBe(20);
+    expect(state.totalCorrect).toBe(20);
+    expect(state.recentAnswers.length).toBe(0); // Reset after wish qualified
+    expect(state.questionsInBlock40).toBe(0);
+    expect(state.correctInBlock40).toBe(0);
+    expect(state.lastCompletedBlockCorrectCount).toBe(20);
+    expect(state.perfectBlocksCount).toBe(1);
+  });
+
+  it('should correctly trigger for 19/20 block and store 19', () => {
+    let state: GameSessionState = INITIAL_GAME_SESSION_STATE;
+
+    for (let i = 0; i < 19; i++) {
+      state = gameSessionReducer(state, { type: 'RECORD_ANSWER', isCorrect: true, blockSize: 20 });
+    }
+    state = gameSessionReducer(state, { type: 'RECORD_ANSWER', isCorrect: false, blockSize: 20 });
+
+    expect(state.totalQuestions).toBe(20);
+    expect(state.totalCorrect).toBe(19);
+    expect(state.recentAnswers.length).toBe(0); // Reset after wish qualified
+    expect(state.lastCompletedBlockCorrectCount).toBe(19);
+    expect(state.perfectBlocksCount).toBe(0);
+  });
+
+  it('should NOT trigger wish modal for 18/20 block and keep sliding window open', () => {
+    let state: GameSessionState = INITIAL_GAME_SESSION_STATE;
+
+    for (let i = 0; i < 18; i++) {
+      state = gameSessionReducer(state, { type: 'RECORD_ANSWER', isCorrect: true, blockSize: 20 });
+    }
+    for (let i = 0; i < 2; i++) {
+      state = gameSessionReducer(state, { type: 'RECORD_ANSWER', isCorrect: false, blockSize: 20 });
+    }
+
+    expect(state.totalQuestions).toBe(20);
+    expect(state.totalCorrect).toBe(18);
+    // Window stays at 20 to slide
+    expect(state.recentAnswers.length).toBe(20);
+    expect(state.lastCompletedBlockCorrectCount).toBe(0);
+  });
+});
+
 describe('useGameSession (Supabase Sync)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -914,8 +965,58 @@ describe('useGameSession (Supabase Sync)', () => {
       expect(result.current.recentAnswers).toEqual([true, true, false]);
       expect(result.current.questionsInBlock40).toBe(3);
       expect(result.current.correctInBlock40).toBe(2);
+      expect(result.current.blockSize).toBe(40);
+    });
+
+    it('handles Kveshmicera 20-block qualification and clears localStorage upon 20-question block completion', () => {
+      const { result } = renderHook(
+        ({ mode, childId }) => useGameSession(mode, childId),
+        { initialProps: { mode: GameMode.Kveshmicera, childId: 'child-kvesh-1' } }
+      );
+
+      expect(result.current.blockSize).toBe(20);
+
+      // Record 19 correct answers
+      act(() => {
+        for (let i = 0; i < 19; i++) {
+          const res = result.current.recordAnswer(true);
+          expect(res.isBlock40Completed).toBe(false);
+        }
+      });
+
+      expect(result.current.questionsInBlock40).toBe(19);
+      expect(result.current.correctInBlock40).toBe(19);
+      expect(loadGameProgress('child-kvesh-1', GameMode.Kveshmicera)?.length).toBe(19);
+
+      // 20th answer (correct) completes the 20-question block!
+      let lastRes: { isBlock40Completed: boolean };
+      act(() => {
+        lastRes = result.current.recordAnswer(true);
+      });
+
+      expect(lastRes!.isBlock40Completed).toBe(true);
+      expect(result.current.lastCompletedBlockCorrectCount).toBe(20);
+      expect(result.current.perfectBlocksCount).toBe(1);
+      // localStorage cleared after qualified wish block
+      expect(loadGameProgress('child-kvesh-1', GameMode.Kveshmicera)).toBeNull();
+      // Window reset
+      expect(result.current.recentAnswers.length).toBe(0);
+      expect(result.current.questionsInBlock40).toBe(0);
+    });
+
+    it('restores and trims Kveshmicera progress if localStorage has more than 20 answers', () => {
+      const longAnswers = Array(25).fill(true);
+      saveGameProgress('child-trim-1', GameMode.Kveshmicera, longAnswers);
+
+      const { result } = renderHook(
+        ({ mode, childId }) => useGameSession(mode, childId),
+        { initialProps: { mode: GameMode.Kveshmicera, childId: 'child-trim-1' } }
+      );
+
+      // Sliced to last 20 answers
+      expect(result.current.recentAnswers.length).toBe(20);
+      expect(result.current.questionsInBlock40).toBe(20);
     });
   });
 });
-
 

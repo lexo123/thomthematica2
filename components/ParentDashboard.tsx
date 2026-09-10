@@ -288,7 +288,13 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClo
                 <div className="flex flex-col min-w-0 mr-2">
                   <span className="font-bold text-amber-950 truncate">✨ {w.wish_text}</span>
                   <span className="text-[11px] text-amber-700">
-                    {w.correct_count === 40 ? '⭐ 40/40 ბლოკი' : '🎯 39/40 ბლოკი'}
+                    {(() => {
+                      const blockSize = w.correct_count > 20 ? 40 : 20;
+                      const isPerfect = w.correct_count === blockSize;
+                      return isPerfect
+                        ? `⭐ ${blockSize}/${blockSize} ბლოკი`
+                        : `🎯 ${w.correct_count}/${blockSize} ბლოკი`;
+                    })()}
                   </span>
                 </div>
                 <span

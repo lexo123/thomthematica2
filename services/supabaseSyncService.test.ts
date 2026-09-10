@@ -243,6 +243,56 @@ describe('supabaseSyncService (Schema Alignment)', () => {
       expect(result.success).toBe(true);
       expect(result.data?.id).toBe('wish-123');
     });
+
+    it('successfully maps and allows correct_count 19 and 20 for Kveshmicera blocks', async () => {
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: {
+          id: 'wish-20',
+          child_id: 'child-123',
+          wish_text: 'Kveshmicera Wish',
+          correct_count: 20,
+          status: 'pending',
+          fulfilled_at: null,
+          created_at: new Date().toISOString(),
+        },
+        error: null,
+      });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockUpsert = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockFrom = vi.fn().mockReturnValue({ upsert: mockUpsert });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result20 = await syncWishToSupabase({
+        childId: 'child-123',
+        wishText: 'Kveshmicera Wish 20',
+        correctCount: 20,
+        status: 'pending',
+      });
+
+      expect(mockUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          correct_count: 20,
+        })
+      );
+      expect(result20.success).toBe(true);
+
+      const result19 = await syncWishToSupabase({
+        childId: 'child-123',
+        wishText: 'Kveshmicera Wish 19',
+        correctCount: 19,
+        status: 'pending',
+      });
+
+      expect(mockUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          correct_count: 19,
+        })
+      );
+      expect(result19.success).toBe(true);
+    });
   });
 
   describe('updateWishStatus', () => {
