@@ -1017,6 +1017,35 @@ describe('useGameSession (Supabase Sync)', () => {
       expect(result.current.recentAnswers.length).toBe(20);
       expect(result.current.questionsInBlock40).toBe(20);
     });
+
+    it('restores 19 saved Kveshmicera answers, then qualifies correctly as a 20-block on the next answer', () => {
+      // Pre-populate localStorage with 19 saved answers (not yet qualified)
+      saveGameProgress('child-restore-kvesh-1', GameMode.Kveshmicera, Array(19).fill(true));
+
+      const { result } = renderHook(
+        ({ mode, childId }) => useGameSession(mode, childId),
+        { initialProps: { mode: GameMode.Kveshmicera, childId: 'child-restore-kvesh-1' } }
+      );
+
+      // Restore-ის შემდეგ, mount-ზევე
+      expect(result.current.recentAnswers.length).toBe(19);
+      expect(result.current.questionsInBlock40).toBe(19);
+      expect(result.current.blockSize).toBe(20);
+
+      // შემდეგი (მე-20) პასუხი
+      let res: { isBlock40Completed: boolean };
+      act(() => {
+        res = result.current.recordAnswer(true);
+      });
+
+      // 🔑 ძირითადი assertion: qualification ხდება 20-block-ის წესით (არა 40-ის მოლოდინში "დაკიდებული")
+      expect(res!.isBlock40Completed).toBe(true);
+      expect(result.current.lastCompletedBlockCorrectCount).toBe(20);
+      expect(result.current.perfectBlocksCount).toBe(1);
+      expect(result.current.recentAnswers.length).toBe(0);
+      expect(loadGameProgress('child-restore-kvesh-1', GameMode.Kveshmicera)).toBeNull();
+    });
   });
 });
+
 
