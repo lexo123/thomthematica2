@@ -311,4 +311,77 @@ describe('Phase 3 - Kveshmicera Retry & Question-level Recording Flow', () => {
       expect(screen.getByText('ბრავო თომა!')).toBeDefined();
     }, { timeout: 3000 });
   });
+
+  it('G. Repeated submission guard: repeating Enter / submit on Correct overlay does not duplicate recorded correct answers', () => {
+    const q1: MathProblem = {
+      category: 'math',
+      num1: 24,
+      num2: 12,
+      operation: Operation.Multiply,
+      answer: 288,
+    };
+    setupDeterministicProblems([q1]);
+
+    render(<App />);
+    fireEvent.click(screen.getByText('ქვეშმიწერით გამრავლება ✍️'));
+
+    // Fill correct digits
+    fillKveshDigits(24, 12, false);
+
+    // Column multiplication right-to-left ends at column 0 (cell-res-0)
+    const lastCell = document.getElementById('cell-res-0') as HTMLInputElement;
+
+    // Submit 1st time via Enter on final cell
+    fireEvent.keyDown(lastCell, { key: 'Enter' });
+
+    // 1 correct answer recorded: session score is 1/1
+    expect(screen.getByText('1/1')).toBeDefined();
+
+    // ResultOverlay ("სწორია") is visible with "შემდეგი" button
+    expect(screen.getByRole('button', { name: /შემდეგი/ })).toBeDefined();
+
+    // Repeat submission trigger 4 times while overlay is showing (gameState === Correct)
+    for (let i = 0; i < 4; i++) {
+      fireEvent.keyDown(lastCell, { key: 'Enter' });
+      const checkBtn = screen.queryByRole('button', { name: /შემოწმება/ });
+      if (checkBtn) {
+        fireEvent.click(checkBtn);
+      }
+    }
+
+    // Session score MUST still be 1/1, NOT 5/5
+    expect(screen.getByText('1/1')).toBeDefined();
+    expect(screen.queryByText('2/2')).toBeNull();
+    expect(screen.queryByText('5/5')).toBeNull();
+  });
+
+  it('H. Repeated submission guard does not break inline retry: retry submissions in Playing state proceed normally', () => {
+    const q1: MathProblem = {
+      category: 'math',
+      num1: 24,
+      num2: 12,
+      operation: Operation.Multiply,
+      answer: 288,
+    };
+    setupDeterministicProblems([q1]);
+
+    render(<App />);
+    fireEvent.click(screen.getByText('ქვეშმიწერით გამრავლება ✍️'));
+
+    // 1. Enter wrong digits and submit
+    fillKveshDigits(24, 12, true);
+    submitKvesh();
+
+    // Answer recorded as incorrect (0/1), inline validation error message shown, overlay NOT shown
+    expect(screen.getByText('0/1')).toBeDefined();
+    expect(screen.getByText(/ზოგიერთი ციფრი არასწორია/i)).toBeDefined();
+    expect(screen.queryByRole('button', { name: /შემდეგი/ })).toBeNull();
+
+    // 2. Legitimate retry: child corrects digits and submits again (still in Playing state)
+    fillKveshDigits(24, 12, false);
+    submitKvesh();
+
+    // Submission is accepted, transition to Correct state occurs with ResultOverlay
+    expect(screen.getByRole('button', { name: /შემდეგი/ })).toBeDefined();
+  });
 });

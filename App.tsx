@@ -192,6 +192,7 @@ const App: React.FC = () => {
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!problem) return;
+    if (gameState !== GameState.Playing) return;
 
     if (gameMode !== GameMode.Kveshmicera && !userAnswer) return;
 
