@@ -23,9 +23,9 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
   const cellRefsMap = useRef<Map<string, HTMLInputElement>>(new Map());
 
   // Ref-based registration pattern for submitting answer on Enter in final cell
-  const submitHandlerRef = useRef<(() => void) | null>(null);
+  const submitHandlerRef = useRef<(() => boolean) | null>(null);
 
-  const registerSubmitHandler = useCallback((fn: () => void) => {
+  const registerSubmitHandler = useCallback((fn: () => boolean) => {
     submitHandlerRef.current = fn;
   }, []);
 
@@ -140,8 +140,10 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
           focusCell(nextCell.row, nextCell.col);
         }, CELL_FOCUS_DELAY_MS);
       } else if (e.key === 'Enter' && currentIndex === sequence.length - 1) {
-        e.stopPropagation();
-        submitHandlerRef.current?.();
+        const didSubmit = submitHandlerRef.current?.();
+        if (didSubmit !== false) {
+          e.stopPropagation();
+        }
       }
       return;
     }

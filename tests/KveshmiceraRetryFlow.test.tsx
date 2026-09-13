@@ -342,7 +342,6 @@ describe('Phase 3 - Kveshmicera Retry & Question-level Recording Flow', () => {
 
     // Repeat submission trigger 4 times while overlay is showing (gameState === Correct)
     for (let i = 0; i < 4; i++) {
-      fireEvent.keyDown(lastCell, { key: 'Enter' });
       const checkBtn = screen.queryByRole('button', { name: /შემოწმება/ });
       if (checkBtn) {
         fireEvent.click(checkBtn);
@@ -383,5 +382,49 @@ describe('Phase 3 - Kveshmicera Retry & Question-level Recording Flow', () => {
 
     // Submission is accepted, transition to Correct state occurs with ResultOverlay
     expect(screen.getByRole('button', { name: /შემდეგი/ })).toBeDefined();
+  });
+
+  it('I. Enter on last cell closes ResultOverlay and advances to next problem when overlay is showing', () => {
+    const q1: MathProblem = {
+      category: 'math',
+      num1: 24,
+      num2: 12,
+      operation: Operation.Multiply,
+      answer: 288,
+    };
+    const q2: MathProblem = {
+      category: 'math',
+      num1: 35,
+      num2: 14,
+      operation: Operation.Multiply,
+      answer: 490,
+    };
+    setupDeterministicProblems([q1, q2]);
+
+    render(<App />);
+    fireEvent.click(screen.getByText('ქვეშმიწერით გამრავლება ✍️'));
+
+    // Solve q1 correctly
+    fillKveshDigits(24, 12, false);
+    const lastCell = document.getElementById('cell-res-0') as HTMLInputElement;
+
+    // First Enter submits the answer and shows ResultOverlay
+    fireEvent.keyDown(lastCell, { key: 'Enter' });
+
+    // ResultOverlay is showing with "შემდეგი" button
+    expect(screen.getByRole('button', { name: /შემდეგი/ })).toBeDefined();
+
+    // Second Enter on last cell (while overlay is shown):
+    // didSubmit is false -> event is NOT stopped -> bubbles to window listener -> closes overlay and advances
+    fireEvent.keyDown(lastCell, { key: 'Enter' });
+
+    // Overlay is closed, next question (35 × 14) is now displayed in Playing state
+    expect(screen.queryByRole('button', { name: /შემდეგი/ })).toBeNull();
+    // In ColumnMultiplication, 35 is rendered as separate digits '3' and '5', and 14 as '1' and '4'
+    expect(screen.getByText('3')).toBeDefined();
+    expect(screen.getByText('5')).toBeDefined();
+    expect(screen.getByText('1')).toBeDefined();
+    expect(screen.getByText('4')).toBeDefined();
+    expect(document.getElementById('cell-res-0')).not.toBeNull();
   });
 });

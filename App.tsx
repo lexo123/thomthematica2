@@ -189,12 +189,12 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = (e?: React.FormEvent): boolean => {
     if (e) e.preventDefault();
-    if (!problem) return;
-    if (gameState !== GameState.Playing) return;
+    if (!problem) return false;
+    if (gameState !== GameState.Playing) return false;
 
-    if (gameMode !== GameMode.Kveshmicera && !userAnswer) return;
+    if (gameMode !== GameMode.Kveshmicera && !userAnswer) return false;
 
     stopTimer();
 
@@ -202,7 +202,7 @@ const App: React.FC = () => {
     let actualUserAnswer = userAnswer;
 
     if (gameMode === GameMode.Kveshmicera) {
-      if (!('num1' in problem && 'num2' in problem) || problem.num1 === undefined || problem.num2 === undefined) return;
+      if (!('num1' in problem && 'num2' in problem) || problem.num1 === undefined || problem.num2 === undefined) return false;
       const { r1: expR1, r2: expR2, res: expRes } = getExpectedDigits(problem.num1, problem.num2);
       let isAllCorrect = true;
       for (let c = 0; c < 4; c++) {
@@ -215,11 +215,12 @@ const App: React.FC = () => {
       actualUserAnswer = nonZeroRes.join('') || "0";
     } else {
       const val = parseInt(userAnswer, 10);
-      if (isNaN(val)) return;
+      if (isNaN(val)) return false;
       isCorrect = val === problem.answer;
     }
 
     processAnswerResult(isCorrect, actualUserAnswer);
+    return true;
   };
 
   useEffect(() => {
