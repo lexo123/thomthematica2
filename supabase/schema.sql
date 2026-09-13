@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS public.wishes (
   status TEXT NOT NULL DEFAULT 'pending',
   fulfilled_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT check_wish_correct_count CHECK (correct_count IN (39, 40)),
+  CONSTRAINT check_wish_correct_count CHECK (correct_count IN (19, 20, 39, 40)),
   CONSTRAINT check_wish_status CHECK (status IN ('pending', 'fulfilled')),
   CONSTRAINT check_wish_text_not_empty CHECK (LENGTH(TRIM(wish_text)) > 0)
 );
