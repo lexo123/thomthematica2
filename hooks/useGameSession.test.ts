@@ -1048,4 +1048,3 @@ describe('useGameSession (Supabase Sync)', () => {
   });
 });
 
-

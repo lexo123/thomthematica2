@@ -140,6 +140,7 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
           focusCell(nextCell.row, nextCell.col);
         }, CELL_FOCUS_DELAY_MS);
       } else if (e.key === 'Enter' && currentIndex === sequence.length - 1) {
+        e.stopPropagation();
         submitHandlerRef.current?.();
       }
       return;

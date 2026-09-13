@@ -136,9 +136,11 @@ describe('Phase 2.5 Game Modes Gate & activeChildId Propagation', () => {
     const checkBtn = screen.getByRole('button', { name: /შემოწმება/ });
     fireEvent.click(checkBtn);
 
-    // Click "შემდეგი" / "თავიდან სცადე"
-    const nextBtn = screen.getByRole('button', { name: /შემდეგი|თავიდან სცადე/ });
-    fireEvent.click(nextBtn);
+    // Under Kveshmicera retry UX, incorrect answers stay inline without generic Incorrect ResultOverlay ("თავიდან სცადე")
+    const nextBtn = screen.queryByRole('button', { name: /შემდეგი|თავიდან სცადე/ });
+    if (nextBtn) {
+      fireEvent.click(nextBtn);
+    }
 
     // 3. Return to Main Menu (Home)
     const homeBtn = screen.getByTitle('მთავარი მენიუ');

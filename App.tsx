@@ -176,6 +176,10 @@ const App: React.FC = () => {
       setIsPerfectBlock(false);
       setConsecutivePerfectBlocks(0);
 
+      if (gameMode === GameMode.Kveshmicera) {
+        return;
+      }
+
       const template = getRandomPhrase(INCORRECT_PHRASES);
       const finalMessage = template.replace("[]", actualUserAnswer);
       

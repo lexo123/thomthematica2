@@ -1,5 +1,6 @@
 {
   "name": "თომთემატიკა",
   "description": "სახალისო მათემატიკური თამაში თომასთვის. უპასუხე კითხვებს და მიიღე მეფის შეფასება!",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
