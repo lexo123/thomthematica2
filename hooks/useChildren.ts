@@ -19,6 +19,11 @@ export const CHILD_AVATARS: { id: string; emoji: string; label: string }[] = [
   { id: 'avatar_12', emoji: '🌟', label: 'ვარსკვლავი' },
 ];
 
+export const GENDER_OPTIONS: { id: 'boy' | 'girl'; emoji: string; label: string }[] = [
+  { id: 'boy', emoji: '👦', label: 'ბიჭი' },
+  { id: 'girl', emoji: '👧', label: 'გოგო' },
+];
+
 export const getAvatarEmoji = (avatarId?: string): string => {
   const found = CHILD_AVATARS.find(a => a.id === avatarId);
   return found ? found.emoji : '🦁';
@@ -69,7 +74,11 @@ export const useChildren = () => {
     fetchChildren();
   }, [fetchChildren]);
 
-  const addChild = async (name: string, avatarId: string = 'avatar_1'): Promise<{ child: Child | null; error: Error | null }> => {
+  const addChild = async (
+    name: string,
+    avatarId: string = 'avatar_1',
+    gender: 'boy' | 'girl' = 'boy'
+  ): Promise<{ child: Child | null; error: Error | null }> => {
     if (!user) {
       return { child: null, error: new Error('ავტორიზაცია აუცილებელია') };
     }
@@ -94,6 +103,7 @@ export const useChildren = () => {
           parent_id: user.id,
           name: trimmedName,
           avatar_id: avatarId,
+          gender: gender,
         })
         .select()
         .single();

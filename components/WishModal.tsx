@@ -4,6 +4,7 @@ import { Button } from './Button';
 interface WishModalProps {
   lastCompletedBlockCorrectCount: number;
   blockSize?: number;
+  childName: string;
   wishText: string;
   isSendingWish: boolean;
   onWishTextChange: (text: string) => void;
@@ -13,6 +14,7 @@ interface WishModalProps {
 export const WishModal: React.FC<WishModalProps> = ({
   lastCompletedBlockCorrectCount,
   blockSize = 40,
+  childName,
   wishText,
   isSendingWish,
   onWishTextChange,
@@ -23,7 +25,7 @@ export const WishModal: React.FC<WishModalProps> = ({
       <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl text-center border-t-8 border-yellow-400 animate-in fade-in zoom-in duration-300">
         <div className="text-6xl mb-4">🏆</div>
         <h2 className="text-3xl font-black text-indigo-900 mb-2">
-          ბრავო თომა!
+          ბრავო {childName}!
         </h2>
         <p className="text-lg text-gray-600 mb-6">
           ზედიზედ {blockSize} კითხვიდან {lastCompletedBlockCorrectCount} სწორად გამოიცანი! შენ ნამდვილი გენიოსი ხარ.

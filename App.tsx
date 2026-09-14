@@ -23,6 +23,7 @@ import { getExpectedDigits } from './utils/columnMultiplication';
 import { useTimer } from './hooks/useTimer';
 import { useColumnMultiplication } from './hooks/useColumnMultiplication';
 import { useGameSession } from './hooks/useGameSession';
+import { personalize } from './utils/personalizeMessage';
 
 /** Delay (ms) to allow DOM rendering before focusing the first cell in Kveshmicera mode */
 const KVESH_FIRST_CELL_FOCUS_DELAY_MS = 120;
@@ -157,7 +158,7 @@ const App: React.FC = () => {
       const nextQuestionsInBlock = questionsInBlock + 1;
       setQuestionsInBlock(nextQuestionsInBlock);
 
-      let message = getRandomPhrase(CORRECT_PHRASES);
+      let message = personalize(getRandomPhrase(CORRECT_PHRASES), activeChild);
 
       if (nextQuestionsInBlock === 3) {
         setShowRewardImage(true);
@@ -438,6 +439,7 @@ const App: React.FC = () => {
         <WishModal 
           lastCompletedBlockCorrectCount={lastCompletedBlockCorrectCount}
           blockSize={blockSize}
+          childName={activeChild?.name ?? ''}
           wishText={wishText}
           isSendingWish={wishSubmitting}
           onWishTextChange={setWishText}

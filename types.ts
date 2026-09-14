@@ -64,6 +64,7 @@ export interface Child {
   parent_id: string;
   name: string;
   avatar_id: string;
+  gender: 'boy' | 'girl';
   created_at: string;
 }
 

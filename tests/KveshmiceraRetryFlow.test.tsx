@@ -28,8 +28,8 @@ describe('Phase 3 - Kveshmicera Retry & Question-level Recording Flow', () => {
     });
 
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
-      childrenList: [{ id: childId, parent_id: 'parent-123', name: 'თომა', avatar_url: null, created_at: '' }],
-      activeChild: { id: childId, parent_id: 'parent-123', name: 'თომა', avatar_url: null, created_at: '' },
+      childrenList: [{ id: childId, parent_id: 'parent-123', name: 'თომა', avatar_url: null, avatar_id: 'avatar_1', gender: 'boy', created_at: '' } as any],
+      activeChild: { id: childId, parent_id: 'parent-123', name: 'თომა', avatar_url: null, avatar_id: 'avatar_1', gender: 'boy', created_at: '' } as any,
       activeChildId: childId,
       loading: false,
       setActiveChild: vi.fn(),

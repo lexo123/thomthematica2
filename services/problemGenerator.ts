@@ -1,7 +1,7 @@
 import { MathProblem, Operation, GameMode, FigureType, MeasurementType, MissingPart, ShapeVariant } from '../types';
 
 export const CORRECT_PHRASES = [
-  "ყოჩაღ, თომა კაი ბიჭი ხარ",
+  "ყოჩაღ, {name} კაი {gender} ხარ",
   "სააღოლ ძმაო",
   "მალადეეც",
   "ბრავო",

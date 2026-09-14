@@ -64,7 +64,7 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
 
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
       childrenList: [
-        { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', avatar_id: 'avatar_1', created_at: '2026-01-01T00:00:00Z' },
+        { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', avatar_id: 'avatar_1', gender: 'boy', created_at: '2026-01-01T00:00:00Z' },
       ],
       activeChild: null,
       activeChildId: null,
@@ -145,9 +145,9 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
 
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
       childrenList: [
-        { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', avatar_id: 'avatar_1', created_at: '2026-01-01T00:00:00Z' },
+        { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', avatar_id: 'avatar_1', gender: 'boy', created_at: '2026-01-01T00:00:00Z' },
       ],
-      activeChild: { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', avatar_id: 'avatar_1', created_at: '2026-01-01T00:00:00Z' },
+      activeChild: { id: 'child-1', parent_id: 'parent-123', name: 'ნიკოლოზი', avatar_id: 'avatar_1', gender: 'boy', created_at: '2026-01-01T00:00:00Z' },
       activeChildId: 'child-1',
       loading: false,
       setActiveChild: vi.fn(),

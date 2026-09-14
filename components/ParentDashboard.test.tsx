@@ -385,8 +385,8 @@ describe('ParentDashboard UI Component', () => {
 
     // C. Authenticated user WITH activeChildId
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
-      childrenList: [{ id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', created_at: '' }],
-      activeChild: { id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', created_at: '' },
+      childrenList: [{ id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', gender: 'boy', created_at: '' }],
+      activeChild: { id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', gender: 'boy', created_at: '' },
       activeChildId: 'child-1',
       loading: false,
       setActiveChild: vi.fn(),
@@ -414,8 +414,8 @@ describe('ParentDashboard UI Component', () => {
       setIsPasswordRecovery: vi.fn(),
     });
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
-      childrenList: [{ id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', created_at: '' }],
-      activeChild: { id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', created_at: '' },
+      childrenList: [{ id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', gender: 'boy', created_at: '' }],
+      activeChild: { id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', gender: 'boy', created_at: '' },
       activeChildId: 'child-1',
       loading: false,
       setActiveChild: vi.fn(),

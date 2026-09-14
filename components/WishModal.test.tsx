@@ -15,12 +15,15 @@ describe('WishModal UI Component', () => {
     render(
       <WishModal
         lastCompletedBlockCorrectCount={40}
+        childName="თომა"
         wishText="დრონი"
         isSendingWish={false}
         onWishTextChange={onWishTextChange}
         onSendWish={onSendWish}
       />
     );
+
+    expect(screen.getByText('ბრავო თომა!')).toBeDefined();
 
     expect(
       screen.getByText('ზედიზედ 40 კითხვიდან 40 სწორად გამოიცანი! შენ ნამდვილი გენიოსი ხარ.')
@@ -35,6 +38,7 @@ describe('WishModal UI Component', () => {
       <WishModal
         lastCompletedBlockCorrectCount={19}
         blockSize={20}
+        childName="ნიტა"
         wishText="სათამაშო მანქანა"
         isSendingWish={false}
         onWishTextChange={onWishTextChange}
@@ -42,6 +46,7 @@ describe('WishModal UI Component', () => {
       />
     );
 
+    expect(screen.getByText('ბრავო ნიტა!')).toBeDefined();
     expect(
       screen.getByText('ზედიზედ 20 კითხვიდან 19 სწორად გამოიცანი! შენ ნამდვილი გენიოსი ხარ.')
     ).toBeDefined();
@@ -55,6 +60,7 @@ describe('WishModal UI Component', () => {
       <WishModal
         lastCompletedBlockCorrectCount={20}
         blockSize={20}
+        childName="თომა"
         wishText="   "
         isSendingWish={false}
         onWishTextChange={onWishTextChange}
@@ -74,6 +80,7 @@ describe('WishModal UI Component', () => {
       <WishModal
         lastCompletedBlockCorrectCount={20}
         blockSize={20}
+        childName="თომა"
         wishText="ლეგო"
         isSendingWish={false}
         onWishTextChange={onWishTextChange}

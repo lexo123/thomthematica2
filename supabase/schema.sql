@@ -46,9 +46,16 @@ CREATE TABLE IF NOT EXISTS public.children (
   parent_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   avatar_id TEXT NOT NULL DEFAULT 'avatar_1',
+  gender TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT children_name_not_empty CHECK (LENGTH(TRIM(name)) > 0)
+  CONSTRAINT children_name_not_empty CHECK (LENGTH(TRIM(name)) > 0),
+  CONSTRAINT children_gender_valid CHECK (gender IN ('boy', 'girl'))
 );
+
+-- Migration reference (Commit #6A):
+-- ALTER TABLE public.children ADD COLUMN gender TEXT;
+-- ALTER TABLE public.children ADD CONSTRAINT children_gender_valid CHECK (gender IN ('boy', 'girl'));
+-- ALTER TABLE public.children ALTER COLUMN gender SET NOT NULL;
 
 -- Enable RLS for children
 ALTER TABLE public.children ENABLE ROW LEVEL SECURITY;
