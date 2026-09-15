@@ -24,6 +24,7 @@ import { useTimer } from './hooks/useTimer';
 import { useColumnMultiplication } from './hooks/useColumnMultiplication';
 import { useGameSession } from './hooks/useGameSession';
 import { personalize } from './utils/personalizeMessage';
+import { selectFromPool } from './utils/poolSelector';
 
 /** Delay (ms) to allow DOM rendering before focusing the first cell in Kveshmicera mode */
 const KVESH_FIRST_CELL_FOCUS_DELAY_MS = 120;
@@ -81,9 +82,8 @@ const App: React.FC = () => {
   const isChildSelectionRequired = Boolean(user && !activeChildId);
   const isGameScreenBlocked = Boolean(gameMode !== null && (isAuthRequired || isChildSelectionRequired));
 
-  const getRandomPhrase = useCallback((phrases: string[]) => {
-    return phrases[Math.floor(Math.random() * phrases.length)];
-  }, []);
+  const correctPhrasePool = useRef<string[]>([...CORRECT_PHRASES]);
+  const incorrectPhrasePool = useRef<string[]>([...INCORRECT_PHRASES]);
 
   const handleTimeOut = useCallback(() => {
     setIsPerfectBlock(false);
@@ -159,7 +159,7 @@ const App: React.FC = () => {
       const nextQuestionsInBlock = questionsInBlock + 1;
       setQuestionsInBlock(nextQuestionsInBlock);
 
-      let message = personalize(getRandomPhrase(CORRECT_PHRASES), activeChild);
+      let message = personalize(selectFromPool(correctPhrasePool, CORRECT_PHRASES), activeChild);
 
       if (nextQuestionsInBlock === 3) {
         setShowRewardImage(true);
@@ -182,7 +182,7 @@ const App: React.FC = () => {
         return;
       }
 
-      const template = getRandomPhrase(INCORRECT_PHRASES);
+      const template = selectFromPool(incorrectPhrasePool, INCORRECT_PHRASES);
       const finalMessage = template.replace("[]", actualUserAnswer);
       
       setCurrentMessage(finalMessage);
