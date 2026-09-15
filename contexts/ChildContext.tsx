@@ -12,7 +12,7 @@ interface ChildContextType {
   hasFetchedOnce: boolean;
   setActiveChildId: (id: string | null) => void;
   setActiveChild: (child: Child | null) => void;
-  addChild: (name: string, avatarId?: string) => Promise<{ child: Child | null; error: Error | null }>;
+  addChild: (name: string, avatarId: string, gender: 'boy' | 'girl') => Promise<{ child: Child | null; error: Error | null }>;
   fetchChildren: () => Promise<void>;
   showChildSelector: boolean;
   setShowChildSelector: (show: boolean) => void;

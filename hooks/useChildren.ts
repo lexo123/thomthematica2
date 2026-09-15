@@ -81,7 +81,7 @@ export const useChildren = () => {
   const addChild = async (
     name: string,
     avatarId: string = 'avatar_1',
-    gender: 'boy' | 'girl' = 'boy'
+    gender: 'boy' | 'girl'
   ): Promise<{ child: Child | null; error: Error | null }> => {
     if (!user) {
       return { child: null, error: new Error('ავტორიზაცია აუცილებელია') };
