@@ -9,6 +9,7 @@ interface ChildContextType {
   activeChildId: string | null;
   loading: boolean;
   error: string | null;
+  hasFetchedOnce: boolean;
   setActiveChildId: (id: string | null) => void;
   setActiveChild: (child: Child | null) => void;
   addChild: (name: string, avatarId?: string) => Promise<{ child: Child | null; error: Error | null }>;
@@ -23,7 +24,7 @@ const ACTIVE_CHILD_STORAGE_KEY = 'thomthematica_active_child_id';
 
 export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { children: childrenList, loading, error, fetchChildren, addChild } = useChildren();
+  const { children: childrenList, loading, error, hasFetchedOnce, fetchChildren, addChild } = useChildren();
   const [activeChildId, setActiveChildIdState] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(ACTIVE_CHILD_STORAGE_KEY);
@@ -44,7 +45,7 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Sync activeChildId with actual children list
   useEffect(() => {
-    if (!user || loading) return;
+    if (!user || loading || !hasFetchedOnce) return;
 
     if (childrenList.length > 0) {
       if (activeChildId) {
@@ -63,7 +64,7 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setActiveChildId(null);
       setShowChildSelector(true);
     }
-  }, [user, childrenList, activeChildId, loading]);
+  }, [user, childrenList, activeChildId, loading, hasFetchedOnce]);
 
   const setActiveChildId = (id: string | null) => {
     setActiveChildIdState(id);
@@ -90,6 +91,7 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         activeChildId,
         loading,
         error,
+        hasFetchedOnce,
         setActiveChildId,
         setActiveChild,
         addChild,

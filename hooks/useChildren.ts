@@ -34,17 +34,20 @@ export const useChildren = () => {
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasFetchedOnce, setHasFetchedOnce] = useState<boolean>(false);
 
   const fetchChildren = useCallback(async () => {
     if (!user) {
       setChildren([]);
       setLoading(false);
+      setHasFetchedOnce(true);
       return;
     }
 
     const supabase = getSupabase();
     if (!supabase) {
       setLoading(false);
+      setHasFetchedOnce(true);
       return;
     }
 
@@ -67,6 +70,7 @@ export const useChildren = () => {
       setError(err.message || 'ბავშვების სიის ჩატვირთვა ვერ მოხერხდა');
     } finally {
       setLoading(false);
+      setHasFetchedOnce(true);
     }
   }, [user]);
 
@@ -124,6 +128,7 @@ export const useChildren = () => {
     children,
     loading,
     error,
+    hasFetchedOnce,
     fetchChildren,
     addChild,
   };

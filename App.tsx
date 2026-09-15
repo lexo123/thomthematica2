@@ -35,6 +35,7 @@ const App: React.FC = () => {
     activeChild,
     activeChildId,
     loading: childrenLoading,
+    hasFetchedOnce,
     setActiveChild,
     addChild,
   } = useChild();
@@ -348,6 +349,7 @@ const App: React.FC = () => {
             childrenList={childrenList}
             activeChildId={activeChildId}
             loading={childrenLoading}
+            childrenReady={hasFetchedOnce && !childrenLoading}
             onSelectChild={(child) => {
               setActiveChild(child);
               setShowChildGateSelector(false);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Child } from '../types';
 import { CHILD_AVATARS, GENDER_OPTIONS, getAvatarEmoji } from '../hooks/useChildren';
 
@@ -6,6 +6,7 @@ interface ChildSelectorProps {
   childrenList: Child[];
   activeChildId: string | null;
   loading: boolean;
+  childrenReady: boolean;
   onSelectChild: (child: Child) => void;
   onAddChild: (name: string, avatarId: string, gender: 'boy' | 'girl') => Promise<{ child: Child | null; error: Error | null }>;
   onClose?: () => void;
@@ -15,11 +16,19 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
   childrenList,
   activeChildId,
   loading,
+  childrenReady,
   onSelectChild,
   onAddChild,
   onClose,
 }) => {
-  const [isAdding, setIsAdding] = useState<boolean>(childrenList.length === 0);
+  const [isAdding, setIsAdding] = useState<boolean>(false);
+  const [modeInitialized, setModeInitialized] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (modeInitialized || !childrenReady) return;
+    setIsAdding(childrenList.length === 0);
+    setModeInitialized(true);
+  }, [childrenReady, childrenList, modeInitialized]);
   const [newChildName, setNewChildName] = useState<string>('');
   const [selectedGender, setSelectedGender] = useState<'boy' | 'girl' | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<string>('avatar_1');

@@ -20,6 +20,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
     activeChild,
     activeChildId,
     loading: childrenLoading,
+    hasFetchedOnce,
     setActiveChild,
     addChild,
     showChildSelector,
@@ -159,6 +160,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
           childrenList={childrenList}
           activeChildId={activeChildId}
           loading={childrenLoading}
+          childrenReady={hasFetchedOnce && !childrenLoading}
           onSelectChild={(child) => {
             setActiveChild(child);
             setShowChildSelector(false);
