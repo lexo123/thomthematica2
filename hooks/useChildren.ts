@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabase } from '../lib/supabase';
 import { ensureProfileExists } from '../lib/ensureProfile';
@@ -31,26 +31,34 @@ export const getAvatarEmoji = (avatarId?: string): string => {
 
 export const useChildren = () => {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasFetchedOnce, setHasFetchedOnce] = useState<boolean>(false);
+  const [fetchedForUserId, setFetchedForUserId] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   const fetchChildren = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
+      requestIdRef.current += 1;
       setChildren([]);
       setLoading(false);
       setHasFetchedOnce(true);
+      setFetchedForUserId(null);
       return;
     }
 
     const supabase = getSupabase();
     if (!supabase) {
+      requestIdRef.current += 1;
       setLoading(false);
       setHasFetchedOnce(true);
+      setFetchedForUserId(userId);
       return;
     }
 
+    const thisRequestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
 
@@ -58,8 +66,12 @@ export const useChildren = () => {
       const { data, error: fetchErr } = await supabase
         .from('children')
         .select('*')
-        .eq('parent_id', user.id)
+        .eq('parent_id', userId)
         .order('created_at', { ascending: true });
+
+      if (thisRequestId !== requestIdRef.current) {
+        return;
+      }
 
       if (fetchErr) {
         throw fetchErr;
@@ -67,12 +79,19 @@ export const useChildren = () => {
 
       setChildren((data as Child[]) || []);
     } catch (err: any) {
+      if (thisRequestId !== requestIdRef.current) {
+        return;
+      }
       setError(err.message || 'ბავშვების სიის ჩატვირთვა ვერ მოხერხდა');
     } finally {
+      if (thisRequestId !== requestIdRef.current) {
+        return;
+      }
       setLoading(false);
       setHasFetchedOnce(true);
+      setFetchedForUserId(userId);
     }
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     fetchChildren();
@@ -124,11 +143,13 @@ export const useChildren = () => {
     }
   };
 
+  const isReadyForCurrentUser = hasFetchedOnce && fetchedForUserId === userId;
+
   return {
     children,
     loading,
     error,
-    hasFetchedOnce,
+    hasFetchedOnce: isReadyForCurrentUser,
     fetchChildren,
     addChild,
   };
