@@ -1,12 +1,12 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: Phase 2.5 დასრულების შემდეგ_
+_ბოლო განახლება: Wave 2 (Commit #10, multi-account race-condition fix) დამტკიცების შემდეგ_
 
 ## Repo
 https://github.com/lexo123/thomthematica2
 
 ## პროექტის მოკლე აღწერა
-React/TypeScript საგანმანათლებლო მათემატიკის აპლიკაცია ბავშვებისთვის, თავდაპირველად აშენებული ერთი ბავშვისთვის (thomthematica), ახლა გადადის multi-user/Parent→Child მოდელზე Supabase-ის (Auth + Postgres + RLS) გამოყენებით. კოდი იწერება Google AI Studio-ს (Gemini) მიერ vibe-coding მიდგომით; Claude და ChatGPT ცალ-ცალკე აკეთებენ code review-ს ყოველ commit-ზე, სანამ შემდეგი ეტაპი დაიწყება.
+React/TypeScript საგანმანათლებლო მათემატიკის აპლიკაცია ბავშვებისთვის, თავდაპირველად აშენებული ერთი ბავშვისთვის (thomthematica), ახლა გადადის multi-user/Parent→Child მოდელზე Supabase-ის (Auth + Postgres + RLS) გამოყენებით. კოდი იწერება Google AI Studio-ს (Gemini) მიერ vibe-coding მიდგომით; Claude და ChatGPT ცალ-ცალკე აკეთებენ code review-ს ყოველ commit-ზე, სანამ შემდეგი ეტაპი დაიწყება. Lexo — project manager/reviewer, არა კოდის ავტორი.
 
 ## დასრულებული ფაზები
 
@@ -26,63 +26,124 @@ React/TypeScript საგანმანათლებლო მათემ�
 - ChildSelector.tsx — "ვინ თამაშობს?" UI, Guest Mode-ისთვის არ ჩნდება
 
 ### Phase 2.2: Sync Service ✅
-- services/supabaseSyncService.ts — schema-ს ველების ზუსტი მთხვევა (game_mode, total_questions, total_correct, perfect_blocks_count, status, correct_count, fulfilled_at)
+- services/supabaseSyncService.ts — schema-ს ველების ზუსტი მთხვევა
 - .upsert() idempotent, id-ზე დაფუძნებული
 
 ### Phase 2.3: Session Lifecycle ✅
 hooks/useGameSession.ts-ში:
 - sessionId lifecycle: იქმნება ერთხელ, თანმიმდევრულად გადაეცემა auto-save-სა და completion sync-ს
 - Sequential FIFO sync queue (enqueueSync) — race condition-ის გამორიცხვა
-- Page Visibility API-ზე დაფუძნებული active play duration (background დრო არ ითვლება)
-- Guest ↔ Authenticated გარდამავალი მდგომარეობების წესები (mid-session logout/login არ ურევს სესიებს)
-- ნაპოვნი და გასწორებული ბაგი: ცალკეული [gameMode] და [childId] ეფექტები აორმაგებდნენ flush-ს ერთდროული mode+child ცვლილებისას → გაერთიანდა ერთ ატომურ [gameMode, childId] ეფექტში, flushCompletedSession(override) პარამეტრით (არა latestRef-ზე დამოკიდებული)
-- Cleanup ფუნქციაც დეტერმინისტულია (nextMode/nextChild closure-ში დაკავებული, არა latestRef-ზე დამოკიდებული)
+- Page Visibility API-ზე დაფუძნებული active play duration
+- Guest ↔ Authenticated გარდამავალი მდგომარეობების წესები
+- ნაპოვნი და გასწორებული ბაგი: ცალკეული [gameMode] და [childId] ეფექტები აორმაგებდნენ flush-ს → გაერთიანდა ერთ ატომურ [gameMode, childId] ეფექტში
 
-### Phase 2.4a: activeChildId → Thomthematica (POC) ✅
-- sessionChildId = (gameMode === Thomthematica && user) ? activeChildId : null
-- Child Selection Gate: isGameScreenBlocked = Boolean(gameMode !== null && user && !activeChildId)
-- ThomthematicaGate.test.tsx — 4 ტესტი (0 children / children but none selected / active child / guest)
-
-### Phase 2.4b: activeChildId → ყველა Game Mode ✅
-- sessionChildId = user ? activeChildId : null (განზოგადებული, 1 ხაზი)
+### Phase 2.4a/2.4b: activeChildId → ყველა Game Mode ✅
+- sessionChildId = user ? activeChildId : null
 - ოთხივე რეჟიმი (Thomthematica, ThomravlebisTabula, Gethometria, Kveshmicera) დაკავშირებულია
-- tests/GameModesGate.test.tsx — gate + guest-access ტესტები ოთხივე რეჟიმზე (it.each)
-- modeChanged: true, childChanged: false სცენარი (იგივე ბავშვი, mode switch) — ცალკე ტესტირებული
-- E2E DOM ტესტები Kveshmicera-სა და Gethometria-ზეც (არა მხოლოდ Thomthematica)
-- 63/63 ტესტი, 0 TypeScript შეცდომა, production build წარმატებული
+- 63/63 ტესტი, 0 TypeScript შეცდომა
 
 ### Phase 2.5: Migration Gate Closure — Guest Mode-ის სრული მოცილება (Variant A) ✅
-- Guest Mode მთლიანად გაუქმებულია — ყველა მომხმარებელი გადის authenticated flow-ით
-- App.tsx: isGameScreenBlocked გაფართოვდა — თამაშის რეჟიმი დაბლოკილია როგორც !user (Auth blocking screen, AuthModal-ის გახსნის call-to-action-ით), ასევე user && !activeChildId (არსებული Child Selection Gate)
-- services/statsService.ts (Google Apps Script/Google Sheets sync) — ფიზიკურად წაშლილია
-- useGameSession.ts — Guest-specific Google Sheets sync path-ები მოცილდა; დამატებით გასწორდა Guest-transition branch, ხოლო protected Session ID lifecycle/FIFO queue/auto-save/completion architecture შენარჩუნებულია.
-- **Migration Gate-ის საბოლოო architecture decision**: `thomthematica2`-ს Google Apps Script public-write endpoint-ზე აღარ აქვს არანაირი დამოკიდებულება — არც source-ში, არც production build bundle-ში, არც runtime-ში (დამოუკიდებლად ვერიფიცირებული). **Endpoint განზრახ რჩება აქტიური**, რადგან მას იყენებს ცალკე, `thomthematica2`-ის scope-ის მიღმა მდგომი legacy `thomthematica` (ერთ-ბავშვიანი) აპლიკაცია. Phase 2.5-ის security objective — public-write endpoint-ზე დამოკიდებულების მოცილება multi-user აპლიკაციისთვის — მიღწეულია decoupling-ით, არა endpoint-ის ფიზიკური shutdown-ით.
-- Tests: 63 → 59. 4 Guest-specific tests წაიშალა; 3 tests გადაიწერა login-required behavior-ზე; 56 baseline tests უცვლელი დარჩა. Final: 59/59 passed.
-- Verification (დამოუკიდებელი, Claude-ის მხრიდან, fresh clone-ზე): TypeScript 0 errors, 59/59 tests passed, production build successful, `script.google.com` reference არსად (source-ში და build bundle-ში), Guest access production-ზე ხელით დადასტურებულია დაბლოკილად, 2–3 რეალური authenticated სესია ხელით ვერიფიცირებულია Supabase-ში (correct data persistence)
+- Guest Mode მთლიანად გაუქმებულია — ყველა მომხმარებელი authenticated flow-ით
+- services/statsService.ts (Google Apps Script sync) ფიზიკურად წაშლილია thomthematica2-დან
+- Google Apps Script public-write endpoint განზრახ რჩება აქტიური — მხოლოდ ცალკე, scope-გარე legacy `thomthematica` (ერთ-ბავშვიანი) აპისთვის; thomthematica2 აღარ არის მასზე დამოკიდებული (source/build/runtime — დამოუკიდებლად ვერიფიცირებული)
+- 59/59 ტესტი
+
+### Phase 3 — Commit #1 (Parent Dashboard: Data/Read/Derivation Layer) ✅
+- **Core rule**: Dashboard — read-only derived-data layer, ახალი statistics data model/schema არ ემატება
+- fetchChildSessionsForAggregate, fetchChildSessionsRecent (bounded `.limit(20)`), deriveDashboardStats (pure, division-by-zero-დაცული)
+- **ChatGPT-მ აღმოაჩინა race condition**: stale-response guard მხოლოდ childId-ს ამოწმებდა — ვერ იცავდა A→B→A double-switch-ისგან (ძველი F1-fetch შეეძლო გადაეწერა უფრო ახალი F3-ის სწორი მონაცემი). **Claude-მ დამოუკიდებლად დაადასტურა** — red→green ციკლით. გასწორდა `requestIdRef` generation-counter-ით (`activeChildIdRef`-ის ნაცვლად) — **ეს არის ის pattern, რომელიც მოგვიანებით Wave 2-ში (Commit #10) ხელახლა იქნა გამოყენებული**
+- 78/78 ტესტი
+
+### Phase 3 — Commit #2 (Parent Dashboard UI) ✅
+- `showDashboard` state ლოკალურად MainMenu.tsx-ში, body-level conditional (არა overlay)
+- explicit rendering priority chain (childId===null → loading → error → stats===null → 0-sessions → no-accuracy → populated)
+- useChildDashboard(childId) ყოველთვის უპირობოდ გამოძახებული (Rules of Hooks)
+- wishes — სრული სია, truncation-ის გარეშე
+- `App.tsx` საერთოდ არ შეხებია ამ commit-ში
+- 88/88 ტესტი
+
+### Phase 3 — Commit #3 (gameModeLabels.ts Shared Util Refactor) ✅
+- `utils/gameModeLabels.ts` — `GAME_MODE_LABELS: Record<GameMode, string>` (მკაცრი ტიპით) + `getGameModeLabel(mode: string)` type-guard-დაფუძნებული lookup
+- `types.ts`-ის `GameSession.game_mode: string` ხელუხლებელი დარჩა
+- 91/91 ტესტი
+
+### Phase 3 — Commit #4 (Game-mode Breakdown Dashboard-ში) ✅
+_[შენიშვნა: ამ commit-ის დეტალური review-prose ვერ აღდგა — ქვემოთ მხოლოდ მიმდინარე კოდიდან პირდაპირ დადასტურებული ფაქტებია, არა თავდაპირველი review-ჩანაწერი.]_
+- დადასტურებულია მიმდინარე კოდში: `useChildDashboard.ts` აბრუნებს `gameModeBreakdown: GameModeBreakdown`-ს, `ParentDashboard.tsx`-ში "4. Game Mode Breakdown" სექციად რენდერდება, `getGameModeLabel`-ს იყენებს ლეიბლებისთვის
+- Commit #3-ის "Architecture Review-ში" ნახსენები open decision (query-strategy: არსებული query-ის გაფართოება vs ცალკე breakdown-query) გადაწყვეტილია — რომელი მიდგომა შეირჩა, ცალკე დასადასტურებელია საჭიროების შემთხვევაში
+
+### Phase 3 — Commit #5 (Session-close Persistence + Rolling-window Persistence + Kveshmicera Enter-fix) ✅
+- Root-cause: `visibilitychange→hidden`-ზე `flushCompletedSession()` ცდომილებით ასრულებდა session-ს, auto-save არ ამოწმებდა ამ flag-ს → session სამუდამოდ `'active'`-ად რჩებოდა
+- გადაწყვეტა: ცალკე `persistCurrentSession()` (status: 'active', არ ცვლის isCompletedRef), `flushCompletedSession()` — მხოლოდ genuine completion-ზე
+- `services/gameProgressStorage.ts` (localStorage, 48სთ TTL), `{transport: 'keepalive'}`, `RESTORE_PROGRESS` reducer-action
+- 125/125 ტესტი
+
+### Phase 3 — Commit #5A (Kveshmicera Wish-block: 40 → 20) ✅
+- `utils/wishBlockSize.ts` (`getWishBlockSize(gameMode)`), `CHECK (correct_count IN (19,20,39,40))`
+- 141/141 ტესტი
+
+### Phase 3 — Commit #5B (Production DB Migration) ✅
+- `ALTER TABLE wishes DROP/ADD CONSTRAINT` — BEGIN/COMMIT-ში, post-migration data-check
+- ⚠️ ცნობილი, უვნებელი risk: AI Studio-ს ZIP-ს დროდადრო აქვს `schema.sql`/`metadata.json`-ის სტალ ასლი — production DB-ს არასდროს შეხებია
+
+### Phase 3 — Kveshmicera Corrections #1–#4 (Post-5B ბაგები) ✅
+- 4 ურთიერთდაკავშირებული ბაგი: Enter-ზე feedback/სურათი გამოტოვება (`stopPropagation()`), incorrect-flow redesign (pre-Phase-3 legacy bug, git-history-ით დადასტურებული), repeated-submission guard, Enter-ით "შემდეგი"-ღილაკის non-closure
+- 150/150 ტესტი (სრული DOM-ინტეგრაციის ტესტებით)
+
+### Phase 3 — Commit #6A (ბავშვის სქესის ველი: schema + registration) ✅
+- Migration: `ADD COLUMN (nullable) → backfill by id → verify → SET NOT NULL → CHECK`
+- `supabase/schema.sql` (`gender TEXT NOT NULL`), `types.ts`, `hooks/useChildren.ts`, `components/ChildSelector.tsx` (სავალდებულო არჩევანი)
+- Production migration — Lexo-ს ხელით, დადასტურებული (`count(*) WHERE gender IS NULL` → 0)
+- 155/155 ტესტი
+
+### Phase 3 — Commit #6B (Personalization: {name} + {gender}) ✅
+- `utils/personalizeMessage.ts` — ცენტრალიზებული `personalize(phrase, child)`, `.replaceAll()`, null-fallback `'მოთამაშე'`
+- `data/rewards.ts` (per-child captions) განზრახ out-of-scope — Wave 3-ისთვის გადადებული
+- Production live-ტესტი დადასტურდა
+- 160/160 ტესტი
+
+### Wave 2 — Child-Context-ის საძირკვლის გამაგრება (Commit #7–#10) ✅
+
+**Commit #7 (`7f22fdf9dcba569aab27bbdadab461d4fbc3e707`):** Child Selector "first mode" race — selector ავტორიზაციის შემდეგ "დამატება"-ში იჭედებოდა თუნდაც არსებული ბავშვებისთვის (stale-closure race `ChildContext`-ის sync-ეფექტსა და `ChildSelector`-ის mount-time `isAdding`-ს შორის). გასწორდა `hasFetchedOnce` readiness-სიგნალით. 158/158 ტესტი.
+
+**Commit #8 (`d351ca52e6dbaaec03531706d4e00c37cb255379`):** "No-repeat-until-exhausted" pool სისტემა ფრაზებისთვის — ახალი გენერიკული `utils/poolSelector.ts` (`selectFromPool<T>`), იგივე pattern რაც production-ში სურათებს ჰქონდა. `ResultOverlay.tsx`/`data/rewards.ts` განზრახ არ შეხებია. 163/163 ტესტი.
+
+**Commit #9 (`537aa4b68cf4e6178c56e3979a1f04ae02b3dd67`):** `addChild`-ის type-safety — `gender: 'boy'` default მოშორდა, `ChildContextType.addChild`-ის out-of-sync interface (gender-პარამეტრის გარეშე) გასწორდა. 163/163 ტესტი.
+
+**Commit #10 (`ea6d8188622e572c5b021fa7b29231b9dc717663`):** Multi-account login-switch race — ორი დამოუკიდებელი race: (1) `hasFetchedOnce` არასდროს ბრუნდებოდა `false`-ზე user-ვინაობის ცვლილებაზე (SPA logout, page-reload-ის გარეშე); (2) stale in-flight fetch-ს შეეძლო overwrite გაეკეთებინა ახალი user-ის state-ისთვის. გასწორდა `fetchedForUserId` (id-შედარება) + `requestIdRef` (იგივე pattern, რაც Commit #1-ში `useChildDashboard.ts`-ისთვის უკვე დამტკიცდა) — ორივე დაცვა ერთმანეთს არ ცვლის, დამოუკიდებელი race-კლასებია. `fetchChildren`-ის `useCallback`-დამოკიდებულებაც `[user]`-დან `[userId]`-ზე გადავიდა. 168/168 ტესტი.
 
 ## საკვანძო არქიტექტურული გადაწყვეტილებები (არ შეიცვალოს განხილვის გარეშე)
 
-- DB schema: ზუსტად 4 table (profiles, children, game_sessions, wishes). answers, progress, statistics, achievements ცხრილები განზრახ არ არსებობს (derived/calculated დონეზეა გადაწყვეტილი).
-- useGameSession(gameMode, childId) — hook mode-აგნოსტიკურია, აღარ საჭიროებს mode-სპეციფიკურ ცვლილებებს ახალი game mode-ის დამატებისას.
-- **Guest Mode არ არსებობს (Phase 2.5, Variant A)** — ყველა მომხმარებელი აუცილებლად authenticated უნდა იყოს Game Screen-ის მისაღწევად.
-- Authenticated Mode: sync მიდის supabaseSyncService.ts-ით, RLS-ით დაცული — ეს არის ერთადერთი sync გზა.
-- **Google Apps Script public-write endpoint** — `thomthematica2` აღარ არის დამოკიდებული ამ endpoint-ზე. Endpoint განზრახ რჩება აქტიური, მხოლოდ ცალკე legacy `thomthematica` (ერთ-ბავშვიანი) აპლიკაციისთვის — ეს scope-ის მიღმაა და thomthematica2-ის Phase-ებზე გავლენას აღარ ახდენს. Google Apps Script public-write endpoint remains active as a legacy dependency of the separate `thomthematica` application. It is no longer a source, build, or runtime dependency of `thomthematica2`.
-- 40-question rolling window (მათემატიკური wish-qualification ლოგიკა) — ხელუხლებელია მთელი ამ პროცესის განმავლობაში, არცერთხელ არ შეცვლილა.
+- DB schema: ზუსტად 4 table (profiles, children, game_sessions, wishes). answers/progress/statistics/achievements ცხრილები განზრახ არ არსებობს
+- useGameSession(gameMode, childId) — mode-აგნოსტიკური
+- Guest Mode არ არსებობს (Phase 2.5)
+- Google Apps Script public-write endpoint — thomthematica2 აღარ დამოკიდებული, legacy thomthematica-ს (ერთ-ბავშვიანი) კუთვნილება
+- 40-question rolling window — ხელუხლებელი მთელი პროცესის განმავლობაში
+- Race-condition-ების დაცვის დამტკიცებული idiom: `requestIdRef` generation-counter (არა identity/childId-guard მარტო) — გამოყენებულია ორჯერ დამოუკიდებლად (Commit #1, Commit #10)
 
 ## ცნობილი, განზრახ გადადებული საკითხები
 
-- Reward images per-child theme — children.reward_theme schema-ში ჯერ არ დამატებულა (დაგეგმილია, მაგრამ ჯერ არ განხორციელებულა).
-- Parent Dashboard / სტატისტიკის ვიზუალიზაცია — არ დაწყებულა, დაგეგმილია მომავალ ფაზად (Phase 3).
-- Active play duration — Page Visibility API-ით უკვე გამართულია (Phase 2.3), დამატებითი idle-timeout არ არის საჭირო ამ ეტაპზე.
+- Per-child ინდივიდუალური სურათები (`data/rewards.ts`) — Wave 3-ში დაგეგმილი, `poolSelector.ts`-ის პირდაპირ per-child მონაცემზე მონტაჟით
+- `vocativeName` ველი (ბავშვის სახელის წოდებითი ბრუნვა) — განხილულია, დაგეგმვა ჯერ არ დაწყებულა, Wave 3-ისთვის
+- კლასის მიხედვით რიცხვითი დიაპაზონი (`grade`) — Wave 4, ყველაზე სენსიტიური (`problemGenerator.ts`-ის ცენტრალურ ლოგიკას ეხება)
+- სიტყვიერი ამოცანები — Wave 5, `grade`-ის შემდეგ განზრახ
+- ახალი საგნები (ქართული/ინგლისური/გეოგრაფია) + hint/explanation-ფუნქციები — Phase 3-ის მთლიანად დასრულების შემდეგ, მოითხოვს math-answer-checking-ის ცენტრალიზებას `App.tsx`-ში
+- `game_sessions`-ის ერთი stuck `'active'`-row — საჭიროებს ხელახალ ტესტირებას
+- `metadata.json`/`migrated_prompt_history/` წაშლა — "ბოლოს, ყველაფრის დასრულების შემდეგ"
+- Production-readiness: Supabase auto-pause (7 დღე უმოქმედობა), backup-სტრატეგია — ინფორმირებული, არა დაბლოკილი
+- კომერციალიზაცია (Georgia-first): Supabase/Netlify Free საკმარისია 10-30+ ბავშვისთვის; საქართველოს PDPL მუხლი 7 შესაბამისობაშია; App Store "Kids Category" + COPPA/GDPR-K საერთაშორისო ეტაპზე; React web app → Capacitor/PWA გადაწყვეტილება ადრე სასურველია
 
 ## Workflow (როგორ ვმუშაობთ)
 
-1. AI Studio (Gemini) წერს კოდს პატარა, ინკრემენტულ commit-ებად.
-2. Claude და ChatGPT ცალ-ცალკე იღებენ commit-ის ლინკს/კოდს და აკეთებენ დამოუკიდებელ code review-ს.
-3. ორივეს შენიშვნები ერთმანეთს ეგზავნება, საჭიროებისამებრ ერთიანდება ერთ საბოლოო პრომფთში.
-4. საბოლოო პრომფთი გადაეცემა AI Studio-ს შემდეგი commit-ისთვის.
-5. ყოველი ფაზის დასრულებისას (ტესტები მწვანე, typecheck სუფთა, build წარმატებული) ეს დოკუმენტი განახლდება.
+1. AI Studio (Gemini) წერს კოდს პატარა, ინკრემენტულ commit-ებად, ZIP export/import-ით
+2. Claude ამოწმებს დამოუკიდებლად, fresh-clone-ით (tsc, vitest, build) — არასდროს ენდობა AI Studio-ს თვითმოხსენებას
+3. ChatGPT აკეთებს დამოუკიდებელ cross-review-ს
+4. ორივეს შენიშვნები ერთიანდება საბოლოო implementation prompt-ში
+5. Lexo იღებს საბოლოო გადაწყვეტილებას; ცვლილებები ლოკალურად ხდება (edit → git add → commit → push ტერმინალით)
+6. ყოველი ფაზის/Wave-ის დასრულებისას ეს დოკუმენტი განახლდება
 
 ## შემდეგი ნაბიჯი
-[Phase 3: Parent Dashboard — ჯერ არ დაწყებულა, დაგეგმვა საჭიროებს ცალკე sign-off-ს]
 
+Wave 2 დასრულებულია. Wave 3 შემდეგია: `vocativeName` ველი (მცირე, დაბალრისკიანი, `gender`-migration-ის pattern-ის გამეორება), შემდეგ per-child ინდივიდუალური სურათები. Wave 4 (grade-based დიაპაზონი) და Wave 5 (სიტყვიერი ამოცანები) — ამის შემდეგ, ცალკე სრული Architecture Review-ციკლით თითოეულისთვის.
+
+[ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს Claude-ის და ChatGPT-ის Project-ებში. **ნამდვილად** ატვირთეთ ეს ფაილი repo-შიც (`git add PROJECT_STATE.md && git commit && git push`), თორემ იგივე პრობლემა განმეორდება.]
