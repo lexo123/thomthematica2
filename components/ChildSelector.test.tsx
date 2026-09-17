@@ -132,4 +132,103 @@ describe('ChildSelector - first mode race condition fixes', () => {
     expect(screen.getByPlaceholderText('მაგ: თომა, ნიტა, ანდრია...')).toBeDefined();
     expect(screen.queryByText('ვინ თამაშობს?')).toBeNull();
   });
+
+  describe('child-name registration input validation', () => {
+    it('blocks submission and displays inline error when name contains invalid characters', async () => {
+      const onSelectChild = vi.fn();
+      const onAddChild = vi.fn();
+
+      render(
+        <ChildSelector
+          childrenList={[]}
+          activeChildId={null}
+          loading={false}
+          childrenReady={true}
+          onSelectChild={onSelectChild}
+          onAddChild={onAddChild}
+        />
+      );
+
+      const nameInput = screen.getByPlaceholderText('მაგ: თომა, ნიტა, ანდრია...');
+      fireEvent.change(nameInput, { target: { value: 'Anna' } });
+
+      // Select gender
+      const boyBtn = screen.getByText('ბიჭი');
+      fireEvent.click(boyBtn);
+
+      // Submit form
+      const submitBtn = screen.getByText('დამატება 🚀');
+      fireEvent.click(submitBtn);
+
+      expect(screen.getByText('სახელი უნდა შეიცავდეს მხოლოდ ქართულ ასოებს (დასაშვებია დეფისი და გამოტოვება)')).toBeDefined();
+      expect(onAddChild).not.toHaveBeenCalled();
+    });
+
+    it('blocks submission and displays error when name is empty or spaces only', async () => {
+      const onSelectChild = vi.fn();
+      const onAddChild = vi.fn();
+
+      render(
+        <ChildSelector
+          childrenList={[]}
+          activeChildId={null}
+          loading={false}
+          childrenReady={true}
+          onSelectChild={onSelectChild}
+          onAddChild={onAddChild}
+        />
+      );
+
+      const nameInput = screen.getByPlaceholderText('მაგ: თომა, ნიტა, ანდრია...');
+      fireEvent.change(nameInput, { target: { value: '   ' } });
+
+      const boyBtn = screen.getByText('ბიჭი');
+      fireEvent.click(boyBtn);
+
+      const submitBtn = screen.getByText('დამატება 🚀');
+      fireEvent.click(submitBtn);
+
+      expect(screen.getByText('შეიყვანეთ ბავშვის სახელი')).toBeDefined();
+      expect(onAddChild).not.toHaveBeenCalled();
+    });
+
+    it('normalizes name with single trim and passes normalized name to onAddChild on valid input', async () => {
+      const onSelectChild = vi.fn();
+      const onAddChild = vi.fn().mockResolvedValue({
+        child: {
+          id: 'child-new',
+          parent_id: 'parent-1',
+          name: 'ანა-მარი',
+          avatar_id: 'avatar_1',
+          gender: 'girl',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+        error: null,
+      });
+
+      render(
+        <ChildSelector
+          childrenList={[]}
+          activeChildId={null}
+          loading={false}
+          childrenReady={true}
+          onSelectChild={onSelectChild}
+          onAddChild={onAddChild}
+        />
+      );
+
+      const nameInput = screen.getByPlaceholderText('მაგ: თომა, ნიტა, ანდრია...');
+      fireEvent.change(nameInput, { target: { value: '  ანა-მარი  ' } });
+
+      const girlBtn = screen.getByText('გოგო');
+      fireEvent.click(girlBtn);
+
+      const submitBtn = screen.getByText('დამატება 🚀');
+      fireEvent.click(submitBtn);
+
+      expect(onAddChild).toHaveBeenCalledTimes(1);
+      // Verify normalizedName was trimmed once and passed
+      expect(onAddChild).toHaveBeenCalledWith('ანა-მარი', 'avatar_1', 'girl');
+    });
+  });
 });

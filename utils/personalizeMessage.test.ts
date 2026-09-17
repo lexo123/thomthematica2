@@ -47,4 +47,48 @@ describe('personalizeMessage', () => {
     expect(personalize(phrase, boyChild)).toBe('სააღოლ ძმაო! მალადეეც, ბრავო!');
     expect(personalize(phrase, null)).toBe('სააღოლ ძმაო! მალადეეც, ბრავო!');
   });
+
+  it('replaces {vocative} for a child with a mapped vocative name', () => {
+    const davitChild: Child = {
+      id: 'child-3',
+      parent_id: 'parent-1',
+      name: 'დავითი',
+      avatar_id: 'avatar_3',
+      gender: 'boy',
+      created_at: '2026-01-01T00:00:00Z',
+    };
+    const phrase = 'ყოჩაღ, {vocative}, კაი {gender} ხარ!';
+    expect(personalize(phrase, davitChild)).toBe('ყოჩაღ, დავით, კაი ბიჭი ხარ!');
+  });
+
+  it('replaces {vocative} with unchanged name for an unmapped child name', () => {
+    const sandroChild: Child = {
+      id: 'child-4',
+      parent_id: 'parent-1',
+      name: 'სანდრო',
+      avatar_id: 'avatar_4',
+      gender: 'boy',
+      created_at: '2026-01-01T00:00:00Z',
+    };
+    const phrase = 'ბრავო, {vocative}!';
+    expect(personalize(phrase, sandroChild)).toBe('ბრავო, სანდრო!');
+  });
+
+  it('uses neutral vocative fallback "ჩემპიონო" when child is null', () => {
+    const phrase = 'ყოჩაღ, {vocative}!';
+    expect(personalize(phrase, null)).toBe('ყოჩაღ, ჩემპიონო!');
+  });
+
+  it('replaces both {name}, {vocative}, and {gender} in the same phrase', () => {
+    const davitChild: Child = {
+      id: 'child-3',
+      parent_id: 'parent-1',
+      name: 'დავითი',
+      avatar_id: 'avatar_3',
+      gender: 'boy',
+      created_at: '2026-01-01T00:00:00Z',
+    };
+    const phrase = 'გაიცანით {name}. ყოჩაღ, {vocative}, ნამდვილი {gender} ხარ!';
+    expect(personalize(phrase, davitChild)).toBe('გაიცანით დავითი. ყოჩაღ, დავით, ნამდვილი ბიჭი ხარ!');
+  });
 });

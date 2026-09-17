@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Child } from '../types';
 import { CHILD_AVATARS, GENDER_OPTIONS, getAvatarEmoji } from '../hooks/useChildren';
+import { isValidChildName } from '../utils/childNameValidator';
 
 interface ChildSelectorProps {
   childrenList: Child[];
@@ -37,8 +38,13 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
 
   const handleCreateChild = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newChildName.trim()) {
+    const normalizedName = newChildName.trim();
+    if (!normalizedName) {
       setErrorMsg('შეიყვანეთ ბავშვის სახელი');
+      return;
+    }
+    if (!isValidChildName(normalizedName)) {
+      setErrorMsg('სახელი უნდა შეიცავდეს მხოლოდ ქართულ ასოებს (დასაშვებია დეფისი და გამოტოვება)');
       return;
     }
     if (!selectedGender) {
@@ -49,7 +55,7 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
     setSubmitting(true);
     setErrorMsg(null);
 
-    const { child, error } = await onAddChild(newChildName, selectedAvatar, selectedGender);
+    const { child, error } = await onAddChild(normalizedName, selectedAvatar, selectedGender);
     setSubmitting(false);
 
     if (error) {
