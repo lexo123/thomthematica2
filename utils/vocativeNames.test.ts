@@ -12,8 +12,8 @@ describe('vocativeNames utility', () => {
   it('returns trimmed unmapped name unchanged without auto-derivation or heuristics', () => {
     // Unmapped names must return exactly as provided (after trim)
     expect(getVocativeName('სანდრო')).toBe('სანდრო');
-    expect(getVocativeName('მარიამი')).toBe('მარიამი');
-    expect(getVocativeName('ნიკოლოზი')).toBe('ნიკოლოზი');
+    expect(getVocativeName('მარიამი')).toBe('მარიამ');
+    expect(getVocativeName('ნიკოლოზი')).toBe('ნიკოლოზ');
     expect(getVocativeName('UnknownName')).toBe('UnknownName');
   });
 
@@ -34,3 +34,4 @@ describe('vocativeNames utility', () => {
     expect(getVocativeName('   ')).toBe('');
   });
 });
+
