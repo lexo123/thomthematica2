@@ -13,13 +13,13 @@ export const CORRECT_PHRASES = [
 ];
 
 export const INCORRECT_PHRASES = [
-  "კარგად დაფიქრდი",
+  "კარგად დაფიქრდი, {vocative}",
   "ვერ გამოიცანი",
   "არასწორია",
   "[] არასწორია",
   "[] არა იის",
-  "[] რანაირად არის, წესიერად დაითვალე",
-  "არასწორია, ასეთი ჭკვიანი {vocative} მაგას როგორ ვერ ხვდები"
+  "[] რანაირად არის? წესიერად დაითვალე",
+  "არასწორია, ასეთი ჭკვიანი {gender} მაგას როგორ ვერ ხვდები"
 ];
 
 export const TIME_LIMIT = 10;
@@ -248,3 +248,4 @@ export const generateProblem = (mode: GameMode, questionIndex: number = 0): Math
     equationResult: equationResult 
   };
 };
+
