@@ -159,7 +159,7 @@ const App: React.FC = () => {
       const nextQuestionsInBlock = questionsInBlock + 1;
       setQuestionsInBlock(nextQuestionsInBlock);
 
-      let message = personalize(selectFromPool(correctPhrasePool, CORRECT_PHRASES), activeChild);
+      let message = '';
 
       if (nextQuestionsInBlock === 3) {
         setShowRewardImage(true);
@@ -168,8 +168,13 @@ const App: React.FC = () => {
         } else {
           message = "შეცდომები გქონდა! მეფე უკმაყოფილოა.";
         }
+        // No pool draw here — ResultOverlay always overrides this message
+        // with an image caption when showImage is true, so drawing from
+        // correctPhrasePool on this turn would silently waste a phrase
+        // the child will never see.
       } else {
         setShowRewardImage(false);
+        message = personalize(selectFromPool(correctPhrasePool, CORRECT_PHRASES), activeChild);
       }
 
       setCurrentMessage(message);
