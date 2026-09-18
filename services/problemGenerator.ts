@@ -1,19 +1,25 @@
 import { MathProblem, Operation, GameMode, FigureType, MeasurementType, MissingPart, ShapeVariant } from '../types';
 
 export const CORRECT_PHRASES = [
-  "ყოჩაღ, {name} კაი {gender} ხარ",
-  "სააღოლ ძმაო",
-  "მალადეეც",
+  "ყოჩაღ, {name}, კარგი {gender} ხარ",
+  "მაგარი ხარ {name}",
+  "{name}, შენ რა ჭკვიანი {gender} ყოფილხარ",
   "ბრავო",
+  "ბრავო, {name}",
   "შენ აღარ ხუმრობ",
-  "მათემატიკოსი კაცი ხარ"
+  "მათემატიკოსი {gender} ხარ",
+  "გენიოსი ხარ",
+  "ძალიან მაგარი ხარ"
 ];
 
 export const INCORRECT_PHRASES = [
-  "არა ბიჭო რა []",
+  "კარგად დაფიქრდი",
+  "ვერ გამოიცანი",
+  "არასწორია",
+  "[] არასწორია",
   "[] არა იის",
   "[] რანაირად არის, წესიერად დაითვალე",
-  "არასწორია, ასეთი ჭკვიანი კაცი მაგას როგორ ვერ ხვდები"
+  "არასწორია, ასეთი ჭკვიანი {gender} მაგას როგორ ვერ ხვდები"
 ];
 
 export const TIME_LIMIT = 10;
