@@ -34,4 +34,3 @@ describe('vocativeNames utility', () => {
     expect(getVocativeName('   ')).toBe('');
   });
 });
-

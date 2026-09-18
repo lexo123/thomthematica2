@@ -25,7 +25,6 @@ export const VOCATIVE_NAMES: Record<string, string> = {
   'მაჰმუდი': 'მაჰმუდ',
   'რუსუდანი': 'რუსუდან',
   'თინათინი': 'თინათინ',
-  
 };
 
 export function getVocativeName(name: string): string {
