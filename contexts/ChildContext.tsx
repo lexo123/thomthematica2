@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Child } from '../types';
+import { Child, ChildRewardImagesState } from '../types';
 import { useAuth } from './AuthContext';
 import { useChildren } from '../hooks/useChildren';
+import { useChildRewardImagesFetcher } from '../hooks/useChildRewardImagesFetcher';
 
 interface ChildContextType {
   childrenList: Child[];
   activeChild: Child | null;
   activeChildId: string | null;
+  childRewardImages: ChildRewardImagesState | null;
   loading: boolean;
   error: string | null;
   hasFetchedOnce: boolean;
@@ -31,6 +33,7 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     return null;
   });
+  const childRewardImages = useChildRewardImagesFetcher(activeChildId);
   const [showChildSelector, setShowChildSelector] = useState<boolean>(false);
 
   // When user logs out, clear active child
@@ -89,6 +92,7 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         childrenList,
         activeChild,
         activeChildId,
+        childRewardImages,
         loading,
         error,
         hasFetchedOnce,
@@ -112,3 +116,5 @@ export const useChild = () => {
   }
   return context;
 };
+
+export const useChildContext = useChild;

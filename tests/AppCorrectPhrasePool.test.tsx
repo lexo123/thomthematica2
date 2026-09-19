@@ -8,6 +8,7 @@ import * as ChildContext from '../contexts/ChildContext';
 import * as poolSelector from '../utils/poolSelector';
 import * as problemGenerator from '../services/problemGenerator';
 import { Operation } from '../types';
+import { CORRECT_PHRASES } from '../services/problemGenerator';
 
 describe('App correct phrase pool draw behavior', () => {
   beforeEach(() => {
@@ -75,16 +76,18 @@ describe('App correct phrase pool draw behavior', () => {
       fireEvent.change(input, { target: { value: '6' } });
       fireEvent.click(screen.getByText('შემოწმება'));
 
-      // Verify that after each question, call count matches expected (0 added on 3rd and 6th)
-      expect(selectFromPoolSpy).toHaveBeenCalledTimes(expectedPoolCalls);
+      // Verify that after each question, correct phrase call count matches expected (0 added on 3rd and 6th)
+      const phraseCalls = selectFromPoolSpy.mock.calls.filter(([_, source]) => source === CORRECT_PHRASES);
+      expect(phraseCalls.length).toBe(expectedPoolCalls);
 
       // Advance to next question
       const nextBtn = screen.getByRole('button', { name: /შემდეგი/ });
       fireEvent.click(nextBtn);
     }
 
-    // Total pool calls equals total correct answers minus block-completing answers (6 - 2 = 4)
+    // Total phrase pool calls equals total correct answers minus block-completing answers (6 - 2 = 4)
     const blockCompletingCount = Math.floor(totalQuestions / 3);
-    expect(selectFromPoolSpy).toHaveBeenCalledTimes(totalQuestions - blockCompletingCount);
+    const finalPhraseCalls = selectFromPoolSpy.mock.calls.filter(([_, source]) => source === CORRECT_PHRASES);
+    expect(finalPhraseCalls.length).toBe(totalQuestions - blockCompletingCount);
   });
 });

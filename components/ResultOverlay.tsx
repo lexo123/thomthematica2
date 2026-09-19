@@ -1,10 +1,18 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { GameState } from '../types';
+import { GameState, RewardCategory } from '../types';
 import { Button } from './Button';
 import { ImageConfig, SUPER_WINNER_GIFS, WINNER_IMAGES, LOSER_IMAGES } from '../data/rewards';
+import { selectFromPool } from '../utils/poolSelector';
+import { useChild } from '../contexts/ChildContext';
 
 // სათადარიგო GIF, თუ რამე გაფუჭდა
 const FALLBACK_GIF = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExN2lsaG1oMnB6eXJ6eXJ6eXJ6eXJ6eXJ6eXJ6eXJ6eXJ6eSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l0MYt5jPR6QX5pnqM/giphy.gif";
+
+const GLOBAL_FALLBACK: Record<RewardCategory, ImageConfig[]> = {
+  winner: WINNER_IMAGES,
+  loser: LOSER_IMAGES,
+  super_winner: SUPER_WINNER_GIFS,
+};
 
 const getDriveId = (url: string) => {
   if (!url) return null;
@@ -40,18 +48,24 @@ export const ResultOverlay: React.FC<ResultOverlayProps> = ({
   isPerfectBlock,
   consecutivePerfectBlocks
 }) => {
+  const { childRewardImages, activeChildId } = useChild();
   const [showContent, setShowContent] = useState(false);
   
   // ვინახავთ აქტიურ სურათს და მის შესაბამის ტექსტს
   const [activeImgData, setActiveImgData] = useState<{src: string, caption: string} | null>(null);
   const [imageError, setImageError] = useState(false);
 
-  // აუზები (Pools) სურათების შესანახად
-  // თავდაპირველად ივსება სრული სიით. როცა სურათი გამოიყენება, იშლება სიიდან.
-  // როცა სია ცარიელდება, ივსება თავიდან.
-  const winnerPool = useRef<ImageConfig[]>([...WINNER_IMAGES]);
-  const loserPool = useRef<ImageConfig[]>([...LOSER_IMAGES]);
-  const superGifPool = useRef<ImageConfig[]>([...SUPER_WINNER_GIFS]);
+  // Pool ref-ების Map: `${activeChildId ?? 'global'}:${category}:${sourceType}`
+  const poolsMapRef = useRef<Map<string, React.MutableRefObject<ImageConfig[]>>>(new Map());
+
+  const getPoolRef = (poolKey: string): React.MutableRefObject<ImageConfig[]> => {
+    let ref = poolsMapRef.current.get(poolKey);
+    if (!ref) {
+      ref = { current: [] };
+      poolsMapRef.current.set(poolKey, ref);
+    }
+    return ref;
+  };
 
   const isCorrect = gameState === GameState.Correct;
 
@@ -67,48 +81,39 @@ export const ResultOverlay: React.FC<ResultOverlayProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onReset]);
 
-  // დამხმარე ფუნქცია აუზიდან სურათის ამოსაღებად
-  const selectImageFromPool = (poolRef: React.MutableRefObject<ImageConfig[]>, originalSource: ImageConfig[]) => {
-    // თუ აუზი ცარიელია, გავავსოთ თავიდან
-    if (poolRef.current.length === 0) {
-      poolRef.current = [...originalSource];
-    }
-    
-    // ავირჩიოთ რანდომ ინდექსი
-    const randomIndex = Math.floor(Math.random() * poolRef.current.length);
-    const selected = poolRef.current[randomIndex];
-    
-    // წავშალოთ არჩეული ელემენტი აუზიდან (რომ აღარ განმეორდეს სანამ არ დაიცლება)
-    poolRef.current.splice(randomIndex, 1);
-    
-    return selected;
-  };
-
   // სურათის ლოგიკა
   useEffect(() => {
     if (!showImage) return;
 
-    let selectedItem: ImageConfig;
+    let category: RewardCategory;
 
-    // 1. განვსაზღვრავთ რომელი აუზიდან ამოვიღოთ
+    // 1. განვსაზღვრავთ კატეგორიას
     if (!isPerfectBlock) {
-      selectedItem = selectImageFromPool(loserPool, LOSER_IMAGES);
+      category = 'loser';
     } else if (consecutivePerfectBlocks > 0 && consecutivePerfectBlocks % 3 === 0) {
       // ყოველი მე-3 სუფთა ბლოკი -> გიფი
-      selectedItem = selectImageFromPool(superGifPool, SUPER_WINNER_GIFS);
+      category = 'super_winner';
     } else {
       // ჩვეულებრივი მოგება
-      selectedItem = selectImageFromPool(winnerPool, WINNER_IMAGES);
+      category = 'winner';
     }
 
-    const finalSrc = getDirectLink(selectedItem.url);
+    const sourceType = childRewardImages?.isPersonalized ? 'personalized' : 'fallback';
+    const poolKey = `${activeChildId ?? 'global'}:${category}:${sourceType}`;
+
+    const source: ImageConfig[] = childRewardImages?.isPersonalized
+      ? childRewardImages[category]
+      : GLOBAL_FALLBACK[category];
+
+    const picked: ImageConfig = selectFromPool(getPoolRef(poolKey), source);
+    const finalSrc = getDirectLink(picked.url);
     
     setActiveImgData({
       src: finalSrc,
-      caption: selectedItem.caption
+      caption: picked.caption
     });
     setImageError(false);
-  }, [showImage, isPerfectBlock, consecutivePerfectBlocks]);
+  }, [showImage, isPerfectBlock, consecutivePerfectBlocks, childRewardImages, activeChildId]);
 
   const titleColor = isCorrect ? 'text-green-600' : 'text-red-600';
   const bgColor = isCorrect ? 'bg-green-500/90' : 'bg-red-500/90';

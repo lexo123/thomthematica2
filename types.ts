@@ -1,3 +1,5 @@
+import type { ImageConfig } from './data/rewards';
+
 export enum GameMode {
   Thomthematica = 'thomthematica',
   ThomravlebisTabula = 'thomravlebis_tabula',
@@ -90,4 +92,22 @@ export interface Wish {
   status: 'pending' | 'fulfilled';
   fulfilled_at?: string | null;
   created_at: string;
+}
+
+export type RewardCategory = 'winner' | 'loser' | 'super_winner';
+
+export interface ChildRewardImage {
+  id: string;
+  child_id: string;
+  category: RewardCategory;
+  storage_path: string;
+  caption: string;
+  sort_order: number;
+}
+
+export interface ChildRewardImagesState {
+  isPersonalized: boolean; // true მხოლოდ თუ სამივე კატეგორიას აქვს >=1 row
+  winner: ImageConfig[];
+  loser: ImageConfig[];
+  super_winner: ImageConfig[];
 }

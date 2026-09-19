@@ -248,4 +248,3 @@ export const generateProblem = (mode: GameMode, questionIndex: number = 0): Math
     equationResult: equationResult 
   };
 };
-

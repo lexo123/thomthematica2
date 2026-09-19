@@ -126,45 +126,42 @@ _[შენიშვნა: ამ commit-ის დეტალური review
 
 **Commit #13–#16 (`5142f12`, `eae5f09`, `e4a176b`, `e7af03b`):** Lexo-მ თავად დაწერა `VOCATIVE_NAMES`-ის სრული სია და გააფართოვა/გადაწერა `CORRECT_PHRASES` (9 ფრაზა) და `INCORRECT_PHRASES` (7 ფრაზა) `services/problemGenerator.ts`-ში, შემდეგ ჩართო `{vocative}` ყველგან, სადაც პირდაპირი მიმართვა გრამატიკულად შესაბამისია. Claude-ის fresh-clone ვერიფიკაციამ თითოეულ commit-ზე დაიჭირა ორი რეგრესია, ორივე გასწორდა: (1) უნებლიე `{gender}`→`{vocative}` ჩანაცვლება ერთ `INCORRECT_PHRASES`-ის ხაზში, რომელმაც gender-პერსონალიზაცია დაკარგა (`e7af03b`-ში `{gender}` დაბრუნდა); (2) `vocativeNames.ts`-იდან წაშლილი identity-mapping ჩანაწერები (`'თომა':'თომა'`) დადასტურდა, როგორც უწყინარი cleanup, არა რეგრესია. **საბოლოო მდგომარეობა: 25/25 test file, 203/203 ტესტი, 0 TS შეცდომა, სუფთა build.**
 
-### Wave 3 — Part 2: Per-Child Reward Images — Architecture Approved 🔵
+### Wave 3 — Part 2: Per-Child Reward Images (Private Storage + Signed URLs + ResultOverlay) ✅
 
-**სტატუსი:** Architecture Review დასრულებულია (Claude + ChatGPT სრული sign-off), Implementation Prompt ჯერ არ დაწერილა.
+**სტატუსი:** სრულად იმპლემენტირებული და დატესტილი (218/218 ტესტი მწვანე, 0 TypeScript შეცდომა).
 
-**კონტექსტი:** ამჟამინდელი გლობალური `WINNER_IMAGES`/`LOSER_IMAGES`/`SUPER_WINNER_GIFS` (`data/rewards.ts`) სინამდვილეში ერთი კონკრეტული ბავშვის (თომას) პირადი ფოტოებია, დარჩენილი one-child-app-ის ეპოქიდან. Lexo ამ სურათებს კოდიდან სრულად ამოიღებს, შეცვლის ახალი, ნამდვილად ზოგადი სურათებით (fallback tier-ისთვის), და თითოეულ დარეგისტრირებულ ბავშვს პირადად შექმნის საკუთარ, მხოლოდ მისთვის ხილულ სურათებს.
+**კონტექსტი:** თითოეული ბავშვისთვის პერსონალიზებული სურათების მიწოდება private Supabase Storage bucket-იდან (`child-reward-images`) prefetch-ილი signed URL-ებით და fallback მექანიზმით.
 
-**საკვანძო architecture გადაწყვეტილებები:**
-- **Association key: `child.id`, არა სახელი** — ორ სხვადასხვა ერთნაირსახელოვან ბავშვს დამოუკიდებელი სურათების ნაკრები ექნება (განსხვავებით `vocativeName`-ისგან, სადაც key სახელია)
-- **ახალი DB table** (არა static repo-ფაილი, განსხვავებით `vocativeNames.ts`-ისგან) — განზრახული გადახვევა წინა precedent-იდან, რადგან ეს ნამდვილი per-child (არა per-name) მონაცემია, და DB Lexo-ს Supabase dashboard-იდან პირდაპირ დამატების საშუალებას აძლევს, code-commit/deploy-ის გარეშე
-- **Confidentiality (ახალი, მკაცრი მოთხოვნა):** ბავშვის სურათი ხელმისაწვდომი უნდა იყოს მხოლოდ მშობლისთვის, ბავშვისთვის და Lexo-სთვის — public Google Drive ბმულები (ამჟამინდელი მექანიზმი) ამ მოთხოვნას არ აკმაყოფილებს. გადაწყვეტა: **private Supabase Storage bucket** + signed URLs
-- **All-or-nothing პერსონალიზაცია** — ბავშვი ან სამივე კატეგორიით (winner/loser/super_winner) არის პერსონალიზებული, ან საერთოდ არა; per-category არევა დაუშვებელია
+**განხორციელებული ცვლილებები:**
+1. **`types.ts`:**
+   - დაემატა `RewardCategory = 'winner' | 'loser' | 'super_winner'`
+   - დაემატა `ChildRewardImage` (DB row ინტერფეისი)
+   - დაემატა `ChildRewardImagesState` (`isPersonalized: boolean`, `winner`, `loser`, `super_winner: ImageConfig[]`)
+2. **`services/rewardImagesService.ts`:**
+   - `fetchChildRewardImages(childId)` — კითხულობს `child_reward_images` ცხრილს `child_id`-ით დალაგებულს `category, sort_order`-ის მიხედვით
+   - All-or-nothing შემოწმება: თუ რომელიმე კატეგორიას არ აქვს ჩანაწერი, დაუყოვნებლივ აბრუნებს `isPersonalized: false` (signed URL-ების batch call არ ეშვება)
+   - ერთჯერადი batch call `createSignedUrls(allPaths, 7200)`
+   - დაბრუნებული signed URL-ების დამაჩვა DB row-ებთან `Map<storage_path, signedUrl>`-ით (არა პოზიციური ინდექსით)
+   - ცალკეული signed URL failure-ის შემთხვევაში გამოტოვება შესაბამისი კატეგორიიდან; თუ რომელიმე კატეგორია დაცარიელდა — All-or-nothing აბრუნებს `isPersonalized: false`
+   - შეცდომების მშვიდი დამუშავება (არასდროს რეჯექთდება)
+3. **`hooks/useChildRewardImagesFetcher.ts`:**
+   - `useChildRewardImagesFetcher(childId: string | null)`
+   - `requestIdRef` generation-counter guard (მსგავსად `useChildDashboard` და `useChildren`-ისა) stale-response race condition-ის თავიდან ასაცილებლად
+   - `childId === null`-ზე დაუყოვნებლივ აბრუნებს `null`-ს
+4. **`contexts/ChildContext.tsx`:**
+   - `childRewardImages` დაემატა `ChildContextType`-სა და `ChildProvider`-ის value-ში
+   - ექსპორტირებულია `useChildContext` (alias)
+5. **`components/ResultOverlay.tsx`:**
+   - წაიშალა დუბლირებული `selectImageFromPool` და ჩანაცვლდა `utils/poolSelector.ts`-ის `selectFromPool`-ით
+   - Pool ref-ების key შეიცავს `sourceType`-ს: `${activeChildId ?? 'global'}:${category}:${sourceType}` ერთიანი `poolsMapRef`-ის შიგნით, რათა fallback-იდან personalized-ზე გადასვლისას pool ინდექსები არ აირიოს
+6. **ტესტები:**
+   - დაემატა `services/rewardImagesService.test.ts` (6 ტესტი)
+   - დაემატა `hooks/useChildRewardImagesFetcher.test.ts` (4 ტესტი)
+   - დაემატა `components/ResultOverlay.test.tsx` (4 ტესტი)
+   - სრული ტესტების რაოდენობა: 218/218 მწვანე
 
-**დამტკიცებული schema:**
-```sql
-CREATE TABLE child_reward_images (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  child_id uuid NOT NULL REFERENCES children(id) ON DELETE CASCADE,
-  category text NOT NULL CHECK (category IN ('winner', 'loser', 'super_winner')),
-  storage_path text NOT NULL,
-  caption text NOT NULL,
-  sort_order int NOT NULL DEFAULT 0,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX child_reward_images_child_category_idx ON child_reward_images (child_id, category);
-ALTER TABLE child_reward_images ENABLE ROW LEVEL SECURITY;
+**შემდეგი ნაბიჯი:** Wave 4 (grade-based დიაპაზონი).
 
-CREATE POLICY "parents_select_own_child_images"
-  ON child_reward_images FOR SELECT
-  USING (child_id IN (SELECT id FROM children WHERE parent_id = auth.uid()));
-```
-(client-ს მხოლოდ SELECT აქვს — INSERT/UPDATE/DELETE Lexo-ს service-role-ით, dashboard-იდან)
-
-**Storage:** `child-reward-images` bucket, `public: false`, path convention `{child_id}/{category}/{filename}`. Storage RLS-ში path-ის child_id-სეგმენტი **text-ად შედარებული** (არა `::uuid` cast) — დადასტურებულია PostgreSQL-ის საკუთარი დოკუმენტაციით/bug-tracker-ით, რომ AND/OR short-circuit evaluation გარანტირებული არ არის, ანუ `::uuid` cast თეორიულად query-ს ჩაშლის რისკის ქვეშ აყენებს malformed path-ის შემთხვევაში.
-
-**Signed URLs:** `createSignedUrl()` prefetch-ილია ერთხელ, session-ის დასაწყისში (`activeChildId`-ის დაყენებისას), არა block-completion-ის მომენტში — რომ ჯილდოს ჩვენებაზე დაყოვნება არ გაჩნდეს. Expiry საკმარისად გრძელი უნდა იყოს session-ის სავარაუდო ხანგრძლივობისთვის.
-
-**Cleanup ამავე commit-ში:** `ResultOverlay.tsx`-ის დუბლირებული `selectImageFromPool` ლოგიკა ჩანაცვლდება არსებული `utils/poolSelector.ts`-ით (Commit #8-დან) — semantics უცვლელი რჩება, მხოლოდ duplication მოიხსნება.
-
-**შემდეგი ნაბიჯი:** AI Studio-სთვის implementation prompt.
 
 ## საკვანძო არქიტექტურული გადაწყვეტილებები (არ შეიცვალოს განხილვის გარეშე)
 
@@ -198,6 +195,6 @@ CREATE POLICY "parents_select_own_child_images"
 
 ## შემდეგი ნაბიჯი
 
-Wave 3 Part 1 (vocativeName + phrase personalization) დასრულებულია. Wave 3 Part 2 (per-child reward images) — architecture დამტკიცებულია Claude-ისა და ChatGPT-ის მიერ, შემდეგი ნაბიჯი AI Studio-სთვის implementation prompt-ის დაწერაა. ამის შემდეგ Wave 4 (grade-based დიაპაზონი) და Wave 5 (სიტყვიერი ამოცანები) — ცალკე სრული Architecture Review-ციკლით თითოეულისთვის.
+Wave 3 Part 1 (vocativeName + phrase personalization) და Wave 3 Part 2 (per-child reward images) სრულად დასრულებულია. შემდეგი ნაბიჯი: Wave 4 (grade-based დიაპაზონი) და Wave 5 (სიტყვიერი ამოცანები) — ცალკე სრული Architecture Review-ციკლით თითოეულისთვის.
 
 [ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს Claude-ის და ChatGPT-ის Project-ებში. **ნამდვილად** ატვირთეთ ეს ფაილი repo-შიც (`git add PROJECT_STATE.md && git commit && git push`), თორემ იგივე პრობლემა განმეორდება.]
