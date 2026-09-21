@@ -188,7 +188,7 @@ const App: React.FC = () => {
       }
 
       const template = selectFromPool(incorrectPhrasePool, INCORRECT_PHRASES);
-      const finalMessage = template.replace("[]", actualUserAnswer);
+      const finalMessage = personalize(template, activeChild).replace("[]", actualUserAnswer);
       
       setCurrentMessage(finalMessage);
       setGameState(GameState.Incorrect);
