@@ -11,6 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT,
+  pin_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -47,6 +48,7 @@ CREATE TABLE IF NOT EXISTS public.children (
   name TEXT NOT NULL,
   avatar_id TEXT NOT NULL DEFAULT 'avatar_1',
   gender TEXT NOT NULL,
+  pin_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT children_name_not_empty CHECK (LENGTH(TRIM(name)) > 0),
   CONSTRAINT children_gender_valid CHECK (gender IN ('boy', 'girl'))

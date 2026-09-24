@@ -27,4 +27,3 @@ export const LOSER_IMAGES: ImageConfig[] = [
     caption: "ვერ გამოიცანი"
   },
 ];
-
