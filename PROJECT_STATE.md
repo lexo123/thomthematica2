@@ -1,12 +1,12 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: Wave 3, Part 2 (Architecture Review დასრულებული, per-child reward images) დამტკიცების შემდეგ_
+_ბოლო განახლება: Wave 3 (Part 1 + Part 2) სრულად დასრულებული და დადასტურებული; PIN-based Parent/Child Identity Gate — architecture დამტკიცებულია Claude-ისა და ChatGPT-ის მიერ, ჯერ არ დაწყებულა implementation_
 
 ## Repo
 https://github.com/lexo123/thomthematica2
 
 ## პროექტის მოკლე აღწერა
-React/TypeScript საგანმანათლებლო მათემატიკის აპლიკაცია ბავშვებისთვის, თავდაპირველად აშენებული ერთი ბავშვისთვის (thomthematica), ახლა გადადის multi-user/Parent→Child მოდელზე Supabase-ის (Auth + Postgres + RLS) გამოყენებით. კოდი იწერება Google AI Studio-ს (Gemini) მიერ vibe-coding მიდგომით; Claude და ChatGPT ცალ-ცალკე აკეთებენ code review-ს ყოველ commit-ზე, სანამ შემდეგი ეტაპი დაიწყება. Lexo — project manager/reviewer, არა კოდის ავტორი.
+React/TypeScript საგანმანათლებლო მათემატიკის აპლიკაცია ბავშვებისთვის, თავდაპირველად აშენებული ერთი ბავშვისთვის (thomthematica), ახლა გადადის multi-user/Parent→Child მოდელზე Supabase-ის (Auth + Postgres + RLS) გამოყენებით. კოდი იწერება Google AI Studio-ს (Gemini) მიერ vibe-coding მიდგომით; Claude და ChatGPT ცალ-ცალკე აკეთებენ code review-ს ყოველ commit-ზე, სანამ შემდეგი ეტაპი დაიწყება. Lexo — project manager/reviewer, არა კოდის ავტორი. **პროექტი ახლოვდება production launch-ს — თავდაპირველად ~10 ახლობელი ბავშვისთვის.**
 
 ## დასრულებული ფაზები
 
@@ -45,144 +45,165 @@ hooks/useGameSession.ts-ში:
 ### Phase 2.5: Migration Gate Closure — Guest Mode-ის სრული მოცილება (Variant A) ✅
 - Guest Mode მთლიანად გაუქმებულია — ყველა მომხმარებელი authenticated flow-ით
 - services/statsService.ts (Google Apps Script sync) ფიზიკურად წაშლილია thomthematica2-დან
-- Google Apps Script public-write endpoint განზრახ რჩება აქტიური — მხოლოდ ცალკე, scope-გარე legacy `thomthematica` (ერთ-ბავშვიანი) აპისთვის; thomthematica2 აღარ არის მასზე დამოკიდებული (source/build/runtime — დამოუკიდებლად ვერიფიცირებული)
+- Google Apps Script public-write endpoint განზრახ რჩება აქტიური — მხოლოდ ცალკე, scope-გარე legacy `thomthematica` (ერთ-ბავშვიანი) აპისთვის; thomthematica2 აღარ არის მასზე დამოკიდებული
 - 59/59 ტესტი
 
 ### Phase 3 — Commit #1 (Parent Dashboard: Data/Read/Derivation Layer) ✅
 - **Core rule**: Dashboard — read-only derived-data layer, ახალი statistics data model/schema არ ემატება
 - fetchChildSessionsForAggregate, fetchChildSessionsRecent (bounded `.limit(20)`), deriveDashboardStats (pure, division-by-zero-დაცული)
-- **ChatGPT-მ აღმოაჩინა race condition**: stale-response guard მხოლოდ childId-ს ამოწმებდა — ვერ იცავდა A→B→A double-switch-ისგან (ძველი F1-fetch შეეძლო გადაეწერა უფრო ახალი F3-ის სწორი მონაცემი). **Claude-მ დამოუკიდებლად დაადასტურა** — red→green ციკლით. გასწორდა `requestIdRef` generation-counter-ით (`activeChildIdRef`-ის ნაცვლად) — **ეს არის ის pattern, რომელიც მოგვიანებით Wave 2-ში (Commit #10) ხელახლა იქნა გამოყენებული**
+- **ChatGPT-მ აღმოაჩინა race condition**: stale-response guard მხოლოდ childId-ს ამოწმებდა — ვერ იცავდა A→B→A double-switch-ისგან. **Claude-მ დამოუკიდებლად დაადასტურა** — red→green ციკლით. გასწორდა `requestIdRef` generation-counter-ით — **ეს არის ის pattern, რომელიც მოგვიანებით Wave 2-ში (Commit #10) და Wave 3 Part 2-ში (reward-images fetcher) ხელახლა იქნა გამოყენებული**
 - 78/78 ტესტი
 
 ### Phase 3 — Commit #2 (Parent Dashboard UI) ✅
 - `showDashboard` state ლოკალურად MainMenu.tsx-ში, body-level conditional (არა overlay)
-- explicit rendering priority chain (childId===null → loading → error → stats===null → 0-sessions → no-accuracy → populated)
-- useChildDashboard(childId) ყოველთვის უპირობოდ გამოძახებული (Rules of Hooks)
-- wishes — სრული სია, truncation-ის გარეშე
-- `App.tsx` საერთოდ არ შეხებია ამ commit-ში
+- explicit rendering priority chain, useChildDashboard(childId) ყოველთვის უპირობოდ გამოძახებული (Rules of Hooks)
 - 88/88 ტესტი
 
 ### Phase 3 — Commit #3 (gameModeLabels.ts Shared Util Refactor) ✅
-- `utils/gameModeLabels.ts` — `GAME_MODE_LABELS: Record<GameMode, string>` (მკაცრი ტიპით) + `getGameModeLabel(mode: string)` type-guard-დაფუძნებული lookup
-- `types.ts`-ის `GameSession.game_mode: string` ხელუხლებელი დარჩა
+- `utils/gameModeLabels.ts` — `GAME_MODE_LABELS` + `getGameModeLabel()`
 - 91/91 ტესტი
 
 ### Phase 3 — Commit #4 (Game-mode Breakdown Dashboard-ში) ✅
-_[შენიშვნა: ამ commit-ის დეტალური review-prose ვერ აღდგა — ქვემოთ მხოლოდ მიმდინარე კოდიდან პირდაპირ დადასტურებული ფაქტებია, არა თავდაპირველი review-ჩანაწერი.]_
-- დადასტურებულია მიმდინარე კოდში: `useChildDashboard.ts` აბრუნებს `gameModeBreakdown: GameModeBreakdown`-ს, `ParentDashboard.tsx`-ში "4. Game Mode Breakdown" სექციად რენდერდება, `getGameModeLabel`-ს იყენებს ლეიბლებისთვის
-- Commit #3-ის "Architecture Review-ში" ნახსენები open decision (query-strategy: არსებული query-ის გაფართოება vs ცალკე breakdown-query) გადაწყვეტილია — რომელი მიდგომა შეირჩა, ცალკე დასადასტურებელია საჭიროების შემთხვევაში
+- `useChildDashboard.ts` აბრუნებს `gameModeBreakdown`, `ParentDashboard.tsx`-ში რენდერდება
 
 ### Phase 3 — Commit #5 (Session-close Persistence + Rolling-window Persistence + Kveshmicera Enter-fix) ✅
-- Root-cause: `visibilitychange→hidden`-ზე `flushCompletedSession()` ცდომილებით ასრულებდა session-ს, auto-save არ ამოწმებდა ამ flag-ს → session სამუდამოდ `'active'`-ად რჩებოდა
-- გადაწყვეტა: ცალკე `persistCurrentSession()` (status: 'active', არ ცვლის isCompletedRef), `flushCompletedSession()` — მხოლოდ genuine completion-ზე
-- `services/gameProgressStorage.ts` (localStorage, 48სთ TTL), `{transport: 'keepalive'}`, `RESTORE_PROGRESS` reducer-action
+- `persistCurrentSession()` vs `flushCompletedSession()` გამიჯვნა
+- `services/gameProgressStorage.ts` (localStorage, 48სთ TTL), `{transport: 'keepalive'}`
 - 125/125 ტესტი
 
 ### Phase 3 — Commit #5A (Kveshmicera Wish-block: 40 → 20) ✅
-- `utils/wishBlockSize.ts` (`getWishBlockSize(gameMode)`), `CHECK (correct_count IN (19,20,39,40))`
+- `utils/wishBlockSize.ts`, `CHECK (correct_count IN (19,20,39,40))`
 - 141/141 ტესტი
 
 ### Phase 3 — Commit #5B (Production DB Migration) ✅
-- `ALTER TABLE wishes DROP/ADD CONSTRAINT` — BEGIN/COMMIT-ში, post-migration data-check
-- ⚠️ ცნობილი, უვნებელი risk: AI Studio-ს ZIP-ს დროდადრო აქვს `schema.sql`/`metadata.json`-ის სტალ ასლი — production DB-ს არასდროს შეხებია
+- `ALTER TABLE wishes DROP/ADD CONSTRAINT` — BEGIN/COMMIT-ში
 
 ### Phase 3 — Kveshmicera Corrections #1–#4 (Post-5B ბაგები) ✅
-- 4 ურთიერთდაკავშირებული ბაგი: Enter-ზე feedback/სურათი გამოტოვება (`stopPropagation()`), incorrect-flow redesign (pre-Phase-3 legacy bug, git-history-ით დადასტურებული), repeated-submission guard, Enter-ით "შემდეგი"-ღილაკის non-closure
-- 150/150 ტესტი (სრული DOM-ინტეგრაციის ტესტებით)
+- 150/150 ტესტი
 
 ### Phase 3 — Commit #6A (ბავშვის სქესის ველი: schema + registration) ✅
-- Migration: `ADD COLUMN (nullable) → backfill by id → verify → SET NOT NULL → CHECK`
-- `supabase/schema.sql` (`gender TEXT NOT NULL`), `types.ts`, `hooks/useChildren.ts`, `components/ChildSelector.tsx` (სავალდებულო არჩევანი)
-- Production migration — Lexo-ს ხელით, დადასტურებული (`count(*) WHERE gender IS NULL` → 0)
+- Migration pattern: `ADD COLUMN (nullable) → backfill by id → verify → SET NOT NULL → CHECK` — **ეს pattern ხელახლა გამოყენებული იქნება PIN-Wave-ისთვის**
 - 155/155 ტესტი
 
 ### Phase 3 — Commit #6B (Personalization: {name} + {gender}) ✅
-- `utils/personalizeMessage.ts` — ცენტრალიზებული `personalize(phrase, child)`, `.replaceAll()`, null-fallback `'მოთამაშე'`
-- `data/rewards.ts` (per-child captions) განზრახ out-of-scope — Wave 3-ისთვის გადადებული
-- Production live-ტესტი დადასტურდა
+- `utils/personalizeMessage.ts` — ცენტრალიზებული `personalize(phrase, child)`
 - 160/160 ტესტი
 
 ### Wave 2 — Child-Context-ის საძირკვლის გამაგრება (Commit #7–#10) ✅
-
-**Commit #7 (`7f22fdf9dcba569aab27bbdadab461d4fbc3e707`):** Child Selector "first mode" race — selector ავტორიზაციის შემდეგ "დამატება"-ში იჭედებოდა თუნდაც არსებული ბავშვებისთვის (stale-closure race `ChildContext`-ის sync-ეფექტსა და `ChildSelector`-ის mount-time `isAdding`-ს შორის). გასწორდა `hasFetchedOnce` readiness-სიგნალით. 158/158 ტესტი.
-
-**Commit #8 (`d351ca52e6dbaaec03531706d4e00c37cb255379`):** "No-repeat-until-exhausted" pool სისტემა ფრაზებისთვის — ახალი გენერიკული `utils/poolSelector.ts` (`selectFromPool<T>`), იგივე pattern რაც production-ში სურათებს ჰქონდა. `ResultOverlay.tsx`/`data/rewards.ts` განზრახ არ შეხებია. 163/163 ტესტი.
-
-**Commit #9 (`537aa4b68cf4e6178c56e3979a1f04ae02b3dd67`):** `addChild`-ის type-safety — `gender: 'boy'` default მოშორდა, `ChildContextType.addChild`-ის out-of-sync interface (gender-პარამეტრის გარეშე) გასწორდა. 163/163 ტესტი.
-
-**Commit #10 (`ea6d8188622e572c5b021fa7b29231b9dc717663`):** Multi-account login-switch race — ორი დამოუკიდებელი race: (1) `hasFetchedOnce` არასდროს ბრუნდებოდა `false`-ზე user-ვინაობის ცვლილებაზე (SPA logout, page-reload-ის გარეშე); (2) stale in-flight fetch-ს შეეძლო overwrite გაეკეთებინა ახალი user-ის state-ისთვის. გასწორდა `fetchedForUserId` (id-შედარება) + `requestIdRef` (იგივე pattern, რაც Commit #1-ში `useChildDashboard.ts`-ისთვის უკვე დამტკიცდა) — ორივე დაცვა ერთმანეთს არ ცვლის, დამოუკიდებელი race-კლასებია. `fetchChildren`-ის `useCallback`-დამოკიდებულებაც `[user]`-დან `[userId]`-ზე გადავიდა. 168/168 ტესტი.
+- Commit #7: Child Selector "first mode" race — `hasFetchedOnce`-ით გასწორდა
+- Commit #8: "No-repeat-until-exhausted" pool სისტემა — `utils/poolSelector.ts` (`selectFromPool<T>`)
+- Commit #9: `addChild`-ის type-safety
+- Commit #10: Multi-account login-switch race — `fetchedForUserId` + `requestIdRef`
+- 168/168 ტესტი
 
 ### Wave 3 — Part 1: vocativeName + Phrase Personalization (Commit #11–#16) ✅
+- `utils/vocativeNames.ts`, `utils/childNameValidator.ts`, `personalizeMessage.ts`-ში `{vocative}`
+- **საბოლოო მდგომარეობა: 25/25 test file, 203/203 ტესტი, 0 TS შეცდომა**
 
-**მიდგომა:** თავდაპირველი გეგმა (`children.vocative_name` DB column, `gender`-migration-ის pattern) Architecture Review-ის დროს გადაისინჯა — წოდებითი ბრუნვა სახელის გრამატიკული თვისებაა, არა კონკრეტული ბავშვის, ამიტომ static client-side lookup (`utils/vocativeNames.ts`, იგივე idiom რაც `gameModeLabels.ts`-ს აქვს) architecturალურად უფრო სუფთაა. DB migration, schema-ცვლილება, registration-ველი — არცერთი არ დასჭირდა. Claude-მ და ChatGPT-მ ცალ-ცალკე დაამტკიცეს ეს მიდგომა implementation-მდე.
+### Wave 3 — Part 2: Per-Child Reward Images ✅ (დასრულებული, დადასტურებული commit bbb26ab)
+- **Schema:** `child_reward_images` table (`child_id`, `category` CHECK IN winner/loser/super_winner, `storage_path`, `caption`, `sort_order`) — SELECT-only RLS client-ისთვის, INSERT/UPDATE/DELETE მხოლოდ Lexo-ს service-role-ით dashboard-იდან
+- **Storage:** private `child-reward-images` bucket, `{child_id}/{category}/{filename}` კონვენცია, storage RLS policy path-ის child_id-სეგმენტს **text-ად** ადარებს (არა `::uuid` cast — PostgreSQL AND/OR short-circuit evaluation გარანტირებული არ არის)
+- **Signed URLs:** `createSignedUrls()` batch call, 2 საათის (7200წმ) expiry, `Map<storage_path, signedUrl>`-ით დაკავშირებული (არა პოზიციური ინდექსი)
+- **All-or-nothing personalization:** სამივე კატეგორია (winner/loser/super_winner) ≥1 row, თორემ სრულად fallback — ორჯერ შემოწმებული (DB row-ების დონეზე + signed-URL-fetch-ის შემდეგ)
+- **Prefetch lifecycle:** `hooks/useChildRewardImagesFetcher.ts` (requestIdRef guard) გამოძახებულია `ChildProvider`-ის კომპონენტის სხეულშივე, `childRewardImages` ემატება `ChildContextType`-ს
+- **ResultOverlay.tsx:** დუბლირებული pool-ლოგიკა ჩანაცვლდა `utils/poolSelector.ts`-ით, pool-key `${activeChildId ?? 'global'}:${category}:${sourceType}` (sourceType='personalized'|'fallback' — აუცილებელია, თორემ fallback→personalized გადასვლისას pool-ის ძველი ინდექსები არასწორ, ახალ მასივზე გამოიყენება)
+- **ვერიფიკაცია:** fresh clone, tsc 0 შეცდომა, vitest 28/28 file, 217/217 ტესტი, production build სუფთა
+- **ორი უწყინარი, დაფიქსირებული deviation:** (1) AI Studio-მ STOP condition დაარღვია უწყინრად — Context hook-ს `useChild` ერქვა (არა `useChildContext`, როგორც prompt ვარაუდობდა), გაჩერების მაგივრად `useChildContext` alias დაამატა; (2) commit-ის თვითაღწერაში "218/218" წერია, რეალურად 217/217-ია (cosmetic)
 
-**Commit #11 (`a5cfaa3` — "fix vocative names"):**
-- `utils/vocativeNames.ts` (`VOCATIVE_NAMES: Record<string,string>`, `getVocativeName()`, fallback = plain name, არავითარი auto-derivation)
-- `utils/childNameValidator.ts` — child-name registration validation: Georgian Mkhedruli ასოები (U+10D0–U+10FF) + space/hyphen (compound names დაშვებული, მაგ. "ანა-მარი"), პირველი/ბოლო სიმბოლო სავალდებულოდ ასო, consecutive separators აკრძალული. ვალიდაცია ეხება მხოლოდ ახალ რეგისტრაციებს — DB constraint არ დამატებულა, არსებული ბავშვები უცვლელი
-- `personalizeMessage.ts` — ახალი `{vocative}` placeholder, ცენტრალიზებული (იგივე pattern რაც `{name}`/`{gender}`-ს აქვს)
-- 202/202 ტესტი
-
-**Commit #12 (`ed5ac23` — "fix reward phrases"):** Lexo-ს დაკვირვებით აღმოჩენილი ბაგი — "no-repeat-until-exhausted" phrase-pool (Commit #8) ტექნიკურად სწორად მუშაობდა, მაგრამ `App.tsx`-ის `processAnswerResult` ბლოკის დამასრულებელ (მე-3) კითხვაზეც ხატავდა `correctPhrasePool`-იდან, თუმცა `ResultOverlay.tsx` ამ ტექსტს ყოველთვის image-caption-ით ანაცვლებდა — ანუ ბავშვისთვის უხილავი draw იყო, რაც pool-ის 1/3-ს უსაფუძვლოდ ხარჯავდა და ხილულ გამეორებებს იწვევდა. გასწორდა: `selectFromPool` მხოლოდ მაშინ იძახება, როცა ტექსტი რეალურად გამოჩნდება. Claude-ის fresh-clone ვერიფიკაციამ (instrumented ტესტი, 18 თანმიმდევრული სწორი პასუხი) დაადასტურა 0 ნაადრევი გამეორება. 203/203 ტესტი
-
-**Commit #13–#16 (`5142f12`, `eae5f09`, `e4a176b`, `e7af03b`):** Lexo-მ თავად დაწერა `VOCATIVE_NAMES`-ის სრული სია და გააფართოვა/გადაწერა `CORRECT_PHRASES` (9 ფრაზა) და `INCORRECT_PHRASES` (7 ფრაზა) `services/problemGenerator.ts`-ში, შემდეგ ჩართო `{vocative}` ყველგან, სადაც პირდაპირი მიმართვა გრამატიკულად შესაბამისია. Claude-ის fresh-clone ვერიფიკაციამ თითოეულ commit-ზე დაიჭირა ორი რეგრესია, ორივე გასწორდა: (1) უნებლიე `{gender}`→`{vocative}` ჩანაცვლება ერთ `INCORRECT_PHRASES`-ის ხაზში, რომელმაც gender-პერსონალიზაცია დაკარგა (`e7af03b`-ში `{gender}` დაბრუნდა); (2) `vocativeNames.ts`-იდან წაშლილი identity-mapping ჩანაწერები (`'თომა':'თომა'`) დადასტურდა, როგორც უწყინარი cleanup, არა რეგრესია. **საბოლოო მდგომარეობა: 25/25 test file, 203/203 ტესტი, 0 TS შეცდომა, სუფთა build.**
-
-### Wave 3 — Part 2: Per-Child Reward Images (Private Storage + Signed URLs + ResultOverlay) ✅
-
-**სტატუსი:** სრულად იმპლემენტირებული და დატესტილი (218/218 ტესტი მწვანე, 0 TypeScript შეცდომა).
-
-**კონტექსტი:** თითოეული ბავშვისთვის პერსონალიზებული სურათების მიწოდება private Supabase Storage bucket-იდან (`child-reward-images`) prefetch-ილი signed URL-ებით და fallback მექანიზმით.
-
-**განხორციელებული ცვლილებები:**
-1. **`types.ts`:**
-   - დაემატა `RewardCategory = 'winner' | 'loser' | 'super_winner'`
-   - დაემატა `ChildRewardImage` (DB row ინტერფეისი)
-   - დაემატა `ChildRewardImagesState` (`isPersonalized: boolean`, `winner`, `loser`, `super_winner: ImageConfig[]`)
-2. **`services/rewardImagesService.ts`:**
-   - `fetchChildRewardImages(childId)` — კითხულობს `child_reward_images` ცხრილს `child_id`-ით დალაგებულს `category, sort_order`-ის მიხედვით
-   - All-or-nothing შემოწმება: თუ რომელიმე კატეგორიას არ აქვს ჩანაწერი, დაუყოვნებლივ აბრუნებს `isPersonalized: false` (signed URL-ების batch call არ ეშვება)
-   - ერთჯერადი batch call `createSignedUrls(allPaths, 7200)`
-   - დაბრუნებული signed URL-ების დამაჩვა DB row-ებთან `Map<storage_path, signedUrl>`-ით (არა პოზიციური ინდექსით)
-   - ცალკეული signed URL failure-ის შემთხვევაში გამოტოვება შესაბამისი კატეგორიიდან; თუ რომელიმე კატეგორია დაცარიელდა — All-or-nothing აბრუნებს `isPersonalized: false`
-   - შეცდომების მშვიდი დამუშავება (არასდროს რეჯექთდება)
-3. **`hooks/useChildRewardImagesFetcher.ts`:**
-   - `useChildRewardImagesFetcher(childId: string | null)`
-   - `requestIdRef` generation-counter guard (მსგავსად `useChildDashboard` და `useChildren`-ისა) stale-response race condition-ის თავიდან ასაცილებლად
-   - `childId === null`-ზე დაუყოვნებლივ აბრუნებს `null`-ს
-4. **`contexts/ChildContext.tsx`:**
-   - `childRewardImages` დაემატა `ChildContextType`-სა და `ChildProvider`-ის value-ში
-   - ექსპორტირებულია `useChildContext` (alias)
-5. **`components/ResultOverlay.tsx`:**
-   - წაიშალა დუბლირებული `selectImageFromPool` და ჩანაცვლდა `utils/poolSelector.ts`-ის `selectFromPool`-ით
-   - Pool ref-ების key შეიცავს `sourceType`-ს: `${activeChildId ?? 'global'}:${category}:${sourceType}` ერთიანი `poolsMapRef`-ის შიგნით, რათა fallback-იდან personalized-ზე გადასვლისას pool ინდექსები არ აირიოს
-6. **ტესტები:**
-   - დაემატა `services/rewardImagesService.test.ts` (6 ტესტი)
-   - დაემატა `hooks/useChildRewardImagesFetcher.test.ts` (4 ტესტი)
-   - დაემატა `components/ResultOverlay.test.tsx` (4 ტესტი)
-   - სრული ტესტების რაოდენობა: 218/218 მწვანე
-
-**შემდეგი ნაბიჯი:** Wave 4 (grade-based დიაპაზონი).
-
+### Post-Wave-3 Fixes ✅
+- **Incorrect-phrase personalization ბაგი (commit ca9d72d):** `App.tsx`-ის incorrect-answer branch-ში `personalize()` არასდროს იძახებოდა (მხოლოდ correct-branch-ში იყო) — `{vocative}`/`{gender}` ლიტერალურად რჩებოდა ტექსტში ვერ-გამოცნობაზე. Fix: `personalize(template, activeChild).replace("[]", actualUserAnswer)`. დადასტურებული fresh-clone-ით.
+- **`data/rewards.ts`-ის ჩანაცვლება (commit 80fb0bc):** ძველი, თომას პირადი ფოტო/გიფ-ლინკები (global fallback tier-ისთვის) სრულად ჩანაცვლდა ზოგადი სურათებით, ზოგადი caption-ებით ("ყოჩაღ, სწორია" / "ვერ გამოიცანი" / "ბრავისიმოოო!!!"). ეს კრიტიკული იყო Wave 3 Part 2-ის all-or-nothing წესის გამო — ნებისმიერი ბავშვი არასრული პერსონალიზაციით ხედავდა ამ fallback-ს.
+- **`migrated_prompt_history/` წაშლა — გადაწყვეტილია, შესასრულებელი:** repo public-ია; ეს directory შეიცავს პირვანდელი ერთ-ბავშვიანი dev-პერიოდის სრულ AI Studio chat-ისტორიას (თომას სახელი ათეულობით ჯერ, ძველი Drive-ლინკები პირადი ფოტოებისკენ, პირადი/საოჯახო რეფერენსები). აპის მუშაობას არ ეხმაურება (მხოლოდ dev-history, AI Studio-ს ცალკე cloud-history-ისგან დამოუკიდებელი) — უსაფრთხოდ, ტერმინალით წასაშლელი (`git rm -r migrated_prompt_history/`). ასევე `metadata.json`-ის description ჯერ კვლავ ახსენებს თომას სახელს.
 
 ## საკვანძო არქიტექტურული გადაწყვეტილებები (არ შეიცვალოს განხილვის გარეშე)
 
-- DB schema: Wave 3 Part 2-მდე ზუსტად 4 table (profiles, children, game_sessions, wishes) იყო; Part 2-ით 5-მდე იზრდება (`child_reward_images`) — ეს განზრახული, სრულად განხილული გადახვევაა "ზუსტად 4 table" წესიდან, per-child (არა per-name) მონაცემის ბუნების გამო. answers/progress/statistics/achievements ცხრილები კვლავ განზრახ არ არსებობს
+- DB schema: 4 table იყო Wave 3 Part 2-მდე; Part 2-ით 5-მდე გაიზარდა (`child_reward_images`) — განზრახული, სრულად განხილული გადახვევა
 - useGameSession(gameMode, childId) — mode-აგნოსტიკური
-- Guest Mode არ არსებობს (Phase 2.5)
-- Google Apps Script public-write endpoint — thomthematica2 აღარ დამოკიდებული, legacy thomthematica-ს (ერთ-ბავშვიანი) კუთვნილება
-- 40-question rolling window — ხელუხლებელი მთელი პროცესის განმავლობაში
-- Race-condition-ების დაცვის დამტკიცებული idiom: `requestIdRef` generation-counter (არა identity/childId-guard მარტო) — გამოყენებულია ორჯერ დამოუკიდებლად (Commit #1, Commit #10)
-- Per-name static content (Record<string,string>) vs. per-child DB storage — გადაწყვეტილების კრიტერიუმი: თუ მონაცემი სახელის/ცნების თვისებაა (გრამატიკა, ლეიბლები) → static repo-ფაილი (`vocativeNames.ts`, `gameModeLabels.ts`); თუ კონკრეტული ბავშვის ინდივიდუალური მონაცემია → DB table (`child_reward_images`)
+- Guest Mode არ არსებობს
+- 40-question rolling window — ხელუხლებელი
+- Race-condition-ების დამტკიცებული idiom: `requestIdRef` generation-counter — გამოყენებულია სამჯერ დამოუკიდებლად (Commit #1, Commit #10, Wave 3 Part 2 reward-images fetcher)
+- Per-name static content (Record<string,string>) vs. per-child DB storage — კრიტერიუმი: სახელის/ცნების თვისება (გრამატიკა, ლეიბლები) → static repo-ფაილი; კონკრეტული ბავშვის ინდივიდუალური მონაცემი → DB table
+- Schema-migration-ის დამტკიცებული pattern: `ADD COLUMN (nullable) → backfill → verify count=0 → SET NOT NULL → CHECK` (Commit #6A-ში დამტკიცებული, ხელახლა გამოსაყენებელია PIN-Wave-ისთვის)
+- Production migration (DB/Storage/RLS SQL) — ყოველთვის Lexo-ს ხელით, Supabase Dashboard/SQL editor-იდან; AI Studio-ს არასდროს გადაეცემა ეს პასუხისმგებლობა — მხოლოდ client-კოდი
+- Auto-pause mitigation: GitHub Actions scheduled workflow (`.github/workflows/keep-supabase-alive.yml`, ყოველ 3 დღეში) Supabase REST endpoint-ზე ping-ისთვის — გადაწყვეტილია, ჯერ არ დანერგილი
+
+## დაგეგმილი მომდევნო Wave-ები (პრიორიტეტის მიხედვით)
+
+### Wave X — PIN-based Parent/Child Identity Gate 🔵 (Architecture დამტკიცებული Claude + ChatGPT-ის მიერ, Implementation ჯერ არ დაწყებულა)
+
+**მიზანი:** ბავშვმა ვერ შეძლოს Parent Dashboard-ში შესვლა იმავე authenticated (email/password) session-ში.
+
+**შეგნებულად მიღებული შეზღუდვა:** ეს არის **client-side UI identity-gate, არა DB-level access-control**. RLS მთელ ოჯახზე (`parent_id = auth.uid()`) კვლავ ღიაა — PIN მხოლოდ განსაზღვრავს რა რენდერდება. ტექნიკურად ცნობიერი ბავშვი (DevTools) შემოვლადია — ეს გაცნობიერებული, მისაღები trade-off ოჯახური/ახლობელი-context-ისთვის (10 ბავშვი). რეალური მეორე auth-ფაქტორი (Edge Function-ზე დაფუძნებული) განზრახ არ არჩეულა — სირთულე/სარგებელი არაპროპორციულია ამ threat model-ისთვის.
+
+**Flow:**
+```
+email/password (უცვლელი)
+   ↓
+PinGate (ახალი კომპონენტი)
+   ├── parent PIN → sessionMode='parent' → ChildSelector + Dashboard ხელმისაწვდომია
+   └── child PIN  → sessionMode='child', activeChildId ავტომატურად ("ატომურად",
+                     არა შუალედური null-state) → პირდაპირ თამაში,
+                     Dashboard-ის ღილაკი საერთოდ არ რენდერდება
+"🔒 შეცვლა" ღილაკი → sessionMode=null, activeChildId=null → PinGate
+Logout → sessionMode + activeChildId სრული reset (Parent A→B login-switch-ზეც)
+```
+
+**Schema (Commit #6A-ს pattern):**
+```sql
+ALTER TABLE profiles ADD COLUMN pin_hash text;  -- ჯერ nullable
+ALTER TABLE children ADD COLUMN pin_hash text;  -- ჯერ nullable
+-- Backfill: არსებულმა მშობელმა/ბავშვებმა ერთჯერადად დააყენონ PIN
+-- Verify: count(*) WHERE pin_hash IS NULL → 0
+-- SET NOT NULL orივე table-ზე
+```
+
+**საკვანძო დაფიქსირებული გადაწყვეტილებები:**
+- PIN **სავალდებულოა** — არასდროს null/optional post-hoc; გამორიცხავს "PIN-ის გარეშე child-mode"-ის edge case-ს მთლიანად
+- `pin_hash`, არა plaintext — თუმცა plain SHA-256(PIN) სუსტია 4-ციფრიან სივრცეზე (10,000 კომბინაცია, ტრივიალური brute-force) — მიზანი არის accidental/plaintext exposure-ის თავიდან აცილება, არა ძლიერი კრიპტოგრაფიული დაცვა (client-side validation-ის low-threat-model-ის გათვალისწინებით)
+- `sessionMode` ცალკე Context-ში (**არა** ChildContext-ში ჩაშენებული) — ChildContext რჩება "რომელ ბავშვთან ვმუშაობთ", SessionModeContext — "ვინ არის შესული"
+- PIN uniqueness ოჯახის (parent + ყველა შვილის) მასშტაბით — **application-level validation**, registration-ზეც და PIN-change-ზეც ორივეზე (DB UNIQUE constraint ორ table-ს შორის პირდაპირ ვერ აგვარებს)
+- Dashboard-Parent PIN-ის წინააღმდეგობა გადაწყვეტილია ცალკე, ვიწრო-scope `PinManagementScreen`-ით (email/password-ით accessible, PIN-ის გარეშე) — **მხოლოდ** PIN-ის ნახვა/შეცვლა, **არავითარი** stats/wishes/Dashboard-კონტენტი — ეს არ არღვევს "ბავშვს Dashboard არ უნდა ჰქონდეს წვდომა" პრინციპს
+- Logout ყოველთვის sessionMode-ს null-ზე აბრუნებს (Commit #10-ის login-switch-race-ის იგივე class-ის თავიდან ასაცილებლად)
+
+**შემდეგი ნაბიჯი:** Implementation prompt ჯერ არ დაწერილა — architecture საბოლოოდ დაფიქსირებულია, მზადაა დეტალური spec-ისთვის.
+
+### Wave Y — Wish Approval Workflow 🔵 (მონახაზი დახატული, Architecture Review არ დაწყებულა)
+
+**მიზანი:** 20/40-კითხვიან block-ის ბოლოს ბავშვის მიერ ჩაწერილი სურვილი (wish) ჯერ მშობელს მიუვიდეს დასადასტურებლად, არა პირდაპირ.
+
+**Schema-მონახაზი:**
+```sql
+ALTER TABLE wishes ADD COLUMN status text NOT NULL DEFAULT 'pending'
+  CHECK (status IN ('pending', 'approved', 'rejected'));
+```
+
+**Workflow-მონახაზი:** ბავშვის submission → `status='pending'` → Parent Dashboard-ში ახალი სექცია (pending wishes + approve/reject) → status-ცვლილება. **დადასტურება მხოლოდ status-ს ცვლის** — რეალური სურათის დამატება (`child_reward_images`) კვლავ ხელით რჩება Lexo-ს მხრიდან (Wave 3 Part 2-ის დაცული boundary უცვლელია, client-ს INSERT არ აქვს reward-images table-ზე).
+
+**სტატუსი:** ჯერ Architecture Review არ დაწყებულა — PIN-Wave-ის შემდეგ დაგეგმილი.
 
 ## ცნობილი, განზრახ გადადებული საკითხები
 
-- `SUPER_WINNER_GIFS`-ში (`data/rewards.ts`) 6 ჩანაწერს ერთი და იგივე caption აქვს ("ბრავისიმოოო!!!") — content-only fix, low priority, ჯერ არ არის გადაწყვეტილი უნიკალურ caption-ებზე გადავიდეს თუ ერთიანი brand-ფრაზა დარჩეს ვარიაციით
-- კლასის მიხედვით რიცხვითი დიაპაზონი (`grade`) — Wave 4, ყველაზე სენსიტიური (`problemGenerator.ts`-ის ცენტრალურ ლოგიკას ეხება)
-- სიტყვიერი ამოცანები — Wave 5, `grade`-ის შემდეგ განზრახ
-- ახალი საგნები (ქართული/ინგლისური/გეოგრაფია) + hint/explanation-ფუნქციები — Phase 3-ის მთლიანად დასრულების შემდეგ, მოითხოვს math-answer-checking-ის ცენტრალიზებას `App.tsx`-ში
-- `game_sessions`-ის ერთი stuck `'active'`-row — საჭიროებს ხელახალ ტესტირებას
-- `metadata.json`/`migrated_prompt_history/` წაშლა — "ბოლოს, ყველაფრის დასრულების შემდეგ"
-- Production-readiness: Supabase auto-pause (7 დღე უმოქმედობა), backup-სტრატეგია — ინფორმირებული, არა დაბლოკილი
-- კომერციალიზაცია (Georgia-first): Supabase/Netlify Free საკმარისია 10-30+ ბავშვისთვის (per-child reward-images-ის storage-გათვლაც ამას ადასტურებს); საქართველოს PDPL მუხლი 7 შესაბამისობაშია; App Store "Kids Category" + COPPA/GDPR-K საერთაშორისო ეტაპზე; React web app → Capacitor/PWA გადაწყვეტილება ადრე სასურველია
+- `SUPER_WINNER_GIFS`-ის დუბლირებული caption — **გადაწყვეტილი, აღარ აქტუალური**: სურათები ინდივიდუალურია თითო ბავშვისთვის, caption-დუბლირება აღარ არის პრობლემა
+- კლასის მიხედვით რიცხვითი დიაპაზონი (Wave 4, ყოფილი "Wave 4") — **PIN-Wave-ისა და Wish-Approval-ის შემდეგ**, ყველაზე სენსიტიური (problemGenerator.ts-ის ცენტრალურ ლოგიკას ეხება)
+- სიტყვიერი ამოცანები (Wave 5) — grade-range-ის შემდეგ განზრახ
+- ახალი საგნები + hint/explanation-ფუნქციები — Phase 3-ის მთლიანად დასრულების შემდეგ
+- `game_sessions`-ის ერთი stuck `'active'`-row — საჭიროებს ხელახალ ტესტირებას production launch-მდე
+- `metadata.json`-ის description-ის განახლება (თომას სახელი) — `migrated_prompt_history/`-ის წაშლასთან ერთად
+- Backup-სტრატეგია — ინფორმირებული, კონკრეტული გეგმა ჯერ არ არის; launch-მდე რეკომენდებული
+- კომერციალიზაცია (Georgia-first) — მომავალი ეტაპი, ჯერ არ აქტუალური 10-ბავშვიანი launch-ისთვის
+
+## Production Launch-ის მდგომარეობა (~10 ახლობელი ბავშვი)
+
+**რეალურად ბლოკავს:**
+1. Wave X (PIN gate) — child-ს Dashboard-წვდომის თავიდან ასაცილებლად
+2. `migrated_prompt_history/` წაშლა — public repo-ზე თომას პირადი მონაცემების ექსპოზიცია
+3. Auto-pause mitigation — GH Actions workflow-ის რეალურად დანერგვა (გადაწყვეტილება არსებობს, კოდი ჯერ არა)
+
+**არ ბლოკავს, მაგრამ რეკომენდებულია launch-მდე ან პარალელურად:**
+- Backup-სტრატეგია
+- `game_sessions` stuck-row-ის ხელახალი ტესტირება
+
+**Webintoapp.com (native app wrapper) გამოყენების გეგმა:** ტექნიკურად პასიური ცვლილება (localStorage/Page Visibility API-ის ქცევა ღირს ხელით ტესტირება ერთი ბავშვით სრულ flow-ზე, სანამ ყველას დაურიგდება) — Supabase auto-pause-ს არ ეხმიანება განსხვავებულად.
 
 ## Workflow (როგორ ვმუშაობთ)
 
@@ -190,11 +211,13 @@ _[შენიშვნა: ამ commit-ის დეტალური review
 2. Claude ამოწმებს დამოუკიდებლად, fresh-clone-ით (tsc, vitest, build) — არასდროს ენდობა AI Studio-ს თვითმოხსენებას
 3. ChatGPT აკეთებს დამოუკიდებელ cross-review-ს
 4. ორივეს შენიშვნები ერთიანდება საბოლოო implementation prompt-ში
-5. Lexo იღებს საბოლოო გადაწყვეტილებას; ცვლილებები ლოკალურად ხდება (edit → git add → commit → push ტერმინალით)
-6. ყოველი ფაზის/Wave-ის დასრულებისას ეს დოკუმენტი განახლდება
+5. Lexo იღებს საბოლოო გადაწყვეტილებას; DB/Storage/RLS migrations — ყოველთვის ხელით, SQL editor-იდან; client-კოდის ცვლილებები — AI Studio-დან, ლოკალურად (edit → git add → commit → push)
+6. ყოველი Wave-ის/მნიშვნელოვანი commit-ის დასრულებისას ეს დოკუმენტი განახლდება
+
+**Lexo-ს სამუშაო კონტექსტი:** არ იცნობს SQL-ს ან Supabase-ის dashboard-ს — ყოველი ტექნიკური ნაბიჯი დეტალურად, ეტაპ-ეტაპად აღსაწერია.
 
 ## შემდეგი ნაბიჯი
 
-Wave 3 Part 1 (vocativeName + phrase personalization) და Wave 3 Part 2 (per-child reward images) სრულად დასრულებულია. შემდეგი ნაბიჯი: Wave 4 (grade-based დიაპაზონი) და Wave 5 (სიტყვიერი ამოცანები) — ცალკე სრული Architecture Review-ციკლით თითოეულისთვის.
+Wave 3 (Part 1 + Part 2) სრულად დასრულებული და დამოუკიდებლად დადასტურებულია. Production launch-ისთვის (~10 ბავშვი) რეალურად ბლოკავს სამი რამ: **Wave X (PIN gate)**, **`migrated_prompt_history/` წაშლა**, და **auto-pause GH Actions workflow**. რეკომენდებული თანმიმდევრობა: (1) `migrated_prompt_history/` წაშლა — უმარტივესი, დამოუკიდებელი; (2) GH Actions ping-workflow; (3) Wave X-ის დეტალური implementation prompt. ამის შემდეგ — Wave Y (wish approval), მერე Wave "grade-range", მერე "word problems".
 
 [ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს Claude-ის და ChatGPT-ის Project-ებში. **ნამდვილად** ატვირთეთ ეს ფაილი repo-შიც (`git add PROJECT_STATE.md && git commit && git push`), თორემ იგივე პრობლემა განმეორდება.]
