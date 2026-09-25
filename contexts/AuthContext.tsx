@@ -10,7 +10,7 @@ interface AuthContextType {
   isConfigured: boolean;
   isPasswordRecovery: boolean;
   setIsPasswordRecovery: (value: boolean) => void;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName?: string, pinHash?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -90,22 +90,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
+  const signUp = async (email: string, password: string, fullName?: string, pinHash?: string) => {
     const supabase = getSupabase();
     if (!supabase) {
       return { error: new Error('Supabase არ არის კონფიგურირებული') };
     }
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName || '',
+            ...(pinHash ? { pin_hash: pinHash } : {}),
           },
         },
       });
-      return { error: error ? new Error(error.message) : null };
+      if (error) {
+        return { error: new Error(error.message) };
+      }
+
+      if (data?.user && pinHash) {
+        await supabase
+          .from('profiles')
+          .update({ pin_hash: pinHash })
+          .eq('id', data.user.id);
+      }
+
+      return { error: null };
     } catch (err: any) {
       return { error: new Error(err.message || 'რეგისტრაციის შეცდომა') };
     }

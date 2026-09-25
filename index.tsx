@@ -4,6 +4,7 @@ import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider } from './contexts/AuthContext';
 import { ChildProvider } from './contexts/ChildContext';
+import { SessionModeProvider } from './contexts/SessionModeContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -16,7 +17,9 @@ root.render(
     <ErrorBoundary>
       <AuthProvider>
         <ChildProvider>
-          <App />
+          <SessionModeProvider>
+            <App />
+          </SessionModeProvider>
         </ChildProvider>
       </AuthProvider>
     </ErrorBoundary>

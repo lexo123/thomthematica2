@@ -3,6 +3,7 @@ import { GameMode } from '../types';
 import { Button } from './Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useChild } from '../contexts/ChildContext';
+import { useSessionMode } from '../contexts/SessionModeContext';
 import { AuthModal } from './AuthModal';
 import { UpdatePasswordModal } from './UpdatePasswordModal';
 import { ChildSelector } from './ChildSelector';
@@ -19,6 +20,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
     childrenList,
     activeChild,
     activeChildId,
+    setActiveChildId,
     loading: childrenLoading,
     hasFetchedOnce,
     setActiveChild,
@@ -26,9 +28,21 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
     showChildSelector,
     setShowChildSelector,
   } = useChild();
+  const { sessionMode, resetSessionMode } = useSessionMode();
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+
+  const handleLogout = async () => {
+    resetSessionMode();
+    setActiveChildId(null);
+    await signOut();
+  };
+
+  const handleSwitchIdentity = () => {
+    resetSessionMode();
+    setActiveChildId(null);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center justify-center p-4 relative">
@@ -56,7 +70,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
                   🔑 პაროლი
                 </button>
                 <button
-                  onClick={() => signOut()}
+                  onClick={handleLogout}
                   className="text-xs font-bold text-rose-600 bg-white/80 hover:bg-white hover:text-rose-700 px-3 py-1.5 rounded-full border border-rose-100 shadow-sm transition-all flex items-center gap-1"
                 >
                   გასვლა 🚪
@@ -91,7 +105,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              {activeChildId && (
+              {/* Conditionally absent when in child mode to prevent unauthorized dashboard access */}
+              {sessionMode !== 'child' && activeChildId && (
                 <button
                   onClick={() => setShowDashboard(true)}
                   className="text-xs font-black bg-indigo-500/40 hover:bg-indigo-500/60 text-white px-3 py-1.5 rounded-xl border border-white/20 transition-all flex items-center gap-1"
@@ -101,10 +116,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
                 </button>
               )}
               <button
-                onClick={() => setShowChildSelector(true)}
+                onClick={handleSwitchIdentity}
                 className="text-xs font-black bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl border border-white/20 transition-all flex items-center gap-1"
               >
-                🔄 შეცვლა
+                🔒 შეცვლა
               </button>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { hashPin, isValidPinFormat } from '../utils/pinHash';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -14,11 +15,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
+
+  const resetFormState = () => {
+    setError(null);
+    setMessage(null);
+    setPin('');
+    setConfirmPin('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,12 +50,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           setSubmitting(false);
           return;
         }
-        const { error } = await signUp(email, password, fullName);
+
+        if (!isValidPinFormat(pin)) {
+          setError('PIN კოდი უნდა შედგებოდეს ზუსტად 4 ციფრისგან');
+          setSubmitting(false);
+          return;
+        }
+
+        if (pin !== confirmPin) {
+          setError('PIN კოდები არ ემთხვევა ერთმანეთს');
+          setSubmitting(false);
+          return;
+        }
+
+        const pinHash = await hashPin(pin);
+        const { error } = await signUp(email, password, fullName, pinHash);
         if (error) {
           setError(error.message || 'რეგისტრაცია ვერ მოხერხდა.');
         } else {
           setMessage('რეგისტრაცია წარმატებულია! შეგიძლიათ შეხვიდეთ სისტემაში.');
           setMode('login');
+          resetFormState();
         }
       } else if (mode === 'forgot_password') {
         const { error } = await resetPassword(email);
@@ -159,6 +184,53 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
+          {mode === 'register' && (
+            <>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  მშობლის PIN კოდი (4 ციფრი)
+                </label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  required
+                  value={pin}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                    setPin(val);
+                  }}
+                  placeholder="••••"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-sm font-medium text-slate-800 outline-none transition-all tracking-widest text-center"
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                  საჭიროა მშობლის დაშბორდზე და პარამეტრებზე წვდომისთვის
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  გაიმეორეთ PIN კოდი
+                </label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  required
+                  value={confirmPin}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                    setConfirmPin(val);
+                  }}
+                  placeholder="••••"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-sm font-medium text-slate-800 outline-none transition-all tracking-widest text-center"
+                />
+              </div>
+            </>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -181,7 +253,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 არ გაქვთ ანგარიში?{' '}
                 <button
                   type="button"
-                  onClick={() => { setMode('register'); setError(null); setMessage(null); }}
+                  onClick={() => { setMode('register'); resetFormState(); }}
                   className="text-amber-600 font-bold hover:underline"
                 >
                   დარეგისტრირდით
@@ -190,7 +262,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <div>
                 <button
                   type="button"
-                  onClick={() => { setMode('forgot_password'); setError(null); setMessage(null); }}
+                  onClick={() => { setMode('forgot_password'); resetFormState(); }}
                   className="text-slate-500 hover:text-slate-700 underline"
                 >
                   დაგავიწყდათ პაროლი?
@@ -202,7 +274,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               უკვე გაქვთ ანგარიში?{' '}
               <button
                 type="button"
-                onClick={() => { setMode('login'); setError(null); setMessage(null); }}
+                onClick={() => { setMode('login'); resetFormState(); }}
                 className="text-amber-600 font-bold hover:underline"
               >
                 შედით აქ
@@ -212,7 +284,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             <div>
               <button
                 type="button"
-                onClick={() => { setMode('login'); setError(null); setMessage(null); }}
+                onClick={() => { setMode('login'); resetFormState(); }}
                 className="text-amber-600 font-bold hover:underline"
               >
                 ← შესვლის გვერდზე დაბრუნება

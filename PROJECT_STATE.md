@@ -1,6 +1,6 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: Wave 3 (Part 1 + Part 2) სრულად დასრულებული და დადასტურებული; PIN-based Parent/Child Identity Gate — architecture დამტკიცებულია Claude-ისა და ChatGPT-ის მიერ, ჯერ არ დაწყებულა implementation_
+_ბოლო განახლება: Wave X (Commit #1: PIN Identity Gate Infrastructure) სრულად დასრულებული; 32/32 test file, 241/241 test green, production build სუფთა_
 
 ## Repo
 https://github.com/lexo123/thomthematica2
@@ -129,43 +129,18 @@ hooks/useGameSession.ts-ში:
 
 ## დაგეგმილი მომდევნო Wave-ები (პრიორიტეტის მიხედვით)
 
-### Wave X — PIN-based Parent/Child Identity Gate 🔵 (Architecture დამტკიცებული Claude + ChatGPT-ის მიერ, Implementation ჯერ არ დაწყებულა)
-
-**მიზანი:** ბავშვმა ვერ შეძლოს Parent Dashboard-ში შესვლა იმავე authenticated (email/password) session-ში.
-
-**შეგნებულად მიღებული შეზღუდვა:** ეს არის **client-side UI identity-gate, არა DB-level access-control**. RLS მთელ ოჯახზე (`parent_id = auth.uid()`) კვლავ ღიაა — PIN მხოლოდ განსაზღვრავს რა რენდერდება. ტექნიკურად ცნობიერი ბავშვი (DevTools) შემოვლადია — ეს გაცნობიერებული, მისაღები trade-off ოჯახური/ახლობელი-context-ისთვის (10 ბავშვი). რეალური მეორე auth-ფაქტორი (Edge Function-ზე დაფუძნებული) განზრახ არ არჩეულა — სირთულე/სარგებელი არაპროპორციულია ამ threat model-ისთვის.
-
-**Flow:**
-```
-email/password (უცვლელი)
-   ↓
-PinGate (ახალი კომპონენტი)
-   ├── parent PIN → sessionMode='parent' → ChildSelector + Dashboard ხელმისაწვდომია
-   └── child PIN  → sessionMode='child', activeChildId ავტომატურად ("ატომურად",
-                     არა შუალედური null-state) → პირდაპირ თამაში,
-                     Dashboard-ის ღილაკი საერთოდ არ რენდერდება
-"🔒 შეცვლა" ღილაკი → sessionMode=null, activeChildId=null → PinGate
-Logout → sessionMode + activeChildId სრული reset (Parent A→B login-switch-ზეც)
-```
-
-**Schema (Commit #6A-ს pattern):**
-```sql
-ALTER TABLE profiles ADD COLUMN pin_hash text;  -- ჯერ nullable
-ALTER TABLE children ADD COLUMN pin_hash text;  -- ჯერ nullable
--- Backfill: არსებულმა მშობელმა/ბავშვებმა ერთჯერადად დააყენონ PIN
--- Verify: count(*) WHERE pin_hash IS NULL → 0
--- SET NOT NULL orივე table-ზე
-```
-
-**საკვანძო დაფიქსირებული გადაწყვეტილებები:**
-- PIN **სავალდებულოა** — არასდროს null/optional post-hoc; გამორიცხავს "PIN-ის გარეშე child-mode"-ის edge case-ს მთლიანად
-- `pin_hash`, არა plaintext — თუმცა plain SHA-256(PIN) სუსტია 4-ციფრიან სივრცეზე (10,000 კომბინაცია, ტრივიალური brute-force) — მიზანი არის accidental/plaintext exposure-ის თავიდან აცილება, არა ძლიერი კრიპტოგრაფიული დაცვა (client-side validation-ის low-threat-model-ის გათვალისწინებით)
-- `sessionMode` ცალკე Context-ში (**არა** ChildContext-ში ჩაშენებული) — ChildContext რჩება "რომელ ბავშვთან ვმუშაობთ", SessionModeContext — "ვინ არის შესული"
-- PIN uniqueness ოჯახის (parent + ყველა შვილის) მასშტაბით — **application-level validation**, registration-ზეც და PIN-change-ზეც ორივეზე (DB UNIQUE constraint ორ table-ს შორის პირდაპირ ვერ აგვარებს)
-- Dashboard-Parent PIN-ის წინააღმდეგობა გადაწყვეტილია ცალკე, ვიწრო-scope `PinManagementScreen`-ით (email/password-ით accessible, PIN-ის გარეშე) — **მხოლოდ** PIN-ის ნახვა/შეცვლა, **არავითარი** stats/wishes/Dashboard-კონტენტი — ეს არ არღვევს "ბავშვს Dashboard არ უნდა ჰქონდეს წვდომა" პრინციპს
-- Logout ყოველთვის sessionMode-ს null-ზე აბრუნებს (Commit #10-ის login-switch-race-ის იგივე class-ის თავიდან ასაცილებლად)
-
-**შემდეგი ნაბიჯი:** Implementation prompt ჯერ არ დაწერილა — architecture საბოლოოდ დაფიქსირებულია, მზადაა დეტალური spec-ისთვის.
+### Wave X — PIN-based Parent/Child Identity Gate 🔵
+- **Commit #1 (PIN Identity Gate Infrastructure) ✅**:
+  - `supabase/schema.sql`: `pin_hash TEXT` დამატებული `profiles` და `children` CREATE TABLE განსაზღვრებებში.
+  - `utils/pinHash.ts`: `isValidPinFormat` (4-digit regex), `hashPin` (canonical SHA-256 lowercase hex 64-char).
+  - `utils/pinUniqueness.ts`: pure `isPinTaken` (scoped to authenticated parent + own children).
+  - `contexts/SessionModeContext.tsx`: `sessionMode` ('parent' | 'child' | null), `setSessionMode`, `resetSessionMode`, memory-only (no localStorage, fresh null on reload), auto-reset on logout.
+  - `components/PinGate.tsx`: Fullscreen 4-digit PIN gate, fetch scope strictly current user `profiles.pin_hash` + own children, parent match -> `sessionMode='parent'`, child match -> `setActiveChildId` + `sessionMode='child'` synchronous atomic event, generic "არასწორი PIN".
+  - `App.tsx`: Root-level early-return `if (user && sessionMode === null) return <PinGate />;` (block unauthenticated bypass).
+  - `MainMenu.tsx`: Dashboard button conditionally absent in child mode (`sessionMode !== 'child'`), "🔒 შეცვლა" button -> `resetSessionMode()` + `setActiveChildId(null)`.
+  - `AuthModal.tsx`: Registration PIN + PIN confirm (4-digit format validation, match check, hashed with `hashPin` and persisted).
+  - **ვერიფიკაცია**: 32/32 test file, 241/241 tests passed (0 broken out of original 231), `tsc --noEmit` 0 errors, `vite build` სუფთა.
+- **შემდეგი ეტაპი (Commit #2)**: არსებული ანგარიშებისთვის PIN-ის დაყენება (PIN backfill / setup modal).
 
 ### Wave Y — Wish Approval Workflow 🔵 (მონახაზი დახატული, Architecture Review არ დაწყებულა)
 

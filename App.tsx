@@ -11,8 +11,10 @@ import { WishModal } from './components/WishModal';
 import { UpdatePasswordModal } from './components/UpdatePasswordModal';
 import { ChildSelector } from './components/ChildSelector';
 import { AuthModal } from './components/AuthModal';
+import { PinGate } from './components/PinGate';
 import { useAuth } from './contexts/AuthContext';
 import { useChild } from './contexts/ChildContext';
+import { useSessionMode } from './contexts/SessionModeContext';
 import {
   generateProblem,
   CORRECT_PHRASES,
@@ -31,6 +33,7 @@ const KVESH_FIRST_CELL_FOCUS_DELAY_MS = 120;
 
 const App: React.FC = () => {
   const { user } = useAuth();
+  const { sessionMode } = useSessionMode();
   const {
     childrenList,
     activeChild,
@@ -280,6 +283,10 @@ const App: React.FC = () => {
     setProblem(null);
     stopTimer();
   };
+
+  if (user && sessionMode === null) {
+    return <PinGate />;
+  }
 
   if (!gameMode) {
     return <MainMenu onSelectMode={(mode) => setGameMode(mode)} />;
