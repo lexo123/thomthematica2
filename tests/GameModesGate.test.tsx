@@ -5,6 +5,7 @@ import { render, screen, fireEvent, act, cleanup } from '@testing-library/react'
 import App from '../App';
 import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
+import { SessionModeProvider } from '../contexts/SessionModeContext';
 import * as supabaseSyncService from '../services/supabaseSyncService';
 
 describe('Phase 2.5 Game Modes Gate & activeChildId Propagation', () => {
@@ -45,7 +46,11 @@ describe('Phase 2.5 Game Modes Gate & activeChildId Propagation', () => {
       refreshChildren: vi.fn(),
     });
 
-    render(<App />);
+    render(
+      <SessionModeProvider initialMode="parent">
+        <App />
+      </SessionModeProvider>
+    );
 
     const modeBtn = screen.getByText(name);
     fireEvent.click(modeBtn);
@@ -79,7 +84,11 @@ describe('Phase 2.5 Game Modes Gate & activeChildId Propagation', () => {
       refreshChildren: vi.fn(),
     });
 
-    render(<App />);
+    render(
+      <SessionModeProvider initialMode="parent">
+        <App />
+      </SessionModeProvider>
+    );
 
     const modeBtn = screen.getByText(name);
     fireEvent.click(modeBtn);
@@ -115,7 +124,11 @@ describe('Phase 2.5 Game Modes Gate & activeChildId Propagation', () => {
       refreshChildren: vi.fn(),
     });
 
-    render(<App />);
+    render(
+      <SessionModeProvider initialMode="parent">
+        <App />
+      </SessionModeProvider>
+    );
 
     // 1. Click Kveshmicera mode
     const kveshModeBtn = screen.getByText('ქვეშმიწერით გამრავლება ✍️');

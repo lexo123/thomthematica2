@@ -132,6 +132,6 @@ describe('SessionModeContext', () => {
 
   it('provides safe fallback when rendered outside SessionModeProvider without throwing', () => {
     render(<TestConsumer />);
-    expect(screen.getByTestId('mode').textContent).toBe('parent');
+    expect(screen.getByTestId('mode').textContent).toBe('null');
   });
 });

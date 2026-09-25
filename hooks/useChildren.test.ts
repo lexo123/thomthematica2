@@ -271,4 +271,60 @@ describe('useChildren - Multi-Account Login Switch & In-Flight Race Condition Pr
     // No supabase queries should have been attempted
     expect(querySpy).not.toHaveBeenCalled();
   });
+
+  it('FIX 1 & FIX 3: fetchChildren requests explicit columns without pin_hash and addChild includes pin_hash', async () => {
+    let capturedSelectCols = '';
+    let capturedInsertPayload: any = null;
+    let capturedInsertSelectCols = '';
+
+    mockSupabaseClient = {
+      from: vi.fn((table: string) => ({
+        upsert: vi.fn().mockResolvedValue({ error: null }),
+        select: vi.fn((cols: string) => {
+          capturedSelectCols = cols;
+          return {
+            eq: vi.fn(() => ({
+              order: vi.fn().mockResolvedValue({ data: [mockChildA], error: null }),
+            })),
+          };
+        }),
+        insert: vi.fn((payload: any) => {
+          capturedInsertPayload = payload;
+          return {
+            select: vi.fn((cols: string) => {
+              capturedInsertSelectCols = cols;
+              return {
+                single: vi.fn().mockResolvedValue({
+                  data: { ...mockChildA, name: payload.name },
+                  error: null,
+                }),
+              };
+            }),
+          };
+        }),
+      })),
+    };
+
+    currentAuthUser = { id: 'user-a' };
+    const { result } = renderHook(() => useChildren());
+
+    await waitFor(() => {
+      expect(result.current.hasFetchedOnce).toBe(true);
+    });
+
+    // FIX 3: select must use explicit columns and NOT select '*' or pin_hash
+    expect(capturedSelectCols).toBe('id, parent_id, name, avatar_id, gender, created_at');
+    expect(capturedSelectCols).not.toContain('pin_hash');
+
+    // FIX 1: addChild passes pin_hash in insert payload and selects explicit columns
+    let addRes: any;
+    await act(async () => {
+      addRes = await result.current.addChild('თომა', 'avatar_1', 'boy', 'test-hashed-pin');
+    });
+
+    expect(addRes.error).toBeNull();
+    expect(capturedInsertPayload.pin_hash).toBe('test-hashed-pin');
+    expect(capturedInsertSelectCols).toBe('id, parent_id, name, avatar_id, gender, created_at');
+    expect(capturedInsertSelectCols).not.toContain('pin_hash');
+  });
 });

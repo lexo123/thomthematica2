@@ -5,6 +5,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import App from '../App';
 import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
+import { SessionModeProvider } from '../contexts/SessionModeContext';
 import * as poolSelector from '../utils/poolSelector';
 import * as problemGenerator from '../services/problemGenerator';
 import { Operation } from '../types';
@@ -54,7 +55,11 @@ describe('App correct phrase pool draw behavior', () => {
       missingPart: 'result',
     });
 
-    render(<App />);
+    render(
+      <SessionModeProvider initialMode="parent">
+        <App />
+      </SessionModeProvider>
+    );
 
     // Click Thomthematica to start
     const thomModeBtn = screen.getByText('თომთემატიკა');

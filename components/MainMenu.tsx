@@ -115,11 +115,22 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
                   📊 დაშბორდი
                 </button>
               )}
+              {/* In parent mode: allow switching child without re-entering PIN */}
+              {sessionMode === 'parent' && (
+                <button
+                  onClick={() => setShowChildSelector(true)}
+                  className="text-xs font-black bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl border border-white/20 transition-all flex items-center gap-1"
+                  title="შვილის შეცვლა"
+                >
+                  🔄 შვილის შეცვლა
+                </button>
+              )}
               <button
                 onClick={handleSwitchIdentity}
                 className="text-xs font-black bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl border border-white/20 transition-all flex items-center gap-1"
+                title="identity-დან გასვლა"
               >
-                🔒 შეცვლა
+                🔒 გასვლა identity-დან
               </button>
             </div>
           </div>

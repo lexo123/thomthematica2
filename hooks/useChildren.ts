@@ -65,7 +65,7 @@ export const useChildren = () => {
     try {
       const { data, error: fetchErr } = await supabase
         .from('children')
-        .select('*')
+        .select('id, parent_id, name, avatar_id, gender, created_at')
         .eq('parent_id', userId)
         .order('created_at', { ascending: true });
 
@@ -100,7 +100,8 @@ export const useChildren = () => {
   const addChild = async (
     name: string,
     avatarId: string = 'avatar_1',
-    gender: 'boy' | 'girl'
+    gender: 'boy' | 'girl',
+    pin: string
   ): Promise<{ child: Child | null; error: Error | null }> => {
     if (!user) {
       return { child: null, error: new Error('ავტორიზაცია აუცილებელია') };
@@ -109,6 +110,10 @@ export const useChildren = () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
       return { child: null, error: new Error('გთხოვთ შეიყვანოთ სახელი') };
+    }
+
+    if (!pin) {
+      return { child: null, error: new Error('PIN კოდი აუცილებელია') };
     }
 
     const supabase = getSupabase();
@@ -127,8 +132,9 @@ export const useChildren = () => {
           name: trimmedName,
           avatar_id: avatarId,
           gender: gender,
+          pin_hash: pin,
         })
-        .select()
+        .select('id, parent_id, name, avatar_id, gender, created_at')
         .single();
 
       if (insertErr) {

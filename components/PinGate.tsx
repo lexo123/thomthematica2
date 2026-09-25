@@ -7,18 +7,23 @@ import { hashPin, isValidPinFormat } from '../utils/pinHash';
 
 export const PinGate: React.FC = () => {
   const { user, signOut } = useAuth();
-  const { childrenList, setActiveChildId } = useChild();
+  const { setActiveChildId } = useChild();
   const { setSessionMode, resetSessionMode } = useSessionMode();
+
+  type ScopedChildPin = { id: string; pin_hash: string | null };
 
   const [pin, setPin] = useState('');
   const [parentPinHash, setParentPinHash] = useState<string | null>(null);
+  const [childrenPins, setChildrenPins] = useState<ScopedChildPin[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const parentPinPromiseRef = useRef<Promise<string | null> | null>(null);
+  const childrenPinsPromiseRef = useRef<Promise<ScopedChildPin[]> | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Fetch parent's own profile pin_hash strictly scoped to current user.id
+  // and fetch children (id, pin_hash) strictly scoped to current user.id
   useEffect(() => {
     let isCancelled = false;
 
@@ -49,7 +54,34 @@ export const PinGate: React.FC = () => {
       }
     };
 
+    const fetchChildrenPins = async (): Promise<ScopedChildPin[]> => {
+      if (!user) {
+        return [];
+      }
+
+      const supabase = getSupabase();
+      if (!supabase) {
+        return [];
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('children')
+          .select('id, pin_hash')
+          .eq('parent_id', user.id);
+
+        const list = !error && data ? (data as ScopedChildPin[]) : [];
+        if (!isCancelled) {
+          setChildrenPins(list);
+        }
+        return list;
+      } catch {
+        return [];
+      }
+    };
+
     parentPinPromiseRef.current = fetchParentPin();
+    childrenPinsPromiseRef.current = fetchChildrenPins();
 
     return () => {
       isCancelled = true;
@@ -110,10 +142,14 @@ export const PinGate: React.FC = () => {
         return;
       }
 
-      // 2. Check child match from currently loaded childrenList
-      const matchedChild = childrenList.find(c => {
-        const childHash = (c as any).pin_hash;
-        return typeof childHash === 'string' && childHash.length > 0 && childHash === candidateHash;
+      // 2. Check child match from independent scoped fetch (id, pin_hash)
+      let currentChildrenPins = childrenPins;
+      if (currentChildrenPins.length === 0 && childrenPinsPromiseRef.current) {
+        currentChildrenPins = await childrenPinsPromiseRef.current;
+      }
+
+      const matchedChild = currentChildrenPins.find(c => {
+        return typeof c.pin_hash === 'string' && c.pin_hash.length > 0 && c.pin_hash === candidateHash;
       });
 
       if (matchedChild) {

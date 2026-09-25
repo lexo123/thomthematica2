@@ -5,6 +5,7 @@ import { render, screen, fireEvent, act, cleanup } from '@testing-library/react'
 import App from '../App';
 import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
+import { SessionModeProvider } from '../contexts/SessionModeContext';
 import * as supabaseSyncService from '../services/supabaseSyncService';
 
 describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
@@ -38,7 +39,11 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
       refreshChildren: vi.fn(),
     });
 
-    render(<App />);
+    render(
+      <SessionModeProvider initialMode="parent">
+        <App />
+      </SessionModeProvider>
+    );
 
     // Click Thomthematica game mode card
     const thomModeBtn = screen.getByText('თომთემატიკა');
@@ -76,7 +81,11 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
       refreshChildren: vi.fn(),
     });
 
-    render(<App />);
+    render(
+      <SessionModeProvider initialMode="parent">
+        <App />
+      </SessionModeProvider>
+    );
 
     // Click Thomthematica game mode
     const thomModeBtn = screen.getByText('თომთემატიკა');
@@ -113,7 +122,11 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
       refreshChildren: vi.fn(),
     });
 
-    render(<App />);
+    render(
+      <SessionModeProvider initialMode="parent">
+        <App />
+      </SessionModeProvider>
+    );
 
     // Click Thomthematica game mode
     const thomModeBtn = screen.getByText('თომთემატიკა');
@@ -157,7 +170,11 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
       refreshChildren: vi.fn(),
     });
 
-    render(<App />);
+    render(
+      <SessionModeProvider initialMode="parent">
+        <App />
+      </SessionModeProvider>
+    );
 
     // Click Thomthematica
     const thomModeBtn = screen.getByText('თომთემატიკა');

@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Child } from '../types';
 import { CHILD_AVATARS, GENDER_OPTIONS, getAvatarEmoji } from '../hooks/useChildren';
 import { isValidChildName } from '../utils/childNameValidator';
+import { hashPin, isValidPinFormat } from '../utils/pinHash';
+import { isPinTaken } from '../utils/pinUniqueness';
+import { useAuth } from '../contexts/AuthContext';
+import { getSupabase } from '../lib/supabase';
 
 interface ChildSelectorProps {
   childrenList: Child[];
@@ -9,7 +13,7 @@ interface ChildSelectorProps {
   loading: boolean;
   childrenReady: boolean;
   onSelectChild: (child: Child) => void;
-  onAddChild: (name: string, avatarId: string, gender: 'boy' | 'girl') => Promise<{ child: Child | null; error: Error | null }>;
+  onAddChild: (name: string, avatarId: string, gender: 'boy' | 'girl', pin: string) => Promise<{ child: Child | null; error: Error | null }>;
   onClose?: () => void;
 }
 
@@ -22,6 +26,13 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
   onAddChild,
   onClose,
 }) => {
+  let user: any = null;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+  } catch {
+    // Graceful fallback when rendered outside AuthProvider (e.g. isolated unit tests)
+  }
   const [isAdding, setIsAdding] = useState<boolean>(false);
   const [modeInitialized, setModeInitialized] = useState<boolean>(false);
 
@@ -33,6 +44,8 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
   const [newChildName, setNewChildName] = useState<string>('');
   const [selectedGender, setSelectedGender] = useState<'boy' | 'girl' | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<string>('avatar_1');
+  const [pin, setPin] = useState<string>('');
+  const [confirmPin, setConfirmPin] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -52,10 +65,44 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
       return;
     }
 
+    if (!isValidPinFormat(pin)) {
+      setErrorMsg('PIN კოდი უნდა შედგებოდეს ზუსტად 4 ციფრისგან');
+      return;
+    }
+
+    if (pin !== confirmPin) {
+      setErrorMsg('PIN კოდები არ ემთხვევა ერთმანეთს');
+      return;
+    }
+
+    const candidateHash = await hashPin(pin);
+
+    // Uniqueness check scoped strictly to current parent's profiles.pin_hash + own children's pin_hashes
+    let existingHashes: (string | null | undefined)[] = [];
+    const supabase = getSupabase();
+    if (supabase && user) {
+      try {
+        const [parentRes, childrenRes] = await Promise.all([
+          supabase.from('profiles').select('pin_hash').eq('id', user.id).maybeSingle(),
+          supabase.from('children').select('pin_hash').eq('parent_id', user.id),
+        ]);
+        const parentHash = parentRes.data?.pin_hash;
+        const childHashes = (childrenRes.data || []).map((c: any) => c.pin_hash);
+        existingHashes = [parentHash, ...childHashes];
+      } catch {
+        // Fallback: proceed
+      }
+    }
+
+    if (isPinTaken(candidateHash, existingHashes)) {
+      setErrorMsg('ეს PIN უკვე გამოყენებულია. აირჩიეთ განსხვავებული PIN.');
+      return;
+    }
+
     setSubmitting(true);
     setErrorMsg(null);
 
-    const { child, error } = await onAddChild(normalizedName, selectedAvatar, selectedGender);
+    const { child, error } = await onAddChild(normalizedName, selectedAvatar, selectedGender, candidateHash);
     setSubmitting(false);
 
     if (error) {
@@ -63,6 +110,8 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
     } else if (child) {
       setNewChildName('');
       setSelectedGender(null);
+      setPin('');
+      setConfirmPin('');
       setIsAdding(false);
       onSelectChild(child);
       if (onClose) onClose();
@@ -113,7 +162,7 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
             <span className="text-sm font-bold text-slate-500">იტვირთება...</span>
           </div>
         ) : isAdding ? (
-          <form onSubmit={handleCreateChild} className="space-y-4 overflow-y-auto pr-1">
+          <form onSubmit={handleCreateChild} noValidate className="space-y-4 overflow-y-auto pr-1">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 ბავშვის სახელი
@@ -187,6 +236,49 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                ბავშვის 4-ციფრიანი PIN კოდი
+              </label>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                required
+                value={pin}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setPin(val);
+                }}
+                placeholder="••••"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-sm font-medium text-slate-800 outline-none transition-all tracking-widest text-center"
+              />
+              <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                ამ PIN-ით ბავშვი შევა თავის პროფილში
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                გაიმეორეთ PIN კოდი
+              </label>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                required
+                value={confirmPin}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setConfirmPin(val);
+                }}
+                placeholder="••••"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-sm font-medium text-slate-800 outline-none transition-all tracking-widest text-center"
+              />
+            </div>
+
             <div className="flex gap-2 pt-2">
               {childrenList.length > 0 && (
                 <button
@@ -194,6 +286,8 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
                   onClick={() => {
                     setIsAdding(false);
                     setSelectedGender(null);
+                    setPin('');
+                    setConfirmPin('');
                     setErrorMsg(null);
                   }}
                   className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"

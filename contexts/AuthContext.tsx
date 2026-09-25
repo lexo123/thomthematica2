@@ -102,7 +102,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         options: {
           data: {
             full_name: fullName || '',
-            ...(pinHash ? { pin_hash: pinHash } : {}),
           },
         },
       });
@@ -111,10 +110,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data?.user && pinHash) {
-        await supabase
+        const { error: pinUpdateError } = await supabase
           .from('profiles')
           .update({ pin_hash: pinHash })
           .eq('id', data.user.id);
+        if (pinUpdateError) {
+          return { error: new Error('PIN-ის შენახვა ვერ მოხერხდა. სცადეთ ხელახლა.') };
+        }
       }
 
       return { error: null };

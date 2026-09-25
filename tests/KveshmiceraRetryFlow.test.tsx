@@ -5,6 +5,7 @@ import { render, screen, fireEvent, act, cleanup, waitFor } from '@testing-libra
 import App from '../App';
 import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
+import * as SessionModeContext from '../contexts/SessionModeContext';
 import * as problemGenerator from '../services/problemGenerator';
 import { GameMode, Operation, MathProblem } from '../types';
 import { getExpectedDigits } from '../utils/columnMultiplication';
@@ -17,6 +18,12 @@ describe('Phase 3 - Kveshmicera Retry & Question-level Recording Flow', () => {
     vi.restoreAllMocks();
     localStorage.clear();
     clearGameProgress(childId, GameMode.Kveshmicera);
+
+    vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
+      sessionMode: 'parent',
+      setSessionMode: vi.fn(),
+      resetSessionMode: vi.fn(),
+    });
 
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: { id: 'parent-123', email: 'parent@example.com' } as any,

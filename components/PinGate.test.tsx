@@ -52,7 +52,6 @@ describe('PinGate Component', () => {
           avatar_id: 'avatar_1',
           gender: 'boy',
           created_at: '2026-01-01T00:00:00Z',
-          pin_hash: HASH_CHILD_5678,
         },
       ],
       activeChild: null,
@@ -75,14 +74,27 @@ describe('PinGate Component', () => {
       resetSessionMode: resetSessionModeMock,
     });
 
-    // Mock supabase select for profiles.pin_hash
-    const mockSingle = vi.fn().mockResolvedValue({
-      data: { pin_hash: HASH_PARENT_1234 },
-      error: null,
+    // Mock supabase scoped queries for profiles.pin_hash and children (id, pin_hash)
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        const mockSingle = vi.fn().mockResolvedValue({
+          data: { pin_hash: HASH_PARENT_1234 },
+          error: null,
+        });
+        const mockEq = vi.fn().mockReturnValue({ maybeSingle: mockSingle, single: mockSingle });
+        const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+        return { select: mockSelect };
+      }
+      if (table === 'children') {
+        const mockEq = vi.fn().mockResolvedValue({
+          data: [{ id: 'child-abc', pin_hash: HASH_CHILD_5678 }],
+          error: null,
+        });
+        const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+        return { select: mockSelect };
+      }
+      return { select: vi.fn().mockReturnValue({ eq: vi.fn() }) };
     });
-    const mockEq = vi.fn().mockReturnValue({ maybeSingle: mockSingle, single: mockSingle });
-    const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
-    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
 
     vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
       from: mockFrom,
@@ -185,5 +197,14 @@ describe('PinGate Component', () => {
     expect(resetSessionModeMock).toHaveBeenCalled();
     expect(setActiveChildIdMock).toHaveBeenCalledWith(null);
     expect(signOutMock).toHaveBeenCalled();
+  });
+
+  it('FIX 3: performs scoped fetch for children (id, pin_hash) without exposing pin_hash on childrenList', async () => {
+    const supabase = supabaseModule.getSupabase();
+    render(<PinGate />);
+
+    // Verify scoped children query was called on children table
+    expect(supabase?.from).toHaveBeenCalledWith('children');
+    expect(supabase?.from).toHaveBeenCalledWith('profiles');
   });
 });

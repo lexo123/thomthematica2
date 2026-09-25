@@ -47,9 +47,9 @@ export const SessionModeProvider: React.FC<{
 export const useSessionMode = (): SessionModeContextType => {
   const context = useContext(SessionModeContext);
   if (!context) {
-    // Defensive fallback when rendered outside SessionModeProvider (e.g. existing integration tests)
+    // Fail-closed fallback when rendered outside SessionModeProvider
     return {
-      sessionMode: 'parent',
+      sessionMode: null,
       setSessionMode: () => {},
       resetSessionMode: () => {},
     };
