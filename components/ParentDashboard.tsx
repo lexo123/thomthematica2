@@ -1,33 +1,88 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Child } from '../types';
 import { useChildDashboard } from '../hooks/useChildDashboard';
 import { getGameModeLabel } from '../utils/gameModeLabels';
+import { getAvatarEmoji } from '../hooks/useChildren';
 
 interface ParentDashboardProps {
   childId: string | null;
+  childrenList?: Child[];
   onClose: () => void;
 }
 
-export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClose }) => {
-  // Hook rules: unconditionally called regardless of childId value
-  const { stats, recentSessions, wishes, gameModeBreakdown = {}, loading, error, refetch } = useChildDashboard(childId);
+export const ParentDashboard: React.FC<ParentDashboardProps> = ({
+  childId,
+  childrenList = [],
+  onClose,
+}) => {
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(
+    () => childId ?? childrenList[0]?.id ?? null
+  );
+
+  useEffect(() => {
+    setSelectedChildId(childId ?? childrenList[0]?.id ?? null);
+  }, [childId]);
+
+  useEffect(() => {
+    if (selectedChildId === null && childrenList.length > 0 && childId === null) {
+      setSelectedChildId(childrenList[0].id);
+    }
+  }, [childrenList, childId, selectedChildId]);
+
+  // Hook rules: unconditionally called regardless of selectedChildId value
+  const { stats, recentSessions, wishes, gameModeBreakdown = {}, loading, error, refetch } =
+    useChildDashboard(selectedChildId);
+
+  const renderHeaderAndPicker = (stickyHeader: boolean = false) => (
+    <>
+      <div
+        className={`flex justify-between items-center border-b pb-4 ${
+          stickyHeader ? 'sticky top-0 bg-white z-10' : ''
+        }`}
+      >
+        <h2 className="text-2xl font-black text-indigo-900 flex items-center gap-2">
+          📊 მშობლის დაშბორდი
+        </h2>
+        <button
+          onClick={onClose}
+          className="text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
+          aria-label="დახურვა"
+        >
+          ✕ დახურვა
+        </button>
+      </div>
+
+      {childrenList.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {childrenList.map((child) => {
+            const isSelected = child.id === selectedChildId;
+            return (
+              <button
+                key={child.id}
+                type="button"
+                onClick={() => setSelectedChildId(child.id)}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl border-2 text-sm font-black transition-all shrink-0 ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                    : 'bg-indigo-50/60 hover:bg-indigo-100/70 text-indigo-950 border-indigo-100'
+                }`}
+              >
+                <span className="text-lg">{getAvatarEmoji(child.avatar_id)}</span>
+                <span>{child.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
 
   // Explicit rendering priority chain (stats is nullable)
-  // 1. childId === null -> "ბავშვი არ არის არჩეული"
-  if (childId === null) {
+  // 1. selectedChildId === null -> "ბავშვი არ არის არჩეული"
+  if (selectedChildId === null) {
     return (
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6 md:p-8 space-y-6 border-b-8 border-indigo-200">
-        <div className="flex justify-between items-center border-b pb-4">
-          <h2 className="text-2xl font-black text-indigo-900 flex items-center gap-2">
-            📊 მშობლის დაშბორდი
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
-            aria-label="დახურვა"
-          >
-            ✕ დახურვა
-          </button>
-        </div>
+        {renderHeaderAndPicker(false)}
         <div className="text-center py-12 text-gray-500 font-medium">
           ბავშვი არ არის არჩეული
         </div>
@@ -39,18 +94,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClo
   if (loading) {
     return (
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6 md:p-8 space-y-6 border-b-8 border-indigo-200">
-        <div className="flex justify-between items-center border-b pb-4">
-          <h2 className="text-2xl font-black text-indigo-900 flex items-center gap-2">
-            📊 მშობლის დაშბორდი
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
-            aria-label="დახურვა"
-          >
-            ✕ დახურვა
-          </button>
-        </div>
+        {renderHeaderAndPicker(false)}
         <div className="text-center py-12 space-y-3">
           <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto"></div>
           <p className="text-indigo-800 font-semibold text-sm">იტვირთება მონაცემები...</p>
@@ -63,18 +107,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClo
   if (error !== null) {
     return (
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6 md:p-8 space-y-6 border-b-8 border-indigo-200">
-        <div className="flex justify-between items-center border-b pb-4">
-          <h2 className="text-2xl font-black text-indigo-900 flex items-center gap-2">
-            📊 მშობლის დაშბორდი
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
-            aria-label="დახურვა"
-          >
-            ✕ დახურვა
-          </button>
-        </div>
+        {renderHeaderAndPicker(false)}
         <div className="text-center py-10 space-y-4">
           <div className="text-rose-600 font-semibold text-base">
             შეცდომა: {error}
@@ -94,18 +127,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClo
   if (stats === null) {
     return (
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6 md:p-8 space-y-6 border-b-8 border-indigo-200">
-        <div className="flex justify-between items-center border-b pb-4">
-          <h2 className="text-2xl font-black text-indigo-900 flex items-center gap-2">
-            📊 მშობლის დაშბორდი
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
-            aria-label="დახურვა"
-          >
-            ✕ დახურვა
-          </button>
-        </div>
+        {renderHeaderAndPicker(false)}
         <div className="text-center py-12 text-gray-400 font-medium">
           მონაცემები არ არის ხელმისაწვდომი
         </div>
@@ -117,18 +139,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClo
   if (stats.completedSessionCount === 0) {
     return (
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6 md:p-8 space-y-6 border-b-8 border-indigo-200">
-        <div className="flex justify-between items-center border-b pb-4">
-          <h2 className="text-2xl font-black text-indigo-900 flex items-center gap-2">
-            📊 მშობლის დაშბორდი
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
-            aria-label="დახურვა"
-          >
-            ✕ დახურვა
-          </button>
-        </div>
+        {renderHeaderAndPicker(false)}
         <div className="text-center py-12 text-gray-500 font-medium">
           ჯერ არცერთი დასრულებული სესია არ არის
         </div>
@@ -139,19 +150,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({ childId, onClo
   // 6 & 7. stats.completedSessionCount > 0 -> Populated stats (accuracy may be null or number)
   return (
     <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6 md:p-8 space-y-6 border-b-8 border-indigo-200 max-h-[90vh] overflow-y-auto">
-      {/* 1. Header + Close Button */}
-      <div className="flex justify-between items-center border-b pb-4 sticky top-0 bg-white z-10">
-        <h2 className="text-2xl font-black text-indigo-900 flex items-center gap-2">
-          📊 მშობლის დაშბორდი
-        </h2>
-        <button
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
-          aria-label="დახურვა"
-        >
-          ✕ დახურვა
-        </button>
-      </div>
+      {/* 1. Header + Close Button + Child Picker */}
+      {renderHeaderAndPicker(true)}
 
       {/* 2. Aggregate Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

@@ -56,7 +56,7 @@ describe('App correct phrase pool draw behavior', () => {
     });
 
     render(
-      <SessionModeProvider initialMode="parent">
+      <SessionModeProvider initialMode="child">
         <App />
       </SessionModeProvider>
     );

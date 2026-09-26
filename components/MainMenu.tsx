@@ -87,44 +87,28 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
           </div>
         </div>
 
-        {/* Authenticated Child Profile Pill */}
+        {/* Authenticated Identity Pill */}
         {user && (
           <div className="flex items-center justify-between bg-indigo-900/90 text-white px-3.5 py-2 rounded-2xl shadow-md backdrop-blur-sm border border-indigo-700/50">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-xl">
-                {activeChild ? getAvatarEmoji(activeChild.avatar_id) : '👶'}
+                {activeChild ? getAvatarEmoji(activeChild.avatar_id) : sessionMode === 'parent' ? '👨‍👩‍👧‍👦' : '👶'}
               </span>
               <div className="flex flex-col min-w-0 leading-tight">
                 <span className="text-[10px] text-indigo-200 font-semibold uppercase tracking-wider">
-                  მოთამაშე
+                  {sessionMode === 'parent' ? 'რეჟიმი' : 'მოთამაშე'}
                 </span>
                 <span className="text-sm font-black truncate">
-                  {activeChild ? activeChild.name : 'ბავშვი არჩეული არ არის'}
+                  {activeChild
+                    ? activeChild.name
+                    : sessionMode === 'parent'
+                    ? 'მშობელი'
+                    : 'ბავშვი არჩეული არ არის'}
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Conditionally absent when in child mode to prevent unauthorized dashboard access */}
-              {sessionMode !== 'child' && activeChildId && (
-                <button
-                  onClick={() => setShowDashboard(true)}
-                  className="text-xs font-black bg-indigo-500/40 hover:bg-indigo-500/60 text-white px-3 py-1.5 rounded-xl border border-white/20 transition-all flex items-center gap-1"
-                  title="დაშბორდი"
-                >
-                  📊 დაშბორდი
-                </button>
-              )}
-              {/* In parent mode: allow switching child without re-entering PIN */}
-              {sessionMode === 'parent' && (
-                <button
-                  onClick={() => setShowChildSelector(true)}
-                  className="text-xs font-black bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl border border-white/20 transition-all flex items-center gap-1"
-                  title="შვილის შეცვლა"
-                >
-                  🔄 შვილის შეცვლა
-                </button>
-              )}
               <button
                 onClick={handleSwitchIdentity}
                 className="text-xs font-black bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl border border-white/20 transition-all flex items-center gap-1"
@@ -140,8 +124,29 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
       {showDashboard ? (
         <ParentDashboard
           childId={activeChildId}
+          childrenList={childrenList}
           onClose={() => setShowDashboard(false)}
         />
+      ) : user && sessionMode === 'parent' ? (
+        <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-8 md:p-12 text-center space-y-8 border-b-8 border-indigo-200">
+          <h1 className="text-4xl font-black text-indigo-900 tracking-tight">
+            მშობლის პანელი 👨‍👩‍👧‍👦
+          </h1>
+          <div className="grid gap-4">
+            <Button
+              onClick={() => setShowDashboard(true)}
+              className="text-xl py-6 bg-indigo-600 hover:bg-indigo-700"
+            >
+              📊 დაშბორდი
+            </Button>
+            <Button
+              onClick={() => setShowChildSelector(true)}
+              className="text-xl py-6 bg-purple-600 hover:bg-purple-700"
+            >
+              ➕ ბავშვის დამატება
+            </Button>
+          </div>
+        </div>
       ) : (
         <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-8 md:p-12 text-center space-y-8 border-b-8 border-indigo-200">
           <h1 className="text-4xl font-black text-indigo-900 tracking-tight">
@@ -187,15 +192,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
           activeChildId={activeChildId}
           loading={childrenLoading}
           childrenReady={hasFetchedOnce && !childrenLoading}
-          onSelectChild={(child) => {
-            setActiveChild(child);
+          onSelectChild={() => {
             setShowChildSelector(false);
           }}
           onAddChild={addChild}
           onClose={() => {
-            if (childrenList.length > 0) {
-              setShowChildSelector(false);
-            }
+            setShowChildSelector(false);
           }}
         />
       )}

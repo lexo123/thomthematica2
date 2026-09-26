@@ -46,7 +46,7 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [user]);
 
-  // Sync activeChildId with actual children list
+  // Sync activeChildId with actual children list (self-healing only; PinGate handles identity selection)
   useEffect(() => {
     if (!user || loading || !hasFetchedOnce) return;
 
@@ -54,18 +54,13 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (activeChildId) {
         const stillExists = childrenList.some(c => c.id === activeChildId);
         if (!stillExists) {
-          // If stored active child is invalid/deleted/from another user, clear and prompt selector
+          // If stored active child is invalid/deleted/from another user, clear it
           setActiveChildId(null);
-          setShowChildSelector(true);
         }
-      } else {
-        // Authenticated user with children but none currently selected
-        setShowChildSelector(true);
       }
-    } else {
-      // If user is authenticated but has 0 children, clear active child and prompt child selector modal
+    } else if (activeChildId) {
+      // If user is authenticated but has 0 children, clear active child
       setActiveChildId(null);
-      setShowChildSelector(true);
     }
   }, [user, childrenList, activeChildId, loading, hasFetchedOnce]);
 

@@ -20,7 +20,7 @@ describe('Phase 3 - Kveshmicera Retry & Question-level Recording Flow', () => {
     clearGameProgress(childId, GameMode.Kveshmicera);
 
     vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
-      sessionMode: 'parent',
+      sessionMode: 'child',
       setSessionMode: vi.fn(),
       resetSessionMode: vi.fn(),
     });

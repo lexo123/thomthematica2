@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Child } from '../types';
-import { CHILD_AVATARS, GENDER_OPTIONS, getAvatarEmoji } from '../hooks/useChildren';
+import { CHILD_AVATARS, GENDER_OPTIONS } from '../hooks/useChildren';
 import { isValidChildName } from '../utils/childNameValidator';
 import { hashPin, isValidPinFormat } from '../utils/pinHash';
 import { isPinTaken } from '../utils/pinUniqueness';
@@ -18,10 +18,7 @@ interface ChildSelectorProps {
 }
 
 export const ChildSelector: React.FC<ChildSelectorProps> = ({
-  childrenList,
-  activeChildId,
   loading,
-  childrenReady,
   onSelectChild,
   onAddChild,
   onClose,
@@ -33,14 +30,6 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
   } catch {
     // Graceful fallback when rendered outside AuthProvider (e.g. isolated unit tests)
   }
-  const [isAdding, setIsAdding] = useState<boolean>(false);
-  const [modeInitialized, setModeInitialized] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (modeInitialized || !childrenReady) return;
-    setIsAdding(childrenList.length === 0);
-    setModeInitialized(true);
-  }, [childrenReady, childrenList, modeInitialized]);
   const [newChildName, setNewChildName] = useState<string>('');
   const [selectedGender, setSelectedGender] = useState<'boy' | 'girl' | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<string>('avatar_1');
@@ -112,7 +101,6 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
       setSelectedGender(null);
       setPin('');
       setConfirmPin('');
-      setIsAdding(false);
       onSelectChild(child);
       if (onClose) onClose();
     }
@@ -124,7 +112,7 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
         className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border-4 border-indigo-200 relative overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {onClose && childrenList.length > 0 && (
+        {onClose && (
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition-colors"
@@ -138,15 +126,13 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
 
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-100 rounded-2xl mb-3 shadow-inner text-3xl">
-            {isAdding ? '✨' : '🎮'}
+            ✨
           </div>
           <h2 className="text-2xl font-black text-indigo-950 tracking-tight">
-            {isAdding ? 'ახალი ბავშვის დამატება' : 'ვინ თამაშობს?'}
+            ახალი ბავშვის დამატება
           </h2>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            {isAdding
-              ? 'შეიყვანეთ სახელი, აირჩიეთ სქესი და ავატარი'
-              : 'აირჩიეთ ბავშვის პროფილი პროგრესის შესანახად'}
+            შეიყვანეთ სახელი, აირჩიეთ სქესი და ავატარი
           </p>
         </div>
 
@@ -161,7 +147,7 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
             <span className="animate-spin text-3xl">🔄</span>
             <span className="text-sm font-bold text-slate-500">იტვირთება...</span>
           </div>
-        ) : isAdding ? (
+        ) : (
           <form onSubmit={handleCreateChild} noValidate className="space-y-4 overflow-y-auto pr-1">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -280,19 +266,13 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
             </div>
 
             <div className="flex gap-2 pt-2">
-              {childrenList.length > 0 && (
+              {onClose && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsAdding(false);
-                    setSelectedGender(null);
-                    setPin('');
-                    setConfirmPin('');
-                    setErrorMsg(null);
-                  }}
+                  onClick={onClose}
                   className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
                 >
-                  უკან დაბრუნება
+                  გაუქმება
                 </button>
               )}
               <button
@@ -304,60 +284,6 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
               </button>
             </div>
           </form>
-        ) : (
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <div className="space-y-2.5 overflow-y-auto max-h-64 pr-1 py-1">
-              {childrenList.map((child) => {
-                const isSelected = child.id === activeChildId;
-                return (
-                  <button
-                    key={child.id}
-                    onClick={() => {
-                      onSelectChild(child);
-                      if (onClose) onClose();
-                    }}
-                    className={`w-full flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all text-left ${
-                      isSelected
-                        ? 'bg-indigo-50 border-indigo-600 shadow-sm'
-                        : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-indigo-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-2xl">
-                        {getAvatarEmoji(child.avatar_id)}
-                      </div>
-                      <div>
-                        <div className="text-base font-black text-slate-800">
-                          {child.name}
-                        </div>
-                        <div className="text-[11px] font-semibold text-slate-400">
-                          {isSelected ? '⭐ აქტიური პროფილი' : 'დააჭირეთ ასარჩევად'}
-                        </div>
-                      </div>
-                    </div>
-                    {isSelected && (
-                      <span className="text-indigo-600 font-black text-lg">✓</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsAdding(true);
-                  setSelectedGender(null);
-                  setErrorMsg(null);
-                }}
-                className="w-full py-3 px-4 border-2 border-dashed border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50/50 text-indigo-700 font-bold text-xs rounded-2xl transition-all flex items-center justify-center gap-1.5"
-              >
-                <span>➕</span>
-                <span>სხვა ბავშვის დამატება</span>
-              </button>
-            </div>
-          </div>
         )}
       </div>
     </div>

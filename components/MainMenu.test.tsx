@@ -7,7 +7,7 @@ import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
 import * as SessionModeContext from '../contexts/SessionModeContext';
 
-describe('MainMenu - FIX 4: Child-Switch & Identity Exit Buttons', () => {
+describe('MainMenu - Parent Control Card vs Child Game Mode & Identity Exit', () => {
   let setShowChildSelectorMock: any;
   let resetSessionModeMock: any;
   let setActiveChildIdMock: any;
@@ -37,13 +37,13 @@ describe('MainMenu - FIX 4: Child-Switch & Identity Exit Buttons', () => {
     cleanup();
   });
 
-  it('renders BOTH "🔄 შვილის შეცვლა" and "🔒 გასვლა identity-დან" in parent mode', () => {
+  it('renders "📊 დაშბორდი", "➕ ბავშვის დამატება", and "🔒 გასვლა identity-დან" in parent mode without game buttons or PIN-less switch', () => {
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
       childrenList: [
         { id: 'child-1', parent_id: 'parent-123', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy', created_at: '' },
       ],
-      activeChild: { id: 'child-1', parent_id: 'parent-123', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy', created_at: '' },
-      activeChildId: 'child-1',
+      activeChild: null,
+      activeChildId: null,
       childRewardImages: null,
       loading: false,
       error: null,
@@ -64,17 +64,23 @@ describe('MainMenu - FIX 4: Child-Switch & Identity Exit Buttons', () => {
 
     render(<MainMenu onSelectMode={vi.fn()} />);
 
-    // Both buttons should be present
-    const switchChildBtn = screen.getByText('🔄 შვილის შეცვლა');
+    // Parent controls are present
+    const dashboardBtn = screen.getByText('📊 დაშბორდი');
+    const addChildBtn = screen.getByText('➕ ბავშვის დამატება');
     const exitIdentityBtn = screen.getByText('🔒 გასვლა identity-დან');
-    expect(switchChildBtn).toBeDefined();
+    expect(dashboardBtn).toBeDefined();
+    expect(addChildBtn).toBeDefined();
     expect(exitIdentityBtn).toBeDefined();
 
-    // Dashboard button should also be visible in parent mode with activeChildId
-    expect(screen.getByText('📊 დაშბორდი')).toBeDefined();
+    // PIN-less child switch and game buttons must be ABSENT in parent mode
+    expect(screen.queryByText(/შვილის შეცვლა|ბავშვის შეცვლა/)).toBeNull();
+    expect(screen.queryByText('თომთემატიკა')).toBeNull();
+    expect(screen.queryByText('თომრავლების ტაბულა')).toBeNull();
+    expect(screen.queryByText('გეთომეტრია 📐')).toBeNull();
+    expect(screen.queryByText('ქვეშმიწერით გამრავლება ✍️')).toBeNull();
 
-    // Clicking "🔄 შვილის შეცვლა" opens ChildSelector without resetting session
-    fireEvent.click(switchChildBtn);
+    // Clicking "➕ ბავშვის დამატება" opens single-purpose ChildSelector
+    fireEvent.click(addChildBtn);
     expect(setShowChildSelectorMock).toHaveBeenCalledWith(true);
     expect(resetSessionModeMock).not.toHaveBeenCalled();
 
@@ -84,7 +90,7 @@ describe('MainMenu - FIX 4: Child-Switch & Identity Exit Buttons', () => {
     expect(setActiveChildIdMock).toHaveBeenCalledWith(null);
   });
 
-  it('renders ONLY "🔒 გასვლა identity-დან" in child mode (hiding "🔄 შვილის შეცვლა" and Dashboard)', () => {
+  it('renders game buttons and "🔒 გასვლა identity-დან" in child mode (hiding Dashboard and Add Child)', () => {
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
       childrenList: [
         { id: 'child-1', parent_id: 'parent-123', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy', created_at: '' },
@@ -111,13 +117,16 @@ describe('MainMenu - FIX 4: Child-Switch & Identity Exit Buttons', () => {
 
     render(<MainMenu onSelectMode={vi.fn()} />);
 
-    // "🔒 გასვლა identity-დან" is present
+    // "🔒 გასვლა identity-დან" and all 4 game buttons are present
     expect(screen.getByText('🔒 გასვლა identity-დან')).toBeDefined();
+    expect(screen.getByText('თომთემატიკა')).toBeDefined();
+    expect(screen.getByText('თომრავლების ტაბულა')).toBeDefined();
+    expect(screen.getByText('გეთომეტრია 📐')).toBeDefined();
+    expect(screen.getByText('ქვეშმიწერით გამრავლება ✍️')).toBeDefined();
 
-    // "🔄 შვილის შეცვლა" must be ABSENT in child mode
-    expect(screen.queryByText('🔄 შვილის შეცვლა')).toBeNull();
-
-    // Dashboard button must be ABSENT in child mode
+    // Parent buttons must be ABSENT in child mode
     expect(screen.queryByText('📊 დაშბორდი')).toBeNull();
+    expect(screen.queryByText('➕ ბავშვის დამატება')).toBeNull();
+    expect(screen.queryByText(/შვილის შეცვლა|ბავშვის შეცვლა/)).toBeNull();
   });
 });

@@ -40,7 +40,7 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
     });
 
     render(
-      <SessionModeProvider initialMode="parent">
+      <SessionModeProvider initialMode="child">
         <App />
       </SessionModeProvider>
     );
@@ -82,7 +82,7 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
     });
 
     render(
-      <SessionModeProvider initialMode="parent">
+      <SessionModeProvider initialMode="child">
         <App />
       </SessionModeProvider>
     );
@@ -123,7 +123,7 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
     });
 
     render(
-      <SessionModeProvider initialMode="parent">
+      <SessionModeProvider initialMode="child">
         <App />
       </SessionModeProvider>
     );
@@ -171,7 +171,7 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
     });
 
     render(
-      <SessionModeProvider initialMode="parent">
+      <SessionModeProvider initialMode="child">
         <App />
       </SessionModeProvider>
     );

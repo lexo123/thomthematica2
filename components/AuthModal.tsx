@@ -113,7 +113,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             {mode === 'forgot_password' && 'პაროლის აღდგენა'}
           </h2>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            {mode === 'login' && 'შედით შვილების პროგრესის და სურვილების სანახავად'}
+            {mode === 'login' && 'შედით ბავშვების პროგრესის და სურვილების სანახავად'}
             {mode === 'register' && 'შექმენით ანგარიში ბავშვების შედეგების შესანახად'}
             {mode === 'forgot_password' && 'შეიყვანეთ ელფოსტა პაროლის აღსადგენად'}
           </p>

@@ -7,6 +7,7 @@ import { MainMenu } from './MainMenu';
 import * as useChildDashboardModule from '../hooks/useChildDashboard';
 import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
+import * as SessionModeContext from '../contexts/SessionModeContext';
 
 describe('ParentDashboard UI Component', () => {
   const mockRefetch = vi.fn().mockResolvedValue(undefined);
@@ -340,8 +341,8 @@ describe('ParentDashboard UI Component', () => {
     expect(screen.queryByText('✨ საჩუქარი A')).toBeNull();
   });
 
-  // 9. Entry-point visibility: button is only visible when user && activeChildId
-  it('shows dashboard button in MainMenu ONLY when user and activeChildId are present', () => {
+  // 9. Entry-point visibility: button is only visible when user && sessionMode === 'parent'
+  it('shows dashboard button in MainMenu ONLY when user && sessionMode === "parent" (even with activeChildId === null)', () => {
     // A. Unauthenticated user
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: null,
@@ -351,7 +352,7 @@ describe('ParentDashboard UI Component', () => {
       verifyOtp: vi.fn(),
       signOut: vi.fn(),
       setIsPasswordRecovery: vi.fn(),
-    });
+    } as any);
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
       childrenList: [],
       activeChild: null,
@@ -364,12 +365,17 @@ describe('ParentDashboard UI Component', () => {
       refreshChildren: vi.fn(),
       showChildSelector: false,
       setShowChildSelector: vi.fn(),
+    } as any);
+    vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
+      sessionMode: null,
+      setSessionMode: vi.fn(),
+      resetSessionMode: vi.fn(),
     });
 
     const { rerender } = render(<MainMenu onSelectMode={vi.fn()} />);
     expect(screen.queryByText('📊 დაშბორდი')).toBeNull();
 
-    // B. Authenticated user, but NO activeChildId
+    // B. Authenticated user in child mode -> dashboard button NOT shown
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: { id: 'parent-1', email: 'parent@example.com' } as any,
       session: {} as any,
@@ -378,32 +384,29 @@ describe('ParentDashboard UI Component', () => {
       verifyOtp: vi.fn(),
       signOut: vi.fn(),
       setIsPasswordRecovery: vi.fn(),
+    } as any);
+    vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
+      sessionMode: 'child',
+      setSessionMode: vi.fn(),
+      resetSessionMode: vi.fn(),
     });
 
     rerender(<MainMenu onSelectMode={vi.fn()} />);
     expect(screen.queryByText('📊 დაშბორდი')).toBeNull();
 
-    // C. Authenticated user WITH activeChildId
-    vi.spyOn(ChildContext, 'useChild').mockReturnValue({
-      childrenList: [{ id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', gender: 'boy', created_at: '' }],
-      activeChild: { id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', gender: 'boy', created_at: '' },
-      activeChildId: 'child-1',
-      loading: false,
-      setActiveChild: vi.fn(),
-      addChild: vi.fn(),
-      updateChild: vi.fn(),
-      deleteChild: vi.fn(),
-      refreshChildren: vi.fn(),
-      showChildSelector: false,
-      setShowChildSelector: vi.fn(),
+    // C. Authenticated user in parent mode (even with activeChildId === null) -> dashboard button IS shown
+    vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
+      sessionMode: 'parent',
+      setSessionMode: vi.fn(),
+      resetSessionMode: vi.fn(),
     });
 
     rerender(<MainMenu onSelectMode={vi.fn()} />);
     expect(screen.getByText('📊 დაშბორდი')).toBeDefined();
   });
 
-  // 10. Regression: open -> close -> game-mode selection works identically
-  it('opens dashboard, closes it, and game-mode selection flow works identically', () => {
+  // 10. Regression: open -> close -> parent control card returns identically
+  it('opens dashboard, closes it, and returns to parent control card identically in parent mode', () => {
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: { id: 'parent-1', email: 'parent@example.com' } as any,
       session: {} as any,
@@ -412,11 +415,11 @@ describe('ParentDashboard UI Component', () => {
       verifyOtp: vi.fn(),
       signOut: vi.fn(),
       setIsPasswordRecovery: vi.fn(),
-    });
+    } as any);
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
-      childrenList: [{ id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', gender: 'boy', created_at: '' }],
-      activeChild: { id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'boy1', gender: 'boy', created_at: '' },
-      activeChildId: 'child-1',
+      childrenList: [{ id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy', created_at: '' }],
+      activeChild: null,
+      activeChildId: null,
       loading: false,
       setActiveChild: vi.fn(),
       addChild: vi.fn(),
@@ -425,6 +428,11 @@ describe('ParentDashboard UI Component', () => {
       refreshChildren: vi.fn(),
       showChildSelector: false,
       setShowChildSelector: vi.fn(),
+    } as any);
+    vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
+      sessionMode: 'parent',
+      setSessionMode: vi.fn(),
+      resetSessionMode: vi.fn(),
     });
 
     vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
@@ -446,30 +454,95 @@ describe('ParentDashboard UI Component', () => {
     const onSelectMode = vi.fn();
     render(<MainMenu onSelectMode={onSelectMode} />);
 
-    // Initially game grid is rendered
-    expect(screen.getByText('თომთემატიკა')).toBeDefined();
+    // Initially parent control card is rendered with "📊 დაშბორდი" and "➕ ბავშვის დამატება"
+    expect(screen.getByText('📊 დაშბორდი')).toBeDefined();
+    expect(screen.getByText('➕ ბავშვის დამატება')).toBeDefined();
     expect(screen.queryByText('📊 მშობლის დაშბორდი')).toBeNull();
 
     // Click dashboard button
     const dashBtn = screen.getByText('📊 დაშბორდი');
     fireEvent.click(dashBtn);
 
-    // Dashboard is now rendered replacing game grid (not overlay)
+    // Dashboard is now rendered replacing parent control card (not overlay)
     expect(screen.getByText('📊 მშობლის დაშბორდი')).toBeDefined();
-    expect(screen.queryByText('თომთემატიკა')).toBeNull();
+    expect(screen.queryByText('➕ ბავშვის დამატება')).toBeNull();
 
     // Click close button on dashboard
     const closeBtn = screen.getByText('✕ დახურვა');
     fireEvent.click(closeBtn);
 
-    // Dashboard is closed and game grid is back
+    // Dashboard is closed and parent control card is back
     expect(screen.queryByText('📊 მშობლის დაშბორდი')).toBeNull();
-    const thomModeBtn = screen.getByText('თომთემატიკა');
-    expect(thomModeBtn).toBeDefined();
+    expect(screen.getByText('📊 დაშბორდი')).toBeDefined();
+    expect(screen.getByText('➕ ბავშვის დამატება')).toBeDefined();
+  });
 
-    // Game mode selection works identically
-    fireEvent.click(thomModeBtn);
-    expect(onSelectMode).toHaveBeenCalledWith('thomthematica');
+  // 10b. Internal horizontal child-switcher inside ParentDashboard
+  it('renders horizontal child-picker, defaults selectedChildId to childrenList[0].id when childId is null, and re-fetches on child click', () => {
+    const hookSpy = vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockImplementation((id: string | null) => {
+      if (id === 'child-1') {
+        return {
+          stats: {
+            completedSessionCount: 2,
+            totalQuestions: 40,
+            totalCorrect: 40,
+            accuracyPercent: 100.0,
+            perfectBlocksCount: 1,
+          },
+          recentSessions: [],
+          wishes: [{ id: 'w-1', child_id: 'child-1', wish_text: 'თომას სურვილი', correct_count: 40, status: 'pending', created_at: '' }],
+          gameModeBreakdown: {},
+          loading: false,
+          error: null,
+          refetch: mockRefetch,
+        };
+      }
+      if (id === 'child-2') {
+        return {
+          stats: {
+            completedSessionCount: 4,
+            totalQuestions: 80,
+            totalCorrect: 76,
+            accuracyPercent: 95.0,
+            perfectBlocksCount: 2,
+          },
+          recentSessions: [],
+          wishes: [{ id: 'w-2', child_id: 'child-2', wish_text: 'ნიტას სურვილი', correct_count: 40, status: 'fulfilled', created_at: '' }],
+          gameModeBreakdown: {},
+          loading: false,
+          error: null,
+          refetch: mockRefetch,
+        };
+      }
+      return {
+        stats: null,
+        recentSessions: [],
+        wishes: [],
+        gameModeBreakdown: {},
+        loading: false,
+        error: null,
+        refetch: mockRefetch,
+      };
+    });
+
+    const childrenList = [
+      { id: 'child-1', parent_id: 'parent-1', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy' as const, created_at: '' },
+      { id: 'child-2', parent_id: 'parent-1', name: 'ნიტა', avatar_id: 'avatar_3', gender: 'girl' as const, created_at: '' },
+    ];
+
+    render(<ParentDashboard childId={null} childrenList={childrenList} onClose={mockOnClose} />);
+
+    // Defaults immediately to first child ('child-1') even when childId prop is null
+    expect(hookSpy).toHaveBeenCalledWith('child-1');
+    expect(screen.getByText('✨ თომას სურვილი')).toBeDefined();
+    expect(screen.getByText('თომა')).toBeDefined();
+    expect(screen.getByText('ნიტა')).toBeDefined();
+
+    // Click second child ('ნიტა') in horizontal picker -> re-fetches for 'child-2'
+    fireEvent.click(screen.getByText('ნიტა'));
+    expect(hookSpy).toHaveBeenCalledWith('child-2');
+    expect(screen.getByText('✨ ნიტას სურვილი')).toBeDefined();
+    expect(screen.queryByText('✨ თომას სურვილი')).toBeNull();
   });
 
   // 11. Game Mode Breakdown rendering with populated data
@@ -556,7 +629,6 @@ describe('ParentDashboard UI Component', () => {
   // 13. Game Mode Breakdown does NOT render in non-populated states
   it('does not render game mode breakdown in loading, error, or empty-sessions states', () => {
     // 1. Loading
-    const { rerender } = render(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
     vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
       stats: null,
       recentSessions: [],
@@ -568,7 +640,7 @@ describe('ParentDashboard UI Component', () => {
       error: null,
       refetch: mockRefetch,
     });
-    rerender(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
+    const { rerender } = render(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
     expect(screen.queryByText('🎮 თამაშის რეჟიმები')).toBeNull();
 
     // 2. Error

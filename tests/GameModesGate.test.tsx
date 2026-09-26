@@ -47,7 +47,7 @@ describe('Phase 2.5 Game Modes Gate & activeChildId Propagation', () => {
     });
 
     render(
-      <SessionModeProvider initialMode="parent">
+      <SessionModeProvider initialMode="child">
         <App />
       </SessionModeProvider>
     );
@@ -85,7 +85,7 @@ describe('Phase 2.5 Game Modes Gate & activeChildId Propagation', () => {
     });
 
     render(
-      <SessionModeProvider initialMode="parent">
+      <SessionModeProvider initialMode="child">
         <App />
       </SessionModeProvider>
     );
@@ -125,7 +125,7 @@ describe('Phase 2.5 Game Modes Gate & activeChildId Propagation', () => {
     });
 
     render(
-      <SessionModeProvider initialMode="parent">
+      <SessionModeProvider initialMode="child">
         <App />
       </SessionModeProvider>
     );

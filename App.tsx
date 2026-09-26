@@ -119,6 +119,12 @@ const App: React.FC = () => {
   } = useColumnMultiplication(problem);
 
   useEffect(() => {
+    if (sessionMode === 'parent') {
+      setGameMode(null);
+    }
+  }, [sessionMode]);
+
+  useEffect(() => {
     if (gameMode && !isGameScreenBlocked) {
       setProblem(generateProblem(gameMode, questionsInBlock));
       if (gameMode === GameMode.ThomravlebisTabula) {
