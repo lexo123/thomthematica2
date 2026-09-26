@@ -8,6 +8,10 @@ interface UseTimerOptions {
 export const useTimer = ({ timeLimit, onTimeOut }: UseTimerOptions) => {
   const [timeLeft, setTimeLeft] = useState<number>(timeLimit);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const onTimeOutRef = useRef(onTimeOut);
+  useEffect(() => {
+    onTimeOutRef.current = onTimeOut;
+  }, [onTimeOut]);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -23,13 +27,13 @@ export const useTimer = ({ timeLimit, onTimeOut }: UseTimerOptions) => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           stopTimer();
-          onTimeOut();
+          onTimeOutRef.current();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  }, [timeLimit, stopTimer, onTimeOut]);
+  }, [timeLimit, stopTimer]);
 
   useEffect(() => {
     return () => stopTimer();

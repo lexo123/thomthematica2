@@ -55,6 +55,7 @@ const App: React.FC = () => {
   const [consecutivePerfectBlocks, setConsecutivePerfectBlocks] = useState<number>(0);
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [showRewardImage, setShowRewardImage] = useState<boolean>(false);
+  const [hasFailedCurrentQuestion, setHasFailedCurrentQuestion] = useState<boolean>(false);
 
   // Child selection modal state during active game mode blocker
   const [showChildGateSelector, setShowChildGateSelector] = useState<boolean>(false);
@@ -91,12 +92,15 @@ const App: React.FC = () => {
   const handleTimeOut = useCallback(() => {
     setIsPerfectBlock(false);
     setConsecutivePerfectBlocks(0);
-    recordAnswer(false);
-    
+    if (!hasFailedCurrentQuestion) {
+      recordAnswer(false);
+      setHasFailedCurrentQuestion(true);
+    }
+
     setCurrentMessage("დრო ამოიწურა! წააგე.");
     setGameState(GameState.Incorrect);
     setShowRewardImage(false);
-  }, [recordAnswer]);
+  }, [recordAnswer, hasFailedCurrentQuestion]);
 
   const { timeLeft, startTimer, stopTimer } = useTimer({
     timeLimit: TIME_LIMIT,
@@ -127,6 +131,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (gameMode && !isGameScreenBlocked) {
       setProblem(generateProblem(gameMode, questionsInBlock));
+      setHasFailedCurrentQuestion(false);
       if (gameMode === GameMode.ThomravlebisTabula) {
         startTimer();
       }
@@ -148,7 +153,10 @@ const App: React.FC = () => {
   }, [gameState, gameMode, problem, focusFirstCell, isGameScreenBlocked]);
 
   const processAnswerResult = (isCorrect: boolean, actualUserAnswer: string) => {
-    const shouldRecord = gameMode !== GameMode.Kveshmicera || !hasKveshFailedThisQuestion;
+    const shouldRecord =
+      gameMode === GameMode.Kveshmicera
+        ? !hasKveshFailedThisQuestion
+        : !hasFailedCurrentQuestion;
 
     if (shouldRecord) {
       recordAnswer(isCorrect);
@@ -165,6 +173,7 @@ const App: React.FC = () => {
     }
 
     if (isCorrect) {
+      setHasFailedCurrentQuestion(false);
       const nextQuestionsInBlock = questionsInBlock + 1;
       setQuestionsInBlock(nextQuestionsInBlock);
 
@@ -189,6 +198,7 @@ const App: React.FC = () => {
       setCurrentMessage(message);
       setGameState(GameState.Correct);
     } else {
+      setHasFailedCurrentQuestion(true);
       setIsPerfectBlock(false);
       setConsecutivePerfectBlocks(0);
 
@@ -266,6 +276,7 @@ const App: React.FC = () => {
       if (gameMode) {
         setProblem(generateProblem(gameMode, nextIndex));
       }
+      setHasFailedCurrentQuestion(false);
       setUserAnswer('');
       resetColMultState();
       setGameState(GameState.Playing);
@@ -287,6 +298,7 @@ const App: React.FC = () => {
     resetSession();
     setGameMode(null);
     setProblem(null);
+    setHasFailedCurrentQuestion(false);
     stopTimer();
   };
 
