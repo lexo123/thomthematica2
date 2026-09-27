@@ -1,0 +1,33 @@
+name: Keep Supabase Alive
+
+# მიზანი: Supabase-ის უფასო tier-ი ავტომატურად აჩერებს (pause) პროექტს
+# 7 დღის უმოქმედობის შემდეგ. ეს workflow კვირაში ერთხელ მსუბუქ
+# request-ს უგზავნის Supabase-ის REST API-ს, რომ პროექტი აქტიური დარჩეს.
+
+on:
+  schedule:
+    # ყოველ კვირას (Sunday), 00:00 UTC. 7 დღეზე ხშირად საკმარისზე მეტია.
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+    # საშუალებას აძლევს ხელით გაშვებასაც, GitHub-ის Actions ტაბიდან
+    # ("Run workflow" ღილაკით) — მაგ. ამ workflow-ის ტესტირებისთვის.
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_ANON_KEY }}")
+          echo "Supabase REST API responded with HTTP $HTTP_STATUS"
+          # 200 ან 401/403 ორივე ნიშნავს, რომ Supabase "ცოცხალია" და
+          # request-ი მიაღწია მას (RLS-ის გამო ცარიელი/დაბლოკილი პასუხიც
+          # საკმარისია "აქტივობად" ჩასათვლელად — Supabase-ს არ სჭირდება
+          # წარმატებული მონაცემის დაბრუნება, მხოლოდ API-ზე ტრაფიკი).
+          if [ "$HTTP_STATUS" -ge 500 ]; then
+            echo "Unexpected server error from Supabase (HTTP $HTTP_STATUS)"
+            exit 1
+          fi
