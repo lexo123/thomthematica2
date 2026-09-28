@@ -1,6 +1,6 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: Wave X (PIN-based Parent/Child Identity Gate) სრულად დასრულებული და დამოუკიდებლად დადასტურებული (commit f45434f-მდე); გასწორებულია განმეორებითი არასწორი პასუხის double-counting ბაგი ყველა თამაშში; დანერგილია Supabase auto-pause mitigation (GH Actions `keep-supabase-alive.yml`)_
+_ბოლო განახლება: Wave X (PIN-based Parent/Child Identity Gate) სრულად დასრულებული და დამოუკიდებლად დადასტურებული (commit f45434f-მდე); გასწორებულია განმეორებითი არასწორი პასუხის double-counting ბაგი ყველა თამაშში; დანერგილია და დადასტურებულია Supabase auto-pause mitigation (GH Actions `keep-supabase-alive.yml`); pin_hash backfill/NOT NULL გადაწყვეტილია — აღარ არის საჭირო_
 
 ## Repo
 https://github.com/lexo123/thomthematica2
@@ -84,7 +84,7 @@ hooks/useGameSession.ts-ში:
 - 150/150 ტესტი
 
 ### Phase 3 — Commit #6A (ბავშვის სქესის ველი: schema + registration) ✅
-- Migration pattern: `ADD COLUMN (nullable) → backfill by id → verify → SET NOT NULL → CHECK` — **ეს pattern Wave X-ში pin_hash-ისთვისაც გამოყენებული იყო ნაწილობრივ (იხ. ქვემოთ, ღია დარჩენილი საკითხი)**
+- Migration pattern: `ADD COLUMN (nullable) → backfill by id → verify → SET NOT NULL → CHECK` — **ეს pattern Wave X-ში pin_hash-ისთვის სრულად არ გამოყენებულა — განზრახ (იხ. ქვემოთ, "pin_hash-ის schema-სტატუსი")**
 - 155/155 ტესტი
 
 ### Phase 3 — Commit #6B (Personalization: {name} + {gender}) ✅
@@ -163,7 +163,11 @@ ALTER TABLE profiles ADD COLUMN pin_hash text;  -- nullable, ხელით pro
 ALTER TABLE children ADD COLUMN pin_hash text;  -- nullable, ხელით production-ში გაშვებული
 ```
 
-**⚠️ ღია, დაუხურავი საკითხი:** `SET NOT NULL` + `CHECK` migration (Commit #6A-ს pattern-ის ბოლო ორი ნაბიჯი) **არასდროს შესრულებულა**. `pin_hash` ორივე table-ზე ჯერ კიდევ **nullable**-ია production-ში. ასევე, ორიგინალურად დაგეგმილი **Commit #18 (structured backfill UI არსებული ანგარიშებისთვის) არასდროს განხორციელებულა** — ამის ნაცვლად, Lexo-ს ერთადერთი არსებული Wave-X-მდელი ოჯახისთვის (თავად + ერთი ბავშვი) PIN ხელით, პირდაპირი SQL-ით დაყენდა (`UPDATE profiles/children SET pin_hash = encode(digest(...), 'hex')`). ეს საკმარისი იყო დაბლოკვის მოსახსნელად, მაგრამ **structured backfill UI და NOT NULL/CHECK constraint კვლავ დარჩენილია მომავალი Wave-ისთვის**, თუ production launch-ის დროს აღმოჩნდება სხვა Wave-X-მდელი ანგარიშები.
+**pin_hash-ის schema-სტატუსი (გადაწყვეტილია, აღარ არის ღია):** `pin_hash` ორივე table-ზე **განზრახ რჩება nullable**. `SET NOT NULL`, structured backfill UI (თავდაპირველად დაგეგმილი Commit #18) და მასთან დაკავშირებული CHECK აღარ იგეგმება. მიზეზები:
+- backfill მხოლოდ Wave-X-მდელი, PIN-ის გარეშე შექმნილი ანგარიშებისთვის იყო საჭირო. ყველა არსებული ანგარიში სატესტოა და launch-მდე წაიშლება; ნამდვილი მომხმარებლები signup-ზევე PIN-ს აყენებენ
+- `profiles.pin_hash`-ზე `NOT NULL` არქიტექტურას გააფუჭებდა: `handle_new_user()` trigger ჯერ ქმნის `profiles` row-ს PIN-ის გარეშე, PIN კი signup-ის შემდეგ ცალკე `UPDATE`-ით იწერება (PIN hash `user_metadata`-დან განზრახ ამოღებულია, FIX 6). `NOT NULL` signup-ს ჩააგდებდა
+- `children.pin_hash`-ზე `NOT NULL` ტექნიკურად შესაძლებელი იქნებოდა (`addChild` PIN-ს insert-თანავე წერს), მაგრამ PIN gate ისედაც client-side UI gate-ია, ამიტომ DB-დონის ეს დაცვა რეალურ სარგებელს არ იძლევა
+- ალეკოს ოჯახის PIN-ები ხელით იყო დაყენებული SQL-ით (`UPDATE profiles/children SET pin_hash = encode(digest(...), 'hex')`) — ეს სატესტო ანგარიშებია
 
 #### დიზაინის ევოლუცია ამ conversation-ში (მნიშვნელოვანია მომავალი კონტექსტისთვის)
 
@@ -202,24 +206,21 @@ Commit-ებმა 7d06e73-მ და f45434f-მ ორივემ **ჩუ�
 
 ## საკვანძო არქიტექტურული გადაწყვეტილებები (არ შეიცვალოს განხილვის გარეშე)
 
-- DB schema: 5 table (`profiles`, `children`, `game_sessions`, `wishes`, `child_reward_images`) + `pin_hash` column ორივე `profiles`/`children`-ზე (ჯერ nullable — იხ. Wave X-ის ღია საკითხი)
+- DB schema: 5 table (`profiles`, `children`, `game_sessions`, `wishes`, `child_reward_images`) + `pin_hash` column ორივე `profiles`/`children`-ზე (განზრახ nullable — იხ. Wave X-ის სექცია)
 - useGameSession(gameMode, childId) — mode-აგნოსტიკური
 - Guest Mode არ არსებობს
 - 40-question rolling window — ხელუხლებელი
 - Race-condition-ების დამტკიცებული idiom: `requestIdRef` generation-counter — გამოყენებულია Commit #1, Commit #10, Wave 3 Part 2 reward-images fetcher-ში
 - Stale-closure-ის დამტკიცებული idiom: callback-ს, რომელიც `setInterval`/`setTimeout`-ის შიგნით გამოიძახება და თავად დამოკიდებულია ცვლად state-ზე, სჭირდება `useRef` + `useEffect` sync pattern (Wave X-ის Post-fix, `useTimer.ts`) — არა პირდაპირი `useCallback` dependency, თუ callback-ი timer-ის `setInterval`-შია registration-ული
 - Per-name static content (Record<string,string>) vs. per-child DB storage — კრიტერიუმი: სახელის/ცნების თვისება → static repo-ფაილი; კონკრეტული ბავშვის ინდივიდუალური მონაცემი → DB table
-- Schema-migration-ის დამტკიცებული pattern: `ADD COLUMN (nullable) → backfill → verify count=0 → SET NOT NULL → CHECK` (Commit #6A-ში დამტკიცებული; Wave X-ში ნაწილობრივ გამოყენებული — SET NOT NULL/CHECK ჯერ არ შესრულებულა)
+- Schema-migration-ის დამტკიცებული pattern: `ADD COLUMN (nullable) → backfill → verify count=0 → SET NOT NULL → CHECK` (Commit #6A-ში დამტკიცებული; Wave X-ში pin_hash-ზე განზრახ არ გამოყენებულა SET NOT NULL/CHECK — მიზეზი იხ. Wave X-ის სექციაში)
 - Production migration (DB/Storage/RLS SQL) — ყოველთვის Lexo-ს ხელით, Supabase Dashboard/SQL editor-იდან; AI Studio-ს არასდროს გადაეცემა ეს პასუხისმგებლობა
 - **PIN gate — client-side UI identity-gate, არა DB-level access-control.** RLS ოჯახის მასშტაბით ღიაა. PIN uniqueness — application-level, non-atomic, best-effort (არა DB UNIQUE constraint ორ table-ს შორის)
 - **PIN-ის გარეშე identity-switch აკრძალულია architecture-ის დონეზე** — ყოველი session (parent-იც, თითო ბავშვიც) საკუთარი PIN-ით უნდა დადასტურდეს, ცალკე, ყოველგვარი "მოსახერხებელი" shortcut-ის გარეშე. ეს Wave X-ის refactor-ის მთავარი, გამოცდილებით ნასწავლი პრინციპია
 - **AI Studio ZIP revert risk** — ვრცელდება ნებისმიერ ფაილზე, რომელიც git-ში/GitHub-ზე იცვლება AI Studio-ს ZIP workflow-ის გარეთ (schema.sql-ს ადრე შეემთხვა, PROJECT_STATE.md-ს ახლა). **ყოველი ასეთი out-of-band ცვლილების შემდეგ, განახლებული ფაილი ხელით უნდა აიტვირთოს AI Studio-ს project-შიც**
-- Auto-pause mitigation: GitHub Actions scheduled workflow (`.github/workflows/keep-supabase-alive.yml`) — ✅ **დანერგილია და push-ილია**. კვირაში ერთხელ (`cron: '0 0 * * 0'`) მსუბუქ request-ს უგზავნის Supabase REST API-ს (`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` secrets-ით), რომ Supabase-ის free-tier-ის 7-დღიანი auto-pause არ ამოქმედდეს. `workflow_dispatch`-ითაც ხელით გაშვებადია. Manual test-run-ის შედეგი ჯერ დასადასტურებელია (Actions ტაბიდან).
+- Auto-pause mitigation: GitHub Actions scheduled workflow (`.github/workflows/keep-supabase-alive.yml`) — ✅ **დანერგილია და push-ილია**. კვირაში ერთხელ (`cron: '0 0 * * 0'`) მსუბუქ request-ს უგზავნის Supabase REST API-ს (`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` secrets-ით), რომ Supabase-ის free-tier-ის 7-დღიანი auto-pause არ ამოქმედდეს. `workflow_dispatch`-ითაც ხელით გაშვებადია. Manual test-run (Actions ტაბიდან, `workflow_dispatch`) წარმატებულია — მწვანე ✓.
 
 ## დაგეგმილი მომდევნო Wave-ები (პრიორიტეტის მიხედვით)
-
-### Wave X-შემდგომი — pin_hash Backfill UI + NOT NULL/CHECK 🔵 (ახალი, ღია)
-Wave X-ის თავდაპირველად დაგეგმილი Commit #18 არასდროს განხორციელებულა. საჭიროა structured backfill UI ან პროცესი Wave-X-მდელი ანგარიშებისთვის (ამჟამად მხოლოდ Lexo-ს ერთი ოჯახი ხელით არის გასწორებული SQL-ით), შემდეგ `SET NOT NULL` + `CHECK` production migration ორივე `pin_hash` column-ზე.
 
 ### Wave Y — Wish Approval Workflow 🔵 (მონახაზი დახატული, Architecture Review არ დაწყებულა)
 **მიზანი:** 20/40-კითხვიან block-ის ბოლოს ბავშვის მიერ ჩაწერილი სურვილი (wish) ჯერ მშობელს მიუვიდეს დასადასტურებლად, არა პირდაპირ.
@@ -247,13 +248,17 @@ ALTER TABLE wishes ADD COLUMN status text NOT NULL DEFAULT 'pending'
 
 ## Production Launch-ის მდგომარეობა (~10 ახლობელი ბავშვი)
 
-**რეალურად ბლოკავს:**
-1. pin_hash backfill/NOT NULL-CHECK — თუ production launch-ისას აღმოჩნდება Wave-X-მდელი ანგარიშები (ამჟამად, ახალი ~10 ოჯახისთვის ეს პრობლემა არ იარსებებს, რადგან PIN უკვე signup-ზევე სავალდებულოა)
+**რეალურად ბლოკავს:** არაფერი ცნობილი.
+
+**launch-მდე ერთჯერადი მოქმედებები:**
+- სატესტო ანგარიშების წაშლა (Supabase Dashboard → Authentication → Users). წაშლის შემდეგ შეამოწმე, რომ მათი `children`, `game_sessions`, `wishes` ჩანაწერებიც წაიშალა და `child-reward-images` bucket-ში სატესტო სურათები არ დარჩა
+- სრული ნამდვილი ნაკადის ერთხელ გავლა ახალი ანგარიშით: რეგისტრაცია PIN-ით → ბავშვის დამატება PIN-ით → ბავშვის PIN-ით შესვლა და თამაში → მშობლის PIN-ით შესვლა და Dashboard
 
 **აღარ ბლოკავს (Wave X-ით და ამ conversation-ის ფარგლებში დასრულებული):**
 - ~~Wave X (PIN gate)~~ ✅ დასრულებულია
 - ~~`migrated_prompt_history/` წაშლა~~ ✅ დასრულებულია
-- ~~Auto-pause mitigation (GH Actions workflow)~~ ✅ დანერგილია (`keep-supabase-alive.yml`, push-ილია; manual test-run დასადასტურებელია)
+- ~~Auto-pause mitigation (GH Actions workflow)~~ ✅ დანერგილია და დადასტურებულია (`keep-supabase-alive.yml`, manual test-run მწვანე)
+- ~~pin_hash backfill/NOT NULL-CHECK~~ ✅ აღარ არის საჭირო (იხ. Wave X-ის სექცია)
 
 **არ ბლოკავს, მაგრამ რეკომენდებულია launch-მდე ან პარალელურად:**
 - Backup-სტრატეგია
@@ -278,8 +283,8 @@ ALTER TABLE wishes ADD COLUMN status text NOT NULL DEFAULT 'pending'
 
 Wave X (PIN-based Parent/Child Identity Gate) სრულად დასრულებულია და დამოუკიდებლად დადასტურებული — identity-first ორსტადიანი flow, ტერმინოლოგიის sweep, Dashboard child-switcher. დამატებით გასწორდა განმეორებითი-არასწორი-პასუხის double-counting ბაგი ყველა თამაშში (Kveshmicera-ს გარდა, რომელიც უკვე სწორად მუშაობდა).
 
-GH Actions auto-pause mitigation workflow (`keep-supabase-alive.yml`) დანერგილია და push-ილია — manual test-run-ის დადასტურება (Actions ტაბიდან) ჯერ ღიაა.
+GH Actions auto-pause mitigation workflow (`keep-supabase-alive.yml`) დანერგილია, push-ილია და manual test-run-ით დადასტურებულია. pin_hash backfill/NOT NULL-CHECK საკითხი დახურულია: საჭირო აღარ არის.
 
-რეკომენდებული თანმიმდევრობა დარჩენილი ნაბიჯებისთვის: (1) auto-pause workflow-ის manual test-run-ის დადასტურება; (2) pin_hash backfill/NOT NULL-CHECK გადაწყვეტილება (საჭიროა თუ არა production launch-მდე, Wave-X-მდელი ანგარიშების რაოდენობის მიხედვით); (3) Wave Y (wish approval) architecture review.
+რეკომენდებული თანმიმდევრობა: (1) Wave Y (wish approval) architecture review; (2) launch-მდე — სატესტო ანგარიშების წაშლა და სრული ნამდვილი ნაკადის გავლა ახალი ანგარიშით (იხ. "launch-მდე ერთჯერადი მოქმედებები"); (3) Backup-სტრატეგია და `game_sessions` stuck-row-ის ხელახალი ტესტირება.
 
 [ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს Claude-ის და ChatGPT-ის Project-ებში, **და** AI Studio-ს project-ში (Wave X-ის დროს გამოვლენილი sync-რისკის გამო). ნამდვილად ატვირთეთ ეს ფაილი repo-შიც (`git add PROJECT_STATE.md && git commit && git push`).]
