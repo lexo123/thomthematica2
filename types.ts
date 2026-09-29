@@ -89,7 +89,7 @@ export interface Wish {
   child_id: string;
   wish_text: string;
   correct_count: 19 | 20 | 39 | 40;
-  status: 'pending' | 'fulfilled';
+  status: 'wish_pending' | 'wish_approved' | 'wish_rejected' | 'image_pending' | 'image_approved' | 'image_rejected' | 'published';
   fulfilled_at?: string | null;
   created_at: string;
 }

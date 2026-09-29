@@ -24,7 +24,7 @@ export interface WishSyncPayload {
   childId: string;
   wishText: string;
   correctCount: 19 | 20 | 39 | 40 | number;
-  status?: 'pending' | 'fulfilled';
+  status?: 'wish_pending' | 'wish_approved' | 'wish_rejected' | 'image_pending' | 'image_approved' | 'image_rejected' | 'published';
   fulfilledAt?: string | null;
   createdAt?: string;
 }
@@ -137,14 +137,14 @@ export const syncWishToSupabase = async (
   const validCorrectCount = ALLOWED_CORRECT_COUNTS.includes(wish.correctCount)
     ? wish.correctCount
     : 40;
-  const status = wish.status || 'pending';
+  const status = wish.status || 'wish_pending';
 
   const payload: Record<string, any> = {
     child_id: wish.childId,
     wish_text: trimmedWish,
     correct_count: validCorrectCount,
     status: status,
-    fulfilled_at: status === 'fulfilled' ? (wish.fulfilledAt || new Date().toISOString()) : null,
+    fulfilled_at: status === 'published' ? (wish.fulfilledAt || new Date().toISOString()) : null,
   };
 
   if (wish.id) {
@@ -173,7 +173,7 @@ export const syncWishToSupabase = async (
  */
 export const updateWishStatus = async (
   wishId: string,
-  status: 'pending' | 'fulfilled'
+  status: 'wish_pending' | 'wish_approved' | 'wish_rejected' | 'image_pending' | 'image_approved' | 'image_rejected' | 'published'
 ): Promise<{ success: boolean; error?: string }> => {
   if (!wishId) return { success: false, error: 'wishId is required' };
 
@@ -185,7 +185,7 @@ export const updateWishStatus = async (
       .from('wishes')
       .update({
         status,
-        fulfilled_at: status === 'fulfilled' ? new Date().toISOString() : null,
+        fulfilled_at: status === 'published' ? new Date().toISOString() : null,
       })
       .eq('id', wishId);
 

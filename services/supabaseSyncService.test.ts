@@ -202,14 +202,14 @@ describe('supabaseSyncService (Schema Alignment)', () => {
       expect(result.error).toBe('childId is required');
     });
 
-    it('successfully maps and inserts wish matching schema constraints (correct_count: 39 | 40, status: pending)', async () => {
+    it('successfully maps and inserts wish matching schema constraints (correct_count: 39 | 40, status: wish_pending)', async () => {
       const mockSingle = vi.fn().mockResolvedValue({
         data: {
           id: 'wish-123',
           child_id: 'child-123',
           wish_text: 'LEGO Robot',
           correct_count: 40,
-          status: 'pending',
+          status: 'wish_pending',
           fulfilled_at: null,
           created_at: new Date().toISOString(),
         },
@@ -227,7 +227,7 @@ describe('supabaseSyncService (Schema Alignment)', () => {
         childId: 'child-123',
         wishText: 'LEGO Robot',
         correctCount: 40,
-        status: 'pending',
+        status: 'wish_pending',
       });
 
       expect(mockFrom).toHaveBeenCalledWith('wishes');
@@ -236,12 +236,52 @@ describe('supabaseSyncService (Schema Alignment)', () => {
           child_id: 'child-123',
           wish_text: 'LEGO Robot',
           correct_count: 40,
-          status: 'pending',
+          status: 'wish_pending',
           fulfilled_at: null,
         })
       );
       expect(result.success).toBe(true);
       expect(result.data?.id).toBe('wish-123');
+    });
+
+    it('defaults status to wish_pending when status is not provided in payload', async () => {
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: {
+          id: 'wish-default-status',
+          child_id: 'child-123',
+          wish_text: 'Default Status Wish',
+          correct_count: 40,
+          status: 'wish_pending',
+          fulfilled_at: null,
+          created_at: new Date().toISOString(),
+        },
+        error: null,
+      });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockUpsert = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockFrom = vi.fn().mockReturnValue({ upsert: mockUpsert });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await syncWishToSupabase({
+        childId: 'child-123',
+        wishText: 'Default Status Wish',
+        correctCount: 40,
+      });
+
+      expect(mockFrom).toHaveBeenCalledWith('wishes');
+      expect(mockUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          child_id: 'child-123',
+          wish_text: 'Default Status Wish',
+          correct_count: 40,
+          status: 'wish_pending',
+          fulfilled_at: null,
+        })
+      );
+      expect(result.success).toBe(true);
     });
 
     it('successfully maps and allows correct_count 19 and 20 for Kveshmicera blocks', async () => {
@@ -251,7 +291,7 @@ describe('supabaseSyncService (Schema Alignment)', () => {
           child_id: 'child-123',
           wish_text: 'Kveshmicera Wish',
           correct_count: 20,
-          status: 'pending',
+          status: 'wish_pending',
           fulfilled_at: null,
           created_at: new Date().toISOString(),
         },
@@ -269,7 +309,7 @@ describe('supabaseSyncService (Schema Alignment)', () => {
         childId: 'child-123',
         wishText: 'Kveshmicera Wish 20',
         correctCount: 20,
-        status: 'pending',
+        status: 'wish_pending',
       });
 
       expect(mockUpsert).toHaveBeenCalledWith(
@@ -283,7 +323,7 @@ describe('supabaseSyncService (Schema Alignment)', () => {
         childId: 'child-123',
         wishText: 'Kveshmicera Wish 19',
         correctCount: 19,
-        status: 'pending',
+        status: 'wish_pending',
       });
 
       expect(mockUpsert).toHaveBeenCalledWith(
@@ -305,11 +345,11 @@ describe('supabaseSyncService (Schema Alignment)', () => {
         from: mockFrom,
       } as any);
 
-      const result = await updateWishStatus('wish-123', 'fulfilled');
+      const result = await updateWishStatus('wish-123', 'published');
       expect(mockFrom).toHaveBeenCalledWith('wishes');
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          status: 'fulfilled',
+          status: 'published',
         })
       );
       expect(result.success).toBe(true);

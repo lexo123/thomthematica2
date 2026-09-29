@@ -299,12 +299,12 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 </div>
                 <span
                   className={`text-xs font-black px-2.5 py-1 rounded-full shrink-0 ${
-                    w.status === 'fulfilled'
+                    w.status === 'published'
                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                       : 'bg-amber-100 text-amber-800 border border-amber-300'
                   }`}
                 >
-                  {w.status === 'fulfilled' ? 'შესრულებულია ✅' : 'მოლოდინში ⏳'}
+                  {w.status === 'published' ? 'შესრულებულია ✅' : 'მოლოდინში ⏳'}
                 </span>
               </div>
             ))}

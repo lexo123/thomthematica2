@@ -56,7 +56,7 @@ describe('useChildDashboard (Parent Dashboard Orchestration Hook)', () => {
         child_id: 'child-1',
         wish_text: 'Remote control drone',
         correct_count: 40 as const,
-        status: 'pending' as const,
+        status: 'wish_pending' as const,
         created_at: '2026-09-04T10:02:00Z',
       },
     ];
