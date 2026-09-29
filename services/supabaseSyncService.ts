@@ -1,5 +1,7 @@
 import { getSupabase, cleanUrl, cleanKey } from '../lib/supabase';
-import { GameMode, GameSession, Wish } from '../types';
+import { GameMode, GameSession, Wish, ChildSafeWish } from '../types';
+
+export type { ChildSafeWish };
 
 export interface GameSessionPayload {
   id?: string;
@@ -168,32 +170,100 @@ export const syncWishToSupabase = async (
   }
 };
 
-/**
- * Updates a wish status (e.g. parent marks wish fulfilled).
- */
-export const updateWishStatus = async (
+export const childResubmitWish = async (
   wishId: string,
-  status: 'wish_pending' | 'wish_approved' | 'wish_rejected' | 'image_pending' | 'image_approved' | 'image_rejected' | 'published'
+  childId: string,
+  newWishText: string
 ): Promise<{ success: boolean; error?: string }> => {
-  if (!wishId) return { success: false, error: 'wishId is required' };
-
   const supabase = getSupabase();
   if (!supabase) return { success: false, error: 'Supabase client is not available' };
+  const trimmed = newWishText.trim();
+  if (!trimmed) return { success: false, error: 'Wish text is required' };
 
-  try {
-    const { error } = await supabase
-      .from('wishes')
-      .update({
-        status,
-        fulfilled_at: status === 'published' ? new Date().toISOString() : null,
-      })
-      .eq('id', wishId);
+  const { data, error } = await supabase
+    .from('wishes')
+    .update({ wish_text: trimmed, status: 'wish_pending', wish_parent_note: null })
+    .eq('id', wishId)
+    .eq('child_id', childId)
+    .eq('status', 'wish_rejected')
+    .select();
 
-    if (error) return { success: false, error: error.message };
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Unknown error updating wish' };
-  }
+  if (error) return { success: false, error: error.message };
+  if (!data || data.length === 0) return { success: false, error: 'Wish is not in a rejectable state or does not belong to this child' };
+  return { success: true };
+};
+
+export const parentApproveWish = async (wishId: string) => {
+  const supabase = getSupabase();
+  if (!supabase) return { success: false, error: 'Supabase client is not available' };
+  const { data, error } = await supabase
+    .from('wishes')
+    .update({ status: 'wish_approved' })
+    .eq('id', wishId)
+    .eq('status', 'wish_pending')
+    .select();
+  if (error) return { success: false, error: error.message };
+  if (!data || data.length === 0) return { success: false, error: 'Wish is no longer pending' };
+  return { success: true };
+};
+
+export const parentRejectWish = async (wishId: string, note: string | null) => {
+  const supabase = getSupabase();
+  if (!supabase) return { success: false, error: 'Supabase client is not available' };
+  const { data, error } = await supabase
+    .from('wishes')
+    .update({ status: 'wish_rejected', wish_parent_note: note })
+    .eq('id', wishId)
+    .eq('status', 'wish_pending')
+    .select();
+  if (error) return { success: false, error: error.message };
+  if (!data || data.length === 0) return { success: false, error: 'Wish is no longer pending' };
+  return { success: true };
+};
+
+export const parentApproveImage = async (wishId: string) => {
+  const supabase = getSupabase();
+  if (!supabase) return { success: false, error: 'Supabase client is not available' };
+  const { data, error } = await supabase
+    .from('wishes')
+    .update({ status: 'image_approved' })
+    .eq('id', wishId)
+    .eq('status', 'image_pending')
+    .select();
+  if (error) return { success: false, error: error.message };
+  if (!data || data.length === 0) return { success: false, error: 'Wish is no longer awaiting image review' };
+  return { success: true };
+};
+
+export const parentRejectImage = async (wishId: string, note: string | null) => {
+  const supabase = getSupabase();
+  if (!supabase) return { success: false, error: 'Supabase client is not available' };
+  const { data, error } = await supabase
+    .from('wishes')
+    .update({ status: 'image_rejected', image_parent_note: note, proposed_image_path: null })
+    .eq('id', wishId)
+    .eq('status', 'image_pending')
+    .select();
+  if (error) return { success: false, error: error.message };
+  if (!data || data.length === 0) return { success: false, error: 'Wish is no longer awaiting image review' };
+  return { success: true };
+};
+
+export const fetchChildSafeWishes = async (
+  childId: string
+): Promise<{ data: ChildSafeWish[] | null; error: string | null }> => {
+  if (!childId) return { data: [], error: null };
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: 'Supabase not configured' };
+
+  const { data, error } = await supabase
+    .from('wishes')
+    .select('id, wish_text, status, wish_parent_note, correct_count, created_at')
+    .eq('child_id', childId)
+    .order('created_at', { ascending: false });
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as ChildSafeWish[], error: null };
 };
 
 /**

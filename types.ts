@@ -90,7 +90,19 @@ export interface Wish {
   wish_text: string;
   correct_count: 19 | 20 | 39 | 40;
   status: 'wish_pending' | 'wish_approved' | 'wish_rejected' | 'image_pending' | 'image_approved' | 'image_rejected' | 'published';
+  wish_parent_note?: string | null;
+  image_parent_note?: string | null;
+  proposed_image_path?: string | null;
   fulfilled_at?: string | null;
+  created_at: string;
+}
+
+export interface ChildSafeWish {
+  id: string;
+  wish_text: string;
+  status: 'wish_pending' | 'wish_approved' | 'wish_rejected' | 'image_pending' | 'image_approved' | 'image_rejected' | 'published';
+  wish_parent_note: string | null;
+  correct_count: number;
   created_at: string;
 }
 

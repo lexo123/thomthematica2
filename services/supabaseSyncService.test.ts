@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   syncGameSessionToSupabase,
   syncWishToSupabase,
-  updateWishStatus,
+  childResubmitWish,
+  parentApproveWish,
+  parentRejectWish,
+  parentApproveImage,
+  parentRejectImage,
+  fetchChildSafeWishes,
   fetchChildWishes,
   fetchChildSessions,
   fetchChildSessionsForAggregate,
@@ -335,24 +340,338 @@ describe('supabaseSyncService (Schema Alignment)', () => {
     });
   });
 
-  describe('updateWishStatus', () => {
-    it('updates wish status to fulfilled', async () => {
-      const mockEq = vi.fn().mockResolvedValue({ error: null });
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+  describe('childResubmitWish', () => {
+    it('successfully resubmits rejected wish with trimmed wish_text, status: wish_pending, and wish_parent_note: null across full .update().eq().eq().eq().select() chain', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [{ id: 'wish-1', child_id: 'child-1', wish_text: 'ახალი სურვილი', status: 'wish_pending', wish_parent_note: null }],
+        error: null,
+      });
+      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqChildId = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqChildId });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
 
       vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
         from: mockFrom,
       } as any);
 
-      const result = await updateWishStatus('wish-123', 'published');
+      const result = await childResubmitWish('wish-1', 'child-1', '  ახალი სურვილი  ');
+
       expect(mockFrom).toHaveBeenCalledWith('wishes');
-      expect(mockUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: 'published',
-        })
-      );
-      expect(result.success).toBe(true);
+      expect(mockUpdate).toHaveBeenCalledWith({
+        wish_text: 'ახალი სურვილი',
+        status: 'wish_pending',
+        wish_parent_note: null,
+      });
+      expect(mockEqId).toHaveBeenCalledWith('id', 'wish-1');
+      expect(mockEqChildId).toHaveBeenCalledWith('child_id', 'child-1');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'wish_rejected');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('fails with clear error when expected-status guard (status=wish_rejected) or child_id guard updates 0 rows', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqChildId = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqChildId });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await childResubmitWish('wish-1', 'child-1', 'ახალი სურვილი');
+
+      expect(mockFrom).toHaveBeenCalledWith('wishes');
+      expect(mockUpdate).toHaveBeenCalledWith({
+        wish_text: 'ახალი სურვილი',
+        status: 'wish_pending',
+        wish_parent_note: null,
+      });
+      expect(mockEqId).toHaveBeenCalledWith('id', 'wish-1');
+      expect(mockEqChildId).toHaveBeenCalledWith('child_id', 'child-1');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'wish_rejected');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({
+        success: false,
+        error: 'Wish is not in a rejectable state or does not belong to this child',
+      });
+    });
+
+    it('returns error when newWishText is empty or whitespace without calling Supabase update', async () => {
+      const mockFrom = vi.fn();
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await childResubmitWish('wish-1', 'child-1', '   ');
+      expect(result).toEqual({ success: false, error: 'Wish text is required' });
+      expect(mockFrom).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('parentApproveWish', () => {
+    it('successfully approves a wish in wish_pending state via .update().eq().eq().select()', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [{ id: 'wish-10', status: 'wish_approved' }],
+        error: null,
+      });
+      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await parentApproveWish('wish-10');
+
+      expect(mockFrom).toHaveBeenCalledWith('wishes');
+      expect(mockUpdate).toHaveBeenCalledWith({ status: 'wish_approved' });
+      expect(mockEqId).toHaveBeenCalledWith('id', 'wish-10');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'wish_pending');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('fails when expected-status guard (status=wish_pending) matches 0 rows', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await parentApproveWish('wish-10');
+
+      expect(mockEqId).toHaveBeenCalledWith('id', 'wish-10');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'wish_pending');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: false, error: 'Wish is no longer pending' });
+    });
+  });
+
+  describe('parentRejectWish', () => {
+    it('successfully rejects a wish in wish_pending state with wish_parent_note via .update().eq().eq().select()', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [{ id: 'wish-20', status: 'wish_rejected', wish_parent_note: 'სხვა სურვილი მოიფიქრე' }],
+        error: null,
+      });
+      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await parentRejectWish('wish-20', 'სხვა სურვილი მოიფიქრე');
+
+      expect(mockFrom).toHaveBeenCalledWith('wishes');
+      expect(mockUpdate).toHaveBeenCalledWith({
+        status: 'wish_rejected',
+        wish_parent_note: 'სხვა სურვილი მოიფიქრე',
+      });
+      expect(mockEqId).toHaveBeenCalledWith('id', 'wish-20');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'wish_pending');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('fails when expected-status guard (status=wish_pending) matches 0 rows', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await parentRejectWish('wish-20', null);
+
+      expect(mockEqId).toHaveBeenCalledWith('id', 'wish-20');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'wish_pending');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: false, error: 'Wish is no longer pending' });
+    });
+  });
+
+  describe('parentApproveImage', () => {
+    it('successfully approves image on wish in image_pending state via .update().eq().eq().select()', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [{ id: 'wish-30', status: 'image_approved' }],
+        error: null,
+      });
+      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await parentApproveImage('wish-30');
+
+      expect(mockFrom).toHaveBeenCalledWith('wishes');
+      expect(mockUpdate).toHaveBeenCalledWith({ status: 'image_approved' });
+      expect(mockEqId).toHaveBeenCalledWith('id', 'wish-30');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'image_pending');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('fails when expected-status guard (status=image_pending) matches 0 rows', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await parentApproveImage('wish-30');
+
+      expect(mockEqId).toHaveBeenCalledWith('id', 'wish-30');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'image_pending');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: false, error: 'Wish is no longer awaiting image review' });
+    });
+  });
+
+  describe('parentRejectImage', () => {
+    it('successfully rejects image on wish in image_pending state and clears proposed_image_path via .update().eq().eq().select()', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [{ id: 'wish-40', status: 'image_rejected', image_parent_note: 'სურათი შეუსაბამოა', proposed_image_path: null }],
+        error: null,
+      });
+      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await parentRejectImage('wish-40', 'სურათი შეუსაბამოა');
+
+      expect(mockFrom).toHaveBeenCalledWith('wishes');
+      expect(mockUpdate).toHaveBeenCalledWith({
+        status: 'image_rejected',
+        image_parent_note: 'სურათი შეუსაბამოა',
+        proposed_image_path: null,
+      });
+      expect(mockEqId).toHaveBeenCalledWith('id', 'wish-40');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'image_pending');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('fails when expected-status guard (status=image_pending) matches 0 rows', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqStatus });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await parentRejectImage('wish-40', null);
+
+      expect(mockEqId).toHaveBeenCalledWith('id', 'wish-40');
+      expect(mockEqStatus).toHaveBeenCalledWith('status', 'image_pending');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: false, error: 'Wish is no longer awaiting image review' });
+    });
+  });
+
+  describe('fetchChildSafeWishes', () => {
+    it('selects only child-safe columns (excluding *, proposed_image_path, and image_parent_note) and returns wishes ordered by created_at DESC', async () => {
+      const sampleSafeWishes = [
+        {
+          id: 'wish-safe-1',
+          wish_text: 'LEGO',
+          status: 'wish_pending',
+          wish_parent_note: null,
+          correct_count: 40,
+          created_at: '2026-09-29T10:00:00Z',
+        },
+      ];
+      const mockOrder = vi.fn().mockResolvedValue({
+        data: sampleSafeWishes,
+        error: null,
+      });
+      const mockEq = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await fetchChildSafeWishes('child-123');
+
+      expect(mockFrom).toHaveBeenCalledWith('wishes');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      const selectArg = mockSelect.mock.calls[0][0] as string;
+      expect(selectArg).toBe('id, wish_text, status, wish_parent_note, correct_count, created_at');
+      expect(selectArg).not.toBe('*');
+      expect(selectArg).not.toContain('*');
+      expect(selectArg).not.toContain('proposed_image_path');
+      expect(selectArg).not.toContain('image_parent_note');
+      expect(mockEq).toHaveBeenCalledWith('child_id', 'child-123');
+      expect(mockOrder).toHaveBeenCalledWith('created_at', { ascending: false });
+      expect(result).toEqual({ data: sampleSafeWishes, error: null });
+    });
+
+    it('returns error when Supabase query fails or client is not configured, and returns empty array for empty childId', async () => {
+      const emptyResult = await fetchChildSafeWishes('');
+      expect(emptyResult).toEqual({ data: [], error: null });
+
+      const mockOrder = vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Failed to fetch child-safe wishes' },
+      });
+      const mockEq = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const errorResult = await fetchChildSafeWishes('child-123');
+      expect(errorResult).toEqual({ data: null, error: 'Failed to fetch child-safe wishes' });
     });
   });
 
