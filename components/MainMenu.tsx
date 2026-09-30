@@ -9,8 +9,10 @@ import { UpdatePasswordModal } from './UpdatePasswordModal';
 import { ChildSelector } from './ChildSelector';
 import { ParentDashboard } from './ParentDashboard';
 import { ParentWishInbox } from './ParentWishInbox';
+import { ChildWishStatusPanel } from './ChildWishStatusPanel';
 import { getAvatarEmoji } from '../hooks/useChildren';
 import { useFamilyPendingWishes } from '../hooks/useFamilyPendingWishes';
+import { useChildOwnWishes } from '../hooks/useChildOwnWishes';
 
 interface MainMenuProps {
   onSelectMode: (mode: GameMode) => void;
@@ -34,6 +36,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
 
   // Single hook instance for Parent Wish Inbox badge and view
   const familyPendingWishes = useFamilyPendingWishes(!!user && sessionMode === 'parent');
+  const childOwnWishes = useChildOwnWishes(sessionMode === 'child' ? activeChildId : null);
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
@@ -176,6 +179,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
         </div>
       ) : (
         <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-8 md:p-12 text-center space-y-8 border-b-8 border-indigo-200">
+          <ChildWishStatusPanel
+            wishes={childOwnWishes.wishes}
+            loading={childOwnWishes.loading}
+            childId={activeChildId ?? ''}
+            onRefetch={childOwnWishes.refetch}
+          />
           <h1 className="text-4xl font-black text-indigo-900 tracking-tight">
             აირჩიე თამაში 👑
           </h1>

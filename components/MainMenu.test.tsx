@@ -24,6 +24,11 @@ describe('MainMenu - Parent Control Card, Wish Inbox & Child Game Mode', () => {
       error: null,
     });
 
+    vi.spyOn(supabaseSyncService, 'fetchChildSafeWishes').mockResolvedValue({
+      data: [],
+      error: null,
+    });
+
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: { id: 'parent-123', email: 'parent@example.com' } as any,
       session: null,
@@ -228,5 +233,84 @@ describe('MainMenu - Parent Control Card, Wish Inbox & Child Game Mode', () => {
     // Close Inbox -> return to parent menu where badge now shows (1)
     fireEvent.click(screen.getByText('✕ დახურვა'));
     expect(screen.getByText('📬 სურვილები (1)')).toBeDefined();
+  });
+
+  it('renders ChildWishStatusPanel in child mode above "აირჩიე თამაში 👑" without leaking internal status or image literals', async () => {
+    vi.spyOn(ChildContext, 'useChild').mockReturnValue({
+      childrenList: [
+        { id: 'child-1', parent_id: 'parent-123', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy', created_at: '' },
+      ],
+      activeChild: { id: 'child-1', parent_id: 'parent-123', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy', created_at: '' },
+      activeChildId: 'child-1',
+      childRewardImages: null,
+      loading: false,
+      error: null,
+      hasFetchedOnce: true,
+      setActiveChildId: setActiveChildIdMock,
+      setActiveChild: vi.fn(),
+      addChild: vi.fn(),
+      fetchChildren: vi.fn(),
+      showChildSelector: false,
+      setShowChildSelector: setShowChildSelectorMock,
+    });
+
+    vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
+      sessionMode: 'child',
+      setSessionMode: vi.fn(),
+      resetSessionMode: resetSessionModeMock,
+    });
+
+    vi.spyOn(supabaseSyncService, 'fetchChildSafeWishes').mockResolvedValue({
+      data: [
+        {
+          id: 'cw-1',
+          wish_text: 'დრონი',
+          status: 'wish_rejected',
+          wish_parent_note: 'სხვა მოიფიქრე',
+          correct_count: 40,
+          created_at: '2026-09-29T08:00:00Z',
+        },
+        {
+          id: 'cw-2',
+          wish_text: 'ველოსიპედი',
+          status: 'image_pending',
+          wish_parent_note: null,
+          correct_count: 40,
+          created_at: '2026-09-29T09:00:00Z',
+        },
+        {
+          id: 'cw-3',
+          wish_text: 'რობოტი',
+          status: 'published',
+          wish_parent_note: null,
+          correct_count: 40,
+          created_at: '2026-09-29T07:00:00Z',
+        },
+      ],
+      error: null,
+    });
+
+    const { container } = render(<MainMenu onSelectMode={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('შენი სურვილი: „დრონი"')).toBeDefined();
+      expect(screen.getByText('მშობლის კომენტარი: სხვა მოიფიქრე')).toBeDefined();
+      expect(screen.getByText('1 სურვილი მშობელთან გაიგზავნა')).toBeDefined();
+    });
+
+    expect(screen.getByText('აირჩიე თამაში 👑')).toBeDefined();
+
+    const renderedText = container.textContent ?? '';
+    for (const forbidden of [
+      'wish_pending',
+      'wish_approved',
+      'image_pending',
+      'image_approved',
+      'image_rejected',
+      'proposed_image_path',
+      'image_parent_note',
+    ]) {
+      expect(renderedText).not.toContain(forbidden);
+    }
   });
 });
