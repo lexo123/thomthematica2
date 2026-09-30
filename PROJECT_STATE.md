@@ -1,6 +1,6 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: Wave X (PIN-based Parent/Child Identity Gate) სრულად დასრულებული და დამოუკიდებლად დადასტურებული (commit f45434f-მდე); გასწორებულია განმეორებითი არასწორი პასუხის double-counting ბაგი ყველა თამაშში; დანერგილია და დადასტურებულია Supabase auto-pause mitigation (GH Actions `keep-supabase-alive.yml`); pin_hash backfill/NOT NULL გადაწყვეტილია — აღარ არის საჭირო_
+_ბოლო განახლება: Wave Y (Wish Approval Workflow) სრულად დასრულებული და დამოუკიდებლად დადასტურებული (Stage 1 → 2 → 3a → 3b → 3c, commit 3d92e11-მდე); ამ პროცესში აღმოჩენილი და გასწორებული launch-blocking security ბაგი (Service Worker-ის cross-origin cache, commit 1f3e969); UI-ტექსტის 5 გადარქმევა (თამაშების სახელები, "დაშბორდი"→"სტატისტიკა", "გასვლა identity-დან"→"მომხმარებლის შეცვლა") დასრულებული_
 
 ## Repo
 https://github.com/lexo123/thomthematica2
@@ -20,10 +20,10 @@ React/TypeScript საგანმანათლებლო მათემ�
 - lib/ensureProfile.ts — client-side self-healing fallback (ON CONFLICT DO NOTHING, legacy ანგარიშებისთვის)
 - profiles-ს არ აქვს client-side DELETE policy (განზრახ — account deletion მხოლოდ Edge Function-ით)
 
-### Phase 2.1: Child Profiles & Selector ✅ (Wave X-ით შეცვლილი — იხ. ქვემოთ)
+### Phase 2.1: Child Profiles & Selector ✅ (Wave X-ით შეცვლილი)
 - ChildContext.tsx — activeChildId-ის ერთადერთი წყარო, localStorage persistence
 - Self-healing validation — თუ activeChildId აღარ არსებობს childrenList-ში, სუფთავდება
-- **ChildSelector.tsx-ის "ვინ თამაშობს?" სია Wave X-ში მთლიანად მოშლილია** — Wave X-ის სექციაში დეტალურადაა აღწერილი, რატომ
+- ChildSelector.tsx-ის "ვინ თამაშობს?" სია Wave X-ში მთლიანად მოშლილია
 
 ### Phase 2.2: Sync Service ✅
 - services/supabaseSyncService.ts — schema-ს ველების ზუსტი მთხვევა
@@ -46,13 +46,13 @@ hooks/useGameSession.ts-ში:
 - Guest Mode მთლიანად გაუქმებულია — ყველა მომხმარებელი authenticated flow-ით
 - services/statsService.ts (Google Apps Script sync) ფიზიკურად წაშლილია thomthematica2-დან
 - Google Apps Script public-write endpoint განზრახ რჩება აქტიური — მხოლოდ ცალკე, scope-გარე legacy `thomthematica` (ერთ-ბავშვიანი) აპისთვის; thomthematica2 აღარ არის მასზე დამოკიდებული
-- App.tsx-ის "Phase 2.5" isGameScreenBlocked/isChildSelectionRequired chain **Wave X-ის შემდეგ პრაქტიკულად dead code გახდა parent-mode-ისთვის** (parent-ს აღარ აქვს UI გზა setGameMode()-ის გამოსაძახებლად) — კოდი განზრახ არ წაშლილა, დამცავი fallback-ის სახით რჩება
+- App.tsx-ის "Phase 2.5" isGameScreenBlocked/isChildSelectionRequired chain Wave X-ის შემდეგ პრაქტიკულად dead code გახდა parent-mode-ისთვის — კოდი განზრახ არ წაშლილა, დამცავი fallback-ის სახით რჩება
 - 59/59 ტესტი
 
 ### Phase 3 — Commit #1 (Parent Dashboard: Data/Read/Derivation Layer) ✅
 - **Core rule**: Dashboard — read-only derived-data layer, ახალი statistics data model/schema არ ემატება
 - fetchChildSessionsForAggregate, fetchChildSessionsRecent (bounded `.limit(20)`), deriveDashboardStats (pure, division-by-zero-დაცული)
-- **ChatGPT-მ აღმოაჩინა race condition**: stale-response guard მხოლოდ childId-ს ამოწმებდა — ვერ იცავდა A→B→A double-switch-ისგან. **Claude-მ დამოუკიდებლად დაადასტურა** — red→green ციკლით. გასწორდა `requestIdRef` generation-counter-ით — **ეს არის ის pattern, რომელიც მოგვიანებით Wave 2-ში (Commit #10), Wave 3 Part 2-ში (reward-images fetcher) და Wave X-ში (ChildContext-ის fetch guard-ები) ხელახლა იქნა გამოყენებული**
+- ChatGPT-მ აღმოაჩინა race condition, Claude-მ დამოუკიდებლად დაადასტურა — გასწორდა `requestIdRef` generation-counter-ით — **ეს pattern მოგვიანებით Wave 2 (Commit #10), Wave 3 Part 2 (reward-images fetcher), Wave X (ChildContext-ის fetch guard-ები), და Wave Y-ის ოთხივე ახალ hook-ში (useFamilyPendingWishes, useChildOwnWishes) ხელახლა იქნა გამოყენებული**
 - 78/78 ტესტი
 
 ### Phase 3 — Commit #2 (Parent Dashboard UI) ✅
@@ -62,6 +62,7 @@ hooks/useGameSession.ts-ში:
 
 ### Phase 3 — Commit #3 (gameModeLabels.ts Shared Util Refactor) ✅
 - `utils/gameModeLabels.ts` — `GAME_MODE_LABELS` + `getGameModeLabel()`
+- **შენიშვნა (Wave Y-ის შემდეგ ცნობილი):** MainMenu.tsx და Header.tsx ამ ცენტრალიზებულ ფაილს არ იყენებენ — თამაშების სახელები სამივე ადგილას ცალ-ცალკე, დუბლირებულად წერია. UI-ტექსტის გადარქმევისას (იხ. ქვემოთ) ეს სამივე ცალ-ცალკე განახლდა
 - 91/91 ტესტი
 
 ### Phase 3 — Commit #4 (Game-mode Breakdown Dashboard-ში) ✅
@@ -80,11 +81,11 @@ hooks/useGameSession.ts-ში:
 - `ALTER TABLE wishes DROP/ADD CONSTRAINT` — BEGIN/COMMIT-ში
 
 ### Phase 3 — Kveshmicera Corrections #1–#4 (Post-5B ბაგები) ✅
-- Correction #3-ში დაინერგა "Repeated Submission Guard" (`hasKveshFailedThisQuestion`) — **მხოლოდ Kveshmicera-სთვის**. ეს scope-ის შეზღუდვა მოგვიანებით (Post-Wave-X) აღმოჩნდა ხარვეზად დანარჩენი სამი თამაშისთვის — იხ. "Post-Wave-X Fix" სექცია
+- Correction #3-ში დაინერგა "Repeated Submission Guard" (`hasKveshFailedThisQuestion`) — მხოლოდ Kveshmicera-სთვის. ეს scope-ის შეზღუდვა მოგვიანებით (Post-Wave-X) აღმოჩნდა ხარვეზად დანარჩენი სამი თამაშისთვის — იხ. "Post-Wave-X Fix" სექცია
 - 150/150 ტესტი
 
 ### Phase 3 — Commit #6A (ბავშვის სქესის ველი: schema + registration) ✅
-- Migration pattern: `ADD COLUMN (nullable) → backfill by id → verify → SET NOT NULL → CHECK` — **ეს pattern Wave X-ში pin_hash-ისთვის სრულად არ გამოყენებულა — განზრახ (იხ. ქვემოთ, "pin_hash-ის schema-სტატუსი")**
+- Migration pattern: `ADD COLUMN (nullable) → backfill by id → verify → SET NOT NULL → CHECK` — ეს pattern Wave X-ში pin_hash-ისთვის სრულად არ გამოყენებულა (განზრახ) და Wave Y-ში wishes.status-ისთვისაც განსხვავებული, ამ ცხრილის საკუთარი ისტორიით ნაკარნახევი მიდგომა დაგვჭირდა — იხ. შესაბამისი სექციები
 - 155/155 ტესტი
 
 ### Phase 3 — Commit #6B (Personalization: {name} + {gender}) ✅
@@ -104,8 +105,8 @@ hooks/useGameSession.ts-ში:
 
 ### Wave 3 — Part 2: Per-Child Reward Images ✅ (დასრულებული, დადასტურებული commit bbb26ab)
 - **Schema:** `child_reward_images` table (`child_id`, `category` CHECK IN winner/loser/super_winner, `storage_path`, `caption`, `sort_order`) — SELECT-only RLS client-ისთვის, INSERT/UPDATE/DELETE მხოლოდ Lexo-ს service-role-ით dashboard-იდან
-- **Storage:** private `child-reward-images` bucket, `{child_id}/{category}/{filename}` კონვენცია, storage RLS policy path-ის child_id-სეგმენტს **text-ად** ადარებს (არა `::uuid` cast)
-- **Signed URLs:** `createSignedUrls()` batch call, 2 საათის (7200წმ) expiry, `Map<storage_path, signedUrl>`-ით დაკავშირებული
+- **Storage:** private `child-reward-images` bucket, `{child_id}/{category}/{filename}` კონვენცია, storage RLS policy path-ის child_id-სეგმენტს **text-ად** ადარებს (არა `::uuid` cast) — **Wave Y-ში (Storage discovery, იხ. ქვემოთ) დადასტურდა, რომ policy კატეგორიის სახელს საერთოდ არ ამოწმებს, მხოლოდ პირველ სეგმენტს — ამიტომ ახალი `pending` ქვე-საქაღალდე ამ policy-ს ავტომატურად ემორჩილა**
+- **Signed URLs:** `createSignedUrls()` batch call, 2 საათის (7200წმ) expiry, `Map<storage_path, signedUrl>`-ით დაკავშირებული — იგივე პატერნი Wave Y-ში `ParentWishInbox.tsx`-მაც გამოიყენა
 - **All-or-nothing personalization:** სამივე კატეგორია (winner/loser/super_winner) ≥1 row, თორემ სრულად fallback
 - **Prefetch lifecycle:** `hooks/useChildRewardImagesFetcher.ts` (requestIdRef guard), `childRewardImages` ემატება `ChildContextType`-ს
 - **ResultOverlay.tsx:** `utils/poolSelector.ts`-ით, pool-key `${activeChildId ?? 'global'}:${category}:${sourceType}`
@@ -114,8 +115,8 @@ hooks/useGameSession.ts-ში:
 ### Post-Wave-3 Fixes ✅
 - **Incorrect-phrase personalization ბაგი (commit ca9d72d):** `App.tsx`-ის incorrect-answer branch-ში `personalize()` არასდროს იძახებოდა — Fix: `personalize(template, activeChild).replace("[]", actualUserAnswer)`
 - **`data/rewards.ts`-ის ჩანაცვლება (commit 80fb0bc):** ძველი, პირადი ფოტო/გიფ-ლინკები ჩანაცვლდა ზოგადი სურათებით/caption-ებით
-- **`migrated_prompt_history/` წაშლილია (commit 41a4d8d, "remove legacy prompt history containing child's personal data")** — ✅ დასრულებულია. Public repo-დან AI Studio-ს პირვანდელი, თომას პირადი მონაცემების შემცველი chat-ისტორია მოცილებულია
-- **`metadata.json`-ის description ჯერ კვლავ ახსენებს თომას სახელს** ("სახალისო მათემატიკური თამაში თომასთვის") — ეს ჯერ არ გასწორებულა, დარჩენილი, დაბალპრიორიტეტული item
+- **`migrated_prompt_history/` წაშლილია (commit 41a4d8d)** — ✅ დასრულებულია
+- **`metadata.json`-ის description ჯერ კვლავ ახსენებს თომას სახელს** ("სახალისო მათემატიკური თამაში თომასთვის") — ეს ჯერ არ გასწორებულა, დარჩენილი, დაბალპრიორიტეტული item. **Wave Y-ის UI-გადარქმევისას ეს ცალსახად, განზრახ ხელუხლებელი დარჩა** — ეს აპლიკაციის სახელს ეხება, არა თამაშის ღილაკს
 
 ---
 
@@ -125,113 +126,147 @@ hooks/useGameSession.ts-ში:
 
 **შეგნებულად მიღებული შეზღუდვა (უცვლელი, თავდაპირველი architecture-იდან):** ეს არის **client-side UI identity-gate, არა DB-level access-control**. RLS მთელ ოჯახზე (`parent_id = auth.uid()`) კვლავ ღიაა. ტექნიკურად ცნობიერი ბავშვი (DevTools) შემოვლადია — შეგნებული, მისაღები trade-off ოჯახური/ახლობელი-context-ისთვის (~10 ბავშვი).
 
-#### საბოლოო, დანერგილი Flow (თავდაპირველი დიზაინისგან განსხვავებული — იხ. "დიზაინის ევოლუცია" ქვემოთ)
+**Wave Y-ში ეს ერთხელ კიდევ დადასტურდა კრიტიკულად:** child-mode-ზე გადასვლა (`setSessionMode('child')`) სუფთა React local state-ია, არავითარი Supabase auth call. ანუ "ბავშვი" და "მშობელი" ერთსა და იმავე ოჯახში **ზუსტად იგივე `auth.uid()`-ია**. ეს განსაზღვრავს, რომ ნებისმიერი ახალი, "მხოლოდ მშობლისთვის" ან "მხოლოდ ბავშვისთვის" მონაცემი **ვერასდროს** დაცული იქნება Storage/DB RLS-ით ამ ორ mode-ს შორის — მხოლოდ query-level column selection-ით (`select('*')`-ის გამორიცხვით) და UI-ით. იხ. Wave Y-ის "Storage/Data-boundary Discovery" ქვემოთ.
 
+#### საბოლოო, დანერგილი Flow
 ```
 email/password login
    ↓
 PinGate — Stage 1: "ვინ შედის?" (Identity List)
-   fetch-ავს მხოლოდ identity metadata-ს (profiles.full_name,
-   children.id/name/avatar_id) — არა pin_hash-ებს ამ ეტაპზე
-   რენდერდება: მშობლის item + თითო ბავშვის item
    ↓ (item-ზე დაჭერა)
 PinGate — Stage 2: PIN Entry (scoped ერთ კონკრეტულ identity-ზე)
-   fetch-ავს pin_hash-ს **მხოლოდ** არჩეული identity-სთვის
-   (profiles.pin_hash ან ერთი კონკრეტული children.pin_hash row)
    ├── Parent match → sessionMode='parent'
-   └── Child match  → activeChildId + sessionMode='child' ატომურად,
-                       იმავე synchronous event-handler-იდან
+   └── Child match  → activeChildId + sessionMode='child' ატომურად
    "← უკან" → Stage 1-ზე დაბრუნება
    ↓
-sessionMode === 'parent':
-   MainMenu-ში ჩანს მხოლოდ "📊 დაშბორდი" + "➕ ბავშვის დამატება"
-   (თამაშის ღილაკები საერთოდ არ რენდერდება — parent-ს არც სჭირდება
-   და არც შეუძლია პირდაპირ თამაშის დაწყება)
-sessionMode === 'child':
-   პირდაპირ თამაშის მენიუ, Dashboard-ღილაკი DOM-ში საერთოდ არ არსებობს
-"🔒 გასვლა identity-დან" (ორივე sessionMode-ში ხილული) →
-   resetSessionMode() + activeChildId=null → უკან PinGate Stage 1-ზე
-Logout → sessionMode + activeChildId სრული reset
+sessionMode === 'parent': MainMenu-ში მხოლოდ "📊 სტატისტიკა" + "📬 სურვილები" + "➕ ბავშვის დამატება"
+sessionMode === 'child': პირდაპირ თამაშის მენიუ
+"🔒 მომხმარებლის შეცვლა" (ორივე mode-ში ხილული) → PinGate Stage 1-ზე
 ```
 
-**PIN-ის გარეშე identity-switch საერთოდ აღარ არსებობს** — არც "🔄 შვილის შეცვლა" ღილაკი (მოშლილია), არც "ვინ თამაშობს?" auto-popup (მოშლილია). ეს იყო თავდაპირველი დიზაინის ცვლილების მთავარი მიზეზი (იხ. ქვემოთ).
+PIN-ის გარეშე identity-switch საერთოდ აღარ არსებობს.
 
-#### Schema (Commit #6A-ს pattern-ით)
+#### pin_hash-ის schema-სტატუსი (დახურული)
+`pin_hash` ორივე table-ზე (`profiles`, `children`) განზრახ რჩება nullable. `SET NOT NULL`/structured backfill აღარ იგეგმება — ყველა არსებული ანგარიში სატესტოა, launch-მდე წაიშლება; `handle_new_user()` trigger PIN-ის გარეშე ქმნის profiles row-ს; PIN gate ისედაც client-side UI gate-ია.
 
-```sql
-ALTER TABLE profiles ADD COLUMN pin_hash text;  -- nullable, ხელით production-ში გაშვებული
-ALTER TABLE children ADD COLUMN pin_hash text;  -- nullable, ხელით production-ში გაშვებული
-```
-
-**pin_hash-ის schema-სტატუსი (გადაწყვეტილია, აღარ არის ღია):** `pin_hash` ორივე table-ზე **განზრახ რჩება nullable**. `SET NOT NULL`, structured backfill UI (თავდაპირველად დაგეგმილი Commit #18) და მასთან დაკავშირებული CHECK აღარ იგეგმება. მიზეზები:
-- backfill მხოლოდ Wave-X-მდელი, PIN-ის გარეშე შექმნილი ანგარიშებისთვის იყო საჭირო. ყველა არსებული ანგარიში სატესტოა და launch-მდე წაიშლება; ნამდვილი მომხმარებლები signup-ზევე PIN-ს აყენებენ
-- `profiles.pin_hash`-ზე `NOT NULL` არქიტექტურას გააფუჭებდა: `handle_new_user()` trigger ჯერ ქმნის `profiles` row-ს PIN-ის გარეშე, PIN კი signup-ის შემდეგ ცალკე `UPDATE`-ით იწერება (PIN hash `user_metadata`-დან განზრახ ამოღებულია, FIX 6). `NOT NULL` signup-ს ჩააგდებდა
-- `children.pin_hash`-ზე `NOT NULL` ტექნიკურად შესაძლებელი იქნებოდა (`addChild` PIN-ს insert-თანავე წერს), მაგრამ PIN gate ისედაც client-side UI gate-ია, ამიტომ DB-დონის ეს დაცვა რეალურ სარგებელს არ იძლევა
-- ალეკოს ოჯახის PIN-ები ხელით იყო დაყენებული SQL-ით (`UPDATE profiles/children SET pin_hash = encode(digest(...), 'hex')`) — ეს სატესტო ანგარიშებია
-
-#### დიზაინის ევოლუცია ამ conversation-ში (მნიშვნელოვანია მომავალი კონტექსტისთვის)
-
-1. **პირველადი, დამტკიცებული architecture** ("ბრმა" PIN): user ტიპავდა 4 ციფრს ყოველგვარი წინასწარი identity-არჩევანის გარეშე, სისტემა ცდილობდა hash-ის დამთხვევას მთელი family-ის (parent + ყველა child) pin_hash-ებთან.
-2. **Commit #17-ის პირველი ვერსია** (commit 0b1c88f) დანერგა schema + pinHash.ts + pinUniqueness.ts + SessionModeContext + "ბრმა" PinGate + App.tsx root-wiring + registration PIN. Claude-ის fresh-clone review-მ აღმოაჩინა **6 პრობლემა**: (1) addChild-ს PIN საერთოდ არ ჰქონდა, (2) signup-ის PIN-UPDATE error არ მოწმდებოდა, (3) `pin_hash` ჟონავდა საერთო `childrenList` state-ში (`select('*')`-ის გამო), (4) ძველი child-switch ღილაკი ჩუმად repurposed იყო PIN-ის მოთხოვნის გარეშე, (5) fail-open fallback `useSessionMode()`-ში, (6) PIN hash დუბლირებულად ინახებოდა Supabase auth `user_metadata`-ში.
-3. **FIX 1-6** (commit 9aa1ab1) ყველა ეს საკითხი გაასწორა. Verified: 34/34, 250/250.
-4. **რეალურ გამოყენებაში** Lexo-მ აღმოაჩინა, რომ თავდაპირველი "ბრმა PIN + child-switch button" დიზაინი **პრაქტიკულად ტოვებდა ზუსტად იმ bypass-ს**, რომლის აღკვეთაც Wave X-ის მიზანი იყო: (ა) parent-ის PIN-ის შეყვანის შემდეგ "ვინ თამაშობს?" auto-popup საშუალებას აძლევდა ნებისმიერს, PIN-ის გარეშე აერჩია ნებისმიერი ბავშვის სახელი, Dashboard-ხილვადობის დაკარგვის გარეშე (რადგან `sessionMode` რჩებოდა `'parent'`-ზე); (ბ) ორი ბავშვის ოჯახში ეს ნიშნავდა, რომ ბავშვებს შეეძლოთ ერთმანეთის ნაცვლად "შესვლა".
-5. **სრული refactor** (commit 7d06e73) — ზემოთ აღწერილი, საბოლოო, დანერგილი identity-first ორსტადიანი flow. ამის პარალელურად გასწორდა ტერმინოლოგია ("შვილი" → "ბავშვი" ყველგან, რადგან ბავშვს შეიძლება არ ჰყავდეს კონკრეტულად "მშობელი" ამ სიტყვის ვიწრო გაგებით — ბებია/სხვა მეურვეც შეიძლება იყოს დარეგისტრირებული) და დაემატა Dashboard-ის შიდა child-switcher (`selectedChildId` fallback: `childId ?? childrenList[0]?.id ?? null`).
-
-#### Verification (commit 7d06e73)
-fresh clone: tsc 0 შეცდომა, vitest 34/34 file, 251/251 ტესტი, production build სუფთა. თითოეული ფაილი (App.tsx, MainMenu.tsx, ChildSelector.tsx, PinGate.tsx, ChildContext.tsx, ParentDashboard.tsx, AuthModal.tsx) კოდის დონეზე დამოუკიდებლად გადამოწმებული.
+#### დიზაინის ევოლუცია (ისტორიული ჩანაწერი)
+1. პირველადი, დამტკიცებული architecture ("ბრმა" PIN) → Commit #17 v1-ში 6 პრობლემა აღმოჩენილი (addChild-ს PIN არ ჰქონდა, signup-ის error არ მოწმდებოდა, pin_hash `select('*')`-ით ჟონავდა, ძველი child-switch ღილაკი repurposed იყო, fail-open fallback, PIN hash დუბლირებულად `user_metadata`-ში)
+2. FIX 1-6 (commit 9aa1ab1) — ყველა გასწორდა
+3. რეალურ გამოყენებაში Lexo-მ აღმოაჩინა, რომ "ბრმა PIN + child-switch button" პრაქტიკულად ტოვებდა bypass-ს
+4. სრული refactor (commit 7d06e73) — საბოლოო, identity-first ორსტადიანი flow, ტერმინოლოგია "შვილი"→"ბავშვი"
 
 #### ⚠️ ცნობილი, განმეორებადი პროცესის ხარვეზი — PROJECT_STATE.md sync
-
-Commit-ებმა 7d06e73-მ და f45434f-მ ორივემ **ჩუმად overwrite** გაუკეთეს `PROJECT_STATE.md`-ს ძველი, Wave-X-მდელი ვერსიით — AI Studio-ს ლოკალურ project-ში, როგორც ჩანს, სტალი ასლი ჰქონდა შენახული, და მისმა ZIP export-მა ეს ძველი ვერსია დააწერა repo-ს განახლებულზე (იგივე "ZIP revert risk" pattern, რაც ადრე `schema.sql`-საც შეემთხვა). **ეს ფაილი (ეს ვერსია) ხელით უნდა აიტვირთოს AI Studio-ს project-შიც**, თორემ შემდეგი commit-იც იგივეს გაიმეორებს.
+Commit-ებმა 7d06e73-მ და f45434f-მ ორივემ ჩუმად overwrite გაუკეთეს ამ ფაილს ძველი ვერსიით AI Studio-ს ZIP export-ის გამო ("ZIP revert risk", schema.sql-საც ადრე შეემთხვა). **ეს ფაილი (ეს ვერსია) ხელით უნდა აიტვირთოს AI Studio-ს project-შიც ყოველი განახლების შემდეგ.**
 
 ---
 
 ### Post-Wave-X Fix — განმეორებითი არასწორი პასუხის Double-Counting ბაგი ✅ (commit f45434f)
 
-**პრობლემა:** ერთსა და იმავე კითხვაზე განმეორებითი (retry) არასწორი პასუხის მიცემისას, ყოველი ცდა ცალკე incorrect-ად ითვლებოდა სტატისტიკაში (`totalQuestions`/`totalCorrect`, Dashboard-ის რიცხვები) — Kveshmicera-ს გარდა, სადაც `hasKveshFailedThisQuestion` guard (Phase 3 Correction #3-დან) სწორად მუშაობდა, მაგრამ **არასდროს ყოფილა გავრცელებული** დანარჩენ სამ თამაშზე (Thomthematica, ThomravlebisTabula, Gethometria).
+**პრობლემა:** განმეორებითი (retry) არასწორი პასუხი ყოველ ცდაზე ცალკე incorrect-ად ითვლებოდა — Kveshmicera-ს გარდა (`hasKveshFailedThisQuestion` guard, Correction #3-დან), რომელიც არასდროს გავრცელებულა დანარჩენ სამ თამაშზე.
 
-**Root cause:** `App.tsx`-ის `handleNext`-ის Incorrect-branch (retry) ახალ `problem`-ს არ აგენერირებდა — იგივე კითხვა რჩებოდა, მაგრამ `processAnswerResult`-ის `shouldRecord` პირობა Kveshmicera-ს გარეთ ყოველთვის `true` იყო.
-
-**Fix:**
-- ახალი, მოდელ-აგნოსტიკური state `hasFailedCurrentQuestion` (App.tsx), reset ყველა წერტილში სადაც ახალი problem/სესია იწყება
-- `processAnswerResult`-ის `shouldRecord` გენერალიზდა: Kveshmicera → `hasKveshFailedThisQuestion` (უცვლელი), დანარჩენი სამი → `hasFailedCurrentQuestion`
-- `handleTimeOut`-საც (ThomravlebisTabula-ს დროის ამოწურვა) დაემატა იგივე guard
-- **დამატებით აღმოჩენილი და გასწორებული stale-closure ბაგი** `hooks/useTimer.ts`-ში: `handleTimeOut`-ის dependency-ში `hasFailedCurrentQuestion`-ის დამატებამ გამოავლინა, რომ `useTimer` `onTimeOut`-ს პირდაპირ (არა `useRef`-ით) იყენებდა `setInterval`-ის closure-ში — `startTimer()`-ის სინქრონული ხელახალი გამოძახება ახალ კითხვაზე (handleNext-ის შიგნით, re-render-მდე) stale `onTimeOut`-ს ამაგრებდა. გასწორდა `onTimeOutRef`-ით (`useRef` + `useEffect` sync), `startTimer`-ის deps შემცირდა `[timeLimit, stopTimer]`-მდე
-
-**ტესტები:** ახალი `tests/NonKveshmiceraRetryFlow.test.tsx` — სამივე non-Kveshmicera რეჟიმისთვის repeat-incorrect scenario + სპეციალურად ThomravlebisTabula-ს "timeout → retry → timeout იმავე კითხვაზე → correct → timeout ახალ კითხვაზე" (stale-closure რეგრესიის ტესტი).
+**Fix:** მოდელ-აგნოსტიკური `hasFailedCurrentQuestion` (App.tsx) + stale-closure fix `hooks/useTimer.ts`-ში (`onTimeOutRef`, `useRef`+`useEffect` sync pattern — **ეს Wave Y-ს პირდაპირ არ შეხებია, მაგრამ იგივე "callback + setInterval/setTimeout + changing state" კლასის watch-out-ია, რაც მომავალშიც გასათვალისწინებელია**).
 
 **Verification:** fresh clone, tsc 0 შეცდომა, vitest 35/35 file, 255/255 ტესტი, production build სუფთა.
 
 ---
 
+## Wave Y — Wish Approval Workflow ✅ (სრულად დასრულებული და დამოუკიდებლად დადასტურებული)
+
+**მიზანი:** ბავშვის დაწერილი "wish" (რა სურათი უნდა, რომ Lexo-მ მომავალში გაუკეთოს) ჯერ მშობელს მიუვიდეს ტექსტობრივად დასადასტურებლად, მერე — Lexo-ს მიერ გაკეთებული სურათიც ცალკე მშობელს დაუდასტურდეს, სანამ ბავშვის საბოლოო ჯილდოების სისტემაში (`child_reward_images`) აღმოჩნდება. Wish **არ არის** ჯილდო — ის მოთხოვნაა კონკრეტულ სურათზე; მშობელი არაფერს ასრულებს, მხოლოდ ამტკიცებს.
+
+### პროდუქტის გადაწყვეტილებები (Architecture Review-დან)
+- **ორსაფეხურიანი მშობლის დასტური**: ჯერ ტექსტი (wish), მერე ცალკე — Lexo-ს მიერ გაკეთებული სურათი. ორივე დამოუკიდებელი approve/reject წერტილია
+- **Reject-ზე კომენტარი**: ორივე ეტაპზე არასავალდებულო, თავისუფალი ტექსტი (არა დაფიქსირებული მიზეზების სია) — `wish_parent_note` ბავშვს მისდის, `image_parent_note` Lexo-ს
+- **მრავალი ერთდროული wish დაშვებულია** — თუ ბავშვმა ერთ სესიაში რამდენჯერმე დახურა 20/40 streak, სანამ ვინმემ განიხილა, მას იმდენი wish ეკუთვნის. **DB-level "ერთი აქტიური wish" შეზღუდვა განზრახ არ არსებობს** (Architecture Review-ის დროს ეს ჯერ შემოთავაზებული, მერე უარყოფილი იყო — Lexo-ს პროდუქტის გადაწყვეტილებით)
+- **Rejected wish-ის resubmit — იმავე row-ზე**, არა ახალი row + `replaces_wish_id` ტიპის ცალკე ტრეკინგი: `wish_text`+`status` (უკან `wish_pending`-ზე)+`wish_parent_note=null` ერთ `UPDATE`-ში. ეს გამარტივება (`replaces_wish_id`-ის მოცილება) Architecture Review-ის დროს, ChatGPT-ის თანხმობით, პირდაპირ დაფიქსირდა
+- **ბავშვისთვის ხილული — მხოლოდ ორი რამ**: (ა) `wish_rejected` row-ებზე — ბარათი (ორიგინალი ტექსტი, მშობლის კომენტარი თუ არის, resubmit-ველი); (ბ) ერთი პასიური counter "N სურვილი მშობელთან გაიგზავნა" ყველა დანარჩენ non-terminal სტატუსზე (`wish_pending`, `wish_approved`, `image_pending`, `image_approved`, `image_rejected`). `published` ბავშვისთვის სრულად უხილავია. **wish_approved, image_pending, image_approved, image_rejected, proposed_image_path, image_parent_note ბავშვისთვის არასდროს ინდივიდუალურად ჩანს**
+- **`image_approved → published` — მუდმივად Lexo-ს ხელით ოპერაცია**, Supabase Dashboard-იდან (status + `child_reward_images`-ში ატვირთვა). არასდროს გახდება client-ფუნქცია, admin UI ან SECURITY DEFINER RPC — ~10 ბავშვისთვის ავტომატიზაცია ზედმეტი სირთულეა
+
+### Schema
+`wishes` ცხრილს **უკვე ჰქონდა** გამოყენებული `status`/`fulfilled_at` (Phase 1-დან, `'pending'`/`'fulfilled'`, `ParentDashboard.tsx`-ში წაკითხვადი ბეჯი) — ეს PROJECT_STATE.md-ში აქამდე დეტალურად აღწერილი არ იყო. Migration-მა ეს კოლაფსა ახალ, ტერმინალურ `'published'`-ში:
+
+```sql
+ALTER TABLE wishes DROP CONSTRAINT IF EXISTS check_wish_status;
+UPDATE wishes SET status = 'published' WHERE status IN ('pending', 'fulfilled');
+ALTER TABLE wishes
+  ADD COLUMN wish_parent_note text,
+  ADD COLUMN image_parent_note text,
+  ADD COLUMN proposed_image_path text;
+ALTER TABLE wishes ALTER COLUMN status SET DEFAULT 'wish_pending';
+ALTER TABLE wishes ADD CONSTRAINT wishes_status_check
+  CHECK (status IN ('wish_pending','wish_approved','wish_rejected','image_pending','image_approved','image_rejected','published'));
+```
+
+`fulfilled_at` დარჩა უცვლელად, ისტორიული კვალის სახით — ახალი კოდი მას აღარ წერს.
+
+### State machine (7 მდგომარეობა)
+```
+wish_pending  (მშობლის რიგი) → wish_approved (Lexo) / wish_rejected (ბავშვი, resubmit იმავე row-ზე)
+wish_approved → Lexo ტვირთავს სურათს pending path-ზე → image_pending
+image_pending (მშობლის რიგი) → image_approved (Lexo) / image_rejected (Lexo, ახალი სურათი → image_pending)
+image_approved → Lexo ხელით child_reward_images-ში → published
+```
+
+### Commit-ების თანმიმდევრობა (ყველა fresh-clone-ით, Claude-ის მიერ, დამოუკიდებლად ვერიფიცირებული)
+- **Stage 1** (a59c021) — production hotfix: `syncWishToSupabase`-ის ჰარდქოდილი `status: 'pending'` → `'wish_pending'`, ტიპების გაფართოება, `fulfilled_at`-ის ძველი `=== 'fulfilled'` შედარებები → `=== 'published'` (Variant A — ბეჯის ლოგიკა ფუნქციურად აღდგენილი, არა დამალული type-cast-ით)
+- **Stage 2** — Storage RLS ვერიფიკაცია **კოდის ცვლილების გარეშე დაიხურა**: `pg_policies`-ის პირდაპირი წაკითხვით დადასტურდა, რომ `parents_select_own_child_storage_objects` policy მხოლოდ path-ის პირველ სეგმენტს (`child_id`) ამოწმებს, კატეგორიის სახელს საერთოდ არ ეხება — ახალი `{child_id}/pending/...` კონვენცია ავტომატურად ექცევა უკვე production-ში მომუშავე policy-ს ქვეშ
+- **Stage 3a** (872acb0) — services-ფენა: `childResubmitWish`, `parentApproveWish/RejectWish`, `parentApproveImage/RejectImage` (ყველა `.eq('status', expectedStatus)` guard-ით), `fetchChildSafeWishes` (ცხადი, შეზღუდული column-ები — `proposed_image_path`/`image_parent_note` სტრუქტურულად გამორიცხული query-დანვე), `updateWishStatus` წაშლილი
+- **Stage 3b** (339a978) — მშობლის Inbox UI: `useFamilyPendingWishes` hook, `ParentWishInbox.tsx`, `MainMenu.tsx`-ში badge+ერთიანი hook-instance (refetch props-ით გადაცემული, არა ცალკე გამოძახებული)
+- **Stage 3c** (e9d6efd) — ბავშვის მხარე: `useChildOwnWishes`, `ChildWishStatusPanel.tsx`, `MainMenu.tsx`-ის child-mode ბლოკში ჩართვა. ტესტებში დამატებულია მკაცრი `FORBIDDEN_UI_LITERALS` assertion (status-სტრინგები/`proposed_image_path`/`image_parent_note` არასდროს ჩანს rendered UI ტექსტში)
+
+### Storage/Data-boundary Discovery (Wave Y-ის ყველაზე მნიშვნელოვანი არქიტექტურული დასკვნა)
+ვინაიდან "ბავშვი" და "მშობელი" ერთი ოჯახის ფარგლებში იზიარებენ ერთსა და იმავე `auth.uid()`-ს (იხ. Wave X-ის სექცია ზემოთ), **Storage/DB RLS ვერასდროს ვერ დაიცავს "ბავშვმა არ უნდა ნახოს X" წესს** — ეს შესაძლებელია მხოლოდ client-code-ის დონეზე (query projection). ეს აღმოჩენა პირდაპირ გავლენას მოახდინა Stage 3a-ს დიზაინზე (`fetchChildSafeWishes`-ის ცხადი column-selection) და ზოგადი წესია ნებისმიერი მომავალი child-visible/parent-only მონაცემისთვის: **`select('*')` არასდროს გამოიყენო query-ში, რომლის შედეგიც child-mode-ის React state-ში შეიძლება მოხვდეს.**
+
+### 🔴 Production Security Incident — Service Worker Cross-Origin Cache Leak ✅ გასწორებული (commit 1f3e969)
+
+Wave Y-ის ტესტირებისას Lexo-მ თავად აღმოაჩინა: (ა) ერთსა და იმავე browser-ში ორი სხვადასხვა მშობლის ანგარიშით ტესტისას, მეორე ანგარიშმა პირველის ოჯახის wishes ნახა Inbox-ში; (ბ) approve/reject-ის შემდეგ ეკრანი ხანდახან საერთოდ არ/ძალიან ნელა განახლდებოდა.
+
+**Root cause:** `public/sw.js`-ის fetch-listener "stale-while-revalidate" სტრატეგიას იყენებდა **ყველა** GET request-ზე, `req.url.startsWith('http')`-ის გარდა არანაირი origin-შემოწმების გარეშე — ანუ Supabase-ისკენ მიმართული request-ებიც URL-ის მიხედვით (არა auth-ის მიხედვით) ქეშირდებოდა. ვინაიდან `fetchFamilyPendingWishes()`-ს ყოველთვის იდენტური URL აქვს ნებისმიერი მომხმარებლისთვის, service worker-ი ერთი მომხმარებლის დაქეშილ პასუხს აბრუნებდა მეორესთვის, Supabase-სთან საერთოდ დაკავშირების გარეშე — **cross-tenant data leak browser cache-ის დონეზე**, RLS-ის მთლიანად გვერდის ავლით (RLS ამ request-ში საერთოდ არ მონაწილეობდა).
+
+**მასშტაბი:** ეხებოდა ნებისმიერ Supabase GET-ს მთელ აპში (wishes, childrenList, reward images, dashboard stats) — არა მხოლოდ Wave Y-ის ახალ ფუნქციებს. Wave Y-მდე არ შემჩნეულა, რადგან არცერთი წინა feature არ საჭიროებდა "იგივე query, ხშირად, ყოველთვის ახალი მონაცემით" პატერნს.
+
+**Fix:** `public/sw.js`-ში cross-origin request-ები (`!req.url.startsWith(self.location.origin)`) მთლიანად გამოირიცხა cache-ლოგიკიდან — `return` ადრეულად, network-ს პირდაპირ მიდის. `CACHE_NAME` აწეული (`v6`→`v7`), რომ `activate`-ის არსებულმა cleanup-ლოგიკამ ავტომატურად წაშალოს ნებისმიერი უკვე დაქეშილი, potentially-stale/leaked Supabase-პასუხი.
+
+**⚠️ ზოგადი წესი მომავლისთვის (დაემატა "საკვანძო გადაწყვეტილებები"-ს):** Service worker-ის cache-ლოგიკა არასდროს არ უნდა გავრცელდეს cross-origin (Supabase და ნებისმიერი სხვა backend) request-ებზე — მხოლოდ საკუთარი origin-ის static assets (JS/CSS/images/navigate).
+
+### UI-ტექსტის გადარქმევა ✅ (commit 3d92e11)
+წმინდა display-ტექსტის ცვლილება, database-ზე გავლენის გარეშე (GameMode enum-ის ინგლისური მნიშვნელობები — `'thomthematica'`, `'thomravlebis_tabula'`, `'gethometria'`, `'kveshmicera'` — უცვლელი, DB-ში ინახება ესენი, არა ქართული label-ები):
+- "თომთემატიკა" (თამაშის ღილაკი) → "მაგალითები" (აპლიკაციის სახელი "თომთემატიკა" — `metadata.json`/`manifest.json`/`index.html` — განზრახ უცვლელი)
+- "თომრავლების ტაბულა" → "გამრავლების ტაბულა"
+- "გეთომეტრია" → "გეომეტრია"
+- "🔒 გასვლა identity-დან" → "🔒 მომხმარებლის შეცვლა"
+- "📊 დაშბორდი" → "📊 სტატისტიკა" (MainMenu-ს ღილაკი და ParentDashboard-ის საკუთარი heading, ორივე)
+
+**შენიშვნა:** ეს სტრიქონები დუბლირებული იყო 3 ადგილას (`utils/gameModeLabels.ts`, `MainMenu.tsx`, `Header.tsx` — ერთმანეთისგან დამოუკიდებლად), პლუს 7 ტესტ-ფაილი — ყველა განახლდა ერთ commit-ში.
+
+### Verification (ყველა ეტაპი, fresh clone, Claude-ის მიერ დამოუკიდებლად)
+თითოეულ commit-ზე: hash-შედარება, parent-commit-თან `git diff --stat`-ით scope-ის წინასწარი დადასტურება (ახალი/მოულოდნელი ფაილი ხელუხლებელი UI-სთვის), `tsc --noEmit` 0 შეცდომა, სრული `vitest run`, `npm run build`. **Stage 1-ზე და UI-rename-ზე AI Studio-ს საბოლოო report-ში აღმოჩნდა უზუსტობა/overclaim** (Stage 1: scope-გადაჭარბება `fulfilled_at`-ის TS2367-ის გამო, საბოლოოდ დამტკიცებულ Variant A-ზე გადავიდა; UI-rename: report-ში ნახსენები იყო არარსებული ცვლილება "🎮 სტუმარი→🔒 ავტორიზაცია", რომელიც რეალურ diff-ში არ აღმოჩნდა) — **ორივე შემთხვევაში რეალური commit სუფთა იყო, მაგრამ ეს არის მუდმივი, დამოუკიდებელი დადასტურების საჭიროების დამატებითი დასტური.**
+
+---
+
 ## საკვანძო არქიტექტურული გადაწყვეტილებები (არ შეიცვალოს განხილვის გარეშე)
 
-- DB schema: 5 table (`profiles`, `children`, `game_sessions`, `wishes`, `child_reward_images`) + `pin_hash` column ორივე `profiles`/`children`-ზე (განზრახ nullable — იხ. Wave X-ის სექცია)
+- DB schema: 5 table (`profiles`, `children`, `game_sessions`, `wishes`, `child_reward_images`) + `pin_hash` column ორივე `profiles`/`children`-ზე (განზრახ nullable) + `wishes.status`/`wish_parent_note`/`image_parent_note`/`proposed_image_path` (Wave Y)
 - useGameSession(gameMode, childId) — mode-აგნოსტიკური
 - Guest Mode არ არსებობს
 - 40-question rolling window — ხელუხლებელი
-- Race-condition-ების დამტკიცებული idiom: `requestIdRef` generation-counter — გამოყენებულია Commit #1, Commit #10, Wave 3 Part 2 reward-images fetcher-ში
-- Stale-closure-ის დამტკიცებული idiom: callback-ს, რომელიც `setInterval`/`setTimeout`-ის შიგნით გამოიძახება და თავად დამოკიდებულია ცვლად state-ზე, სჭირდება `useRef` + `useEffect` sync pattern (Wave X-ის Post-fix, `useTimer.ts`) — არა პირდაპირი `useCallback` dependency, თუ callback-ი timer-ის `setInterval`-შია registration-ული
+- Race-condition-ების დამტკიცებული idiom: `requestIdRef` generation-counter — Commit #1, Commit #10, Wave 3 Part 2, Wave Y-ის ორივე ახალი hook
+- Stale-closure-ის დამტკიცებული idiom: `useRef` + `useEffect` sync callback-ისთვის, რომელიც `setInterval`/`setTimeout`-ში რეგისტრირდება და ცვლად state-ზეა დამოკიდებული (Wave X Post-fix, `useTimer.ts`)
 - Per-name static content (Record<string,string>) vs. per-child DB storage — კრიტერიუმი: სახელის/ცნების თვისება → static repo-ფაილი; კონკრეტული ბავშვის ინდივიდუალური მონაცემი → DB table
-- Schema-migration-ის დამტკიცებული pattern: `ADD COLUMN (nullable) → backfill → verify count=0 → SET NOT NULL → CHECK` (Commit #6A-ში დამტკიცებული; Wave X-ში pin_hash-ზე განზრახ არ გამოყენებულა SET NOT NULL/CHECK — მიზეზი იხ. Wave X-ის სექციაში)
+- Schema-migration-ის დამტკიცებული pattern: `ADD COLUMN (nullable) → backfill → verify count=0 → SET NOT NULL → CHECK` — Commit #6A-ში დამტკიცებული; Wave X-ში (pin_hash) და Wave Y-ში (wishes.status — ძველი production მონაცემის კოლაფსი ახალ ტერმინალურ მნიშვნელობაში) ორივეგან **განზრახ, საკუთარი მიზეზით, არ გამოყენებულა ზუსტად ეს pattern** — თითოეული გადაწყვეტილების მიზეზი საკუთარ სექციაშია
 - Production migration (DB/Storage/RLS SQL) — ყოველთვის Lexo-ს ხელით, Supabase Dashboard/SQL editor-იდან; AI Studio-ს არასდროს გადაეცემა ეს პასუხისმგებლობა
-- **PIN gate — client-side UI identity-gate, არა DB-level access-control.** RLS ოჯახის მასშტაბით ღიაა. PIN uniqueness — application-level, non-atomic, best-effort (არა DB UNIQUE constraint ორ table-ს შორის)
-- **PIN-ის გარეშე identity-switch აკრძალულია architecture-ის დონეზე** — ყოველი session (parent-იც, თითო ბავშვიც) საკუთარი PIN-ით უნდა დადასტურდეს, ცალკე, ყოველგვარი "მოსახერხებელი" shortcut-ის გარეშე. ეს Wave X-ის refactor-ის მთავარი, გამოცდილებით ნასწავლი პრინციპია
-- **AI Studio ZIP revert risk** — ვრცელდება ნებისმიერ ფაილზე, რომელიც git-ში/GitHub-ზე იცვლება AI Studio-ს ZIP workflow-ის გარეთ (schema.sql-ს ადრე შეემთხვა, PROJECT_STATE.md-ს ახლა). **ყოველი ასეთი out-of-band ცვლილების შემდეგ, განახლებული ფაილი ხელით უნდა აიტვირთოს AI Studio-ს project-შიც**
-- Auto-pause mitigation: GitHub Actions scheduled workflow (`.github/workflows/keep-supabase-alive.yml`) — ✅ **დანერგილია და push-ილია**. კვირაში ერთხელ (`cron: '0 0 * * 0'`) მსუბუქ request-ს უგზავნის Supabase REST API-ს (`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` secrets-ით), რომ Supabase-ის free-tier-ის 7-დღიანი auto-pause არ ამოქმედდეს. `workflow_dispatch`-ითაც ხელით გაშვებადია. Manual test-run (Actions ტაბიდან, `workflow_dispatch`) წარმატებულია — მწვანე ✓.
+- **PIN gate — client-side UI identity-gate, არა DB-level access-control.** RLS ოჯახის მასშტაბით ღიაა. Parent და child mode ერთსა და იმავე `auth.uid()`-ს იზიარებენ — **ამიტომ ნებისმიერი "მხოლოდ მშობლისთვის"/"მხოლოდ ბავშვისთვის" მონაცემი მხოლოდ query-level column-selection-ით/UI-ით არის დაცვადი, არასდროს RLS/Storage-policy-ით** (Wave Y Storage Discovery)
+- **PIN-ის გარეშე identity-switch აკრძალულია architecture-ის დონეზე**
+- **Wave Y-ის wishes-workflow**: 7-state machine (`wish_pending/wish_approved/wish_rejected/image_pending/image_approved/image_rejected/published`), **ერთი ბავშვის მრავალი ერთდროული wish განზრახ დაშვებულია** (არა DB-constraint), **rejected wish resubmit-ავს იმავე row-ს** (არა ახალი row+FK), **`image_approved→published` მუდმივად Lexo-ს ხელით ოპერაციაა**
+- **`select('*')` აკრძალულია ნებისმიერ query-ზე, რომლის შედეგი child-mode-ის (ან ზოგადად ნაკლებად-პრივილეგირებული mode-ის) React state-ში შეიძლება მოხვდეს** — ცხადი column-ების ჩამონათვალი ყოველთვის სავალდებულოა
+- **🔴 Service worker (`public/sw.js`) არასდროს არ უნდა cache-ავდეს cross-origin (Supabase) request-ს** — მხოლოდ საკუთარი origin-ის static assets/navigate. ეს production security incident-იდან (Wave Y) ნასწავლი, mandatory წესია ნებისმიერი მომავალი `sw.js`-ის ცვლილებისთვის
+- **AI Studio ZIP revert risk** — ვრცელდება ნებისმიერ ფაილზე, რომელიც git-ში/GitHub-ზე იცვლება AI Studio-ს ZIP workflow-ის გარეთ. ყოველი ასეთი ცვლილების შემდეგ, განახლებული ფაილი ხელით უნდა აიტვირთოს AI Studio-ს project-შიც
+- **AI Studio-ს საბოლოო report-ს არასდროს ვენდობით ბრმად** — ყოველი commit fresh-clone-ით, დამოუკიდებლად მოწმდება (hash, scope/diff, tsc, vitest, build). Wave Y-ში ორჯერ დადასტურდა, რომ ეს წესი რეალურ ღირებულებას იძლევა (Stage 1-ის scope-განხილვა, UI-rename-ის report-ში არარსებული ცვლილების ხსენება)
+- Auto-pause mitigation: GitHub Actions scheduled workflow (`.github/workflows/keep-supabase-alive.yml`) — ✅ დანერგილია, push-ილია, manual test-run წარმატებული
 
 ## დაგეგმილი მომდევნო Wave-ები (პრიორიტეტის მიხედვით)
 
-### Wave Y — Wish Approval Workflow 🔵 (მონახაზი დახატული, Architecture Review არ დაწყებულა)
-**მიზანი:** 20/40-კითხვიან block-ის ბოლოს ბავშვის მიერ ჩაწერილი სურვილი (wish) ჯერ მშობელს მიუვიდეს დასადასტურებლად, არა პირდაპირ.
-```sql
-ALTER TABLE wishes ADD COLUMN status text NOT NULL DEFAULT 'pending'
-  CHECK (status IN ('pending', 'approved', 'rejected'));
-```
-**Workflow-მონახაზი:** ბავშვის submission → `status='pending'` → Parent Dashboard-ში pending wishes + approve/reject → status-ცვლილება. რეალური სურათის დამატება (`child_reward_images`) კვლავ ხელით რჩება Lexo-ს მხრიდან.
-**სტატუსი:** Architecture Review ჯერ არ დაწყებულა.
-
-### Wave "grade-range" (კლასის მიხედვით რიცხვითი დიაპაზონი) — PIN-Wave-ისა და Wish-Approval-ის შემდეგ, ყველაზე სენსიტიური (problemGenerator.ts-ის ცენტრალურ ლოგიკას ეხება)
+### Wave "grade-range" (კლასის მიხედვით რიცხვითი დიაპაზონი) — შემდეგი პრიორიტეტი, ყველაზე სენსიტიური (problemGenerator.ts-ის ცენტრალურ ლოგიკას ეხება)
 
 ### Wave "word problems" — grade-range-ის შემდეგ
 
@@ -244,47 +279,51 @@ ALTER TABLE wishes ADD COLUMN status text NOT NULL DEFAULT 'pending'
 - `metadata.json`-ის description-ის განახლება (თომას სახელი) — ჯერ არ გასწორებულა
 - Backup-სტრატეგია — ინფორმირებული, კონკრეტული გეგმა ჯერ არ არის; launch-მდე რეკომენდებული
 - კომერციალიზაცია (Georgia-first) — მომავალი ეტაპი, ჯერ არ აქტუალური 10-ბავშვიანი launch-ისთვის
-- **PROJECT_STATE.md-ის AI Studio sync** — ახალი, განმეორებადი პრობლემა (იხ. Wave X-ის სექცია); ყოველი Wave X-შემდგომი commit-ის შემდეგ საჭიროა ხელით შემოწმება, ხომ არ დაბრუნდა ძველ ვერსიაზე
+- **PROJECT_STATE.md-ის AI Studio sync** — ყოველი Wave X/Y-შემდგომი commit-ის შემდეგ საჭიროა ხელით შემოწმება, ხომ არ დაბრუნდა ძველ ვერსიაზე
+- **`image_approved → published`-ის manual ოპერაცია** (Wave Y) — ყოველი დამტკიცებული სურათისთვის Lexo-მ თავად უნდა შეამოწმოს Supabase Table Editor/SQL Editor, push notification არ არსებობს. Saved query/view `wish_approved`/`image_rejected`/`image_approved` status-ებისთვის რეკომენდებულია, ჯერ არ შექმნილა
 
 ## Production Launch-ის მდგომარეობა (~10 ახლობელი ბავშვი)
 
 **რეალურად ბლოკავს:** არაფერი ცნობილი.
 
 **launch-მდე ერთჯერადი მოქმედებები:**
-- სატესტო ანგარიშების წაშლა (Supabase Dashboard → Authentication → Users). წაშლის შემდეგ შეამოწმე, რომ მათი `children`, `game_sessions`, `wishes` ჩანაწერებიც წაიშალა და `child-reward-images` bucket-ში სატესტო სურათები არ დარჩა
-- სრული ნამდვილი ნაკადის ერთხელ გავლა ახალი ანგარიშით: რეგისტრაცია PIN-ით → ბავშვის დამატება PIN-ით → ბავშვის PIN-ით შესვლა და თამაში → მშობლის PIN-ით შესვლა და Dashboard
+- სატესტო ანგარიშების წაშლა (Supabase Dashboard → Authentication → Users). წაშლის შემდეგ შეამოწმე, რომ მათი `children`, `game_sessions`, `wishes` ჩანაწერებიც წაიშალა და `child-reward-images` bucket-ში (მათ შორის `pending`-ქვესაქაღალდეებში) სატესტო სურათები არ დარჩა
+- სრული ნამდვილი ნაკადის ერთხელ გავლა ახალი ანგარიშით: რეგისტრაცია PIN-ით → ბავშვის დამატება PIN-ით → ბავშვის PIN-ით შესვლა და თამაში → wish-ის დაწერა → მშობლის PIN-ით შესვლა, Inbox, დადასტურება/უარყოფა → სურათის ატვირთვა/დადასტურება → `published`-ის ხელით დასმა
+- **ყველა ტესტ-browser-ში service worker-ის hard-refresh/unregister** (security fix-ის commit-ის შემდეგ) — ძველი, დაზიანებული cache-ლოგიკის მქონე service worker-ები ხელით უნდა ჩანაცვლდეს
 
-**აღარ ბლოკავს (Wave X-ით და ამ conversation-ის ფარგლებში დასრულებული):**
+**აღარ ბლოკავს (ამ conversation-ის ფარგლებში დასრულებული):**
 - ~~Wave X (PIN gate)~~ ✅ დასრულებულია
 - ~~`migrated_prompt_history/` წაშლა~~ ✅ დასრულებულია
-- ~~Auto-pause mitigation (GH Actions workflow)~~ ✅ დანერგილია და დადასტურებულია (`keep-supabase-alive.yml`, manual test-run მწვანე)
-- ~~pin_hash backfill/NOT NULL-CHECK~~ ✅ აღარ არის საჭირო (იხ. Wave X-ის სექცია)
+- ~~Auto-pause mitigation~~ ✅ დანერგილია და დადასტურებულია
+- ~~pin_hash backfill/NOT NULL-CHECK~~ ✅ აღარ არის საჭირო
+- ~~Wave Y (Wish Approval Workflow)~~ ✅ დასრულებულია, Stage 1-3c
+- ~~Service Worker cross-origin cache leak~~ ✅ გასწორებულია (commit 1f3e969)
+- ~~UI-ტექსტის გადარქმევა~~ ✅ დასრულებულია
 
 **არ ბლოკავს, მაგრამ რეკომენდებულია launch-მდე ან პარალელურად:**
 - Backup-სტრატეგია
 - `game_sessions` stuck-row-ის ხელახალი ტესტირება
 - `metadata.json`-ის description-ის განახლება
+- Saved query/view Lexo-ს image-approval სამუშაო რიგისთვის (Wave Y manual ნაბიჯების გასამარტივებლად)
 
-**Webintoapp.com (native app wrapper) გამოყენების გეგმა:** ტექნიკურად პასიური ცვლილება, ღირს ხელით ტესტირება ერთი ბავშვით სრულ flow-ზე (PIN gate-ის ჩათვლით), სანამ ყველას დაურიგდება.
+**Webintoapp.com (native app wrapper) გამოყენების გეგმა:** ტექნიკურად პასიური ცვლილება, ღირს ხელით ტესტირება ერთი ბავშვით სრულ flow-ზე (PIN gate-ისა და Wave Y-ის wish-ციკლის ჩათვლით), სანამ ყველას დაურიგდება.
 
 ## Workflow (როგორ ვმუშაობთ)
 
 1. AI Studio (Gemini) წერს კოდს პატარა, ინკრემენტულ commit-ებად, ZIP export/import-ით
-2. Claude ამოწმებს დამოუკიდებლად, fresh-clone-ით (tsc, vitest, build) — არასდროს ენდობა AI Studio-ს თვითმოხსენებას
-3. ChatGPT აკეთებს დამოუკიდებელ cross-review-ს
+2. Claude ამოწმებს დამოუკიდებლად, fresh-clone-ით (hash, `git diff --stat` scope-შემოწმება, tsc, vitest, build) — **არასდროს** ენდობა AI Studio-ს თვითმოხსენებას, თუნდაც report დეტალური/დარწმუნებული ჩანდეს
+3. ChatGPT აკეთებს დამოუკიდებელ cross-review-ს არქიტექტურული გადაწყვეტილებების დონეზე (არა ყოველი მექანიკური/text-only commit-ისთვის)
 4. ორივეს შენიშვნები ერთიანდება საბოლოო implementation prompt-ში
-5. Lexo იღებს საბოლოო გადაწყვეტილებას; DB/Storage/RLS migrations — ყოველთვის ხელით, SQL editor-იდან; client-კოდის ცვლილებები — AI Studio-დან, ლოკალურად (edit → git add → commit → push)
+5. Lexo იღებს საბოლოო გადაწყვეტილებას; DB/Storage/RLS migrations — ყოველთვის ხელით, SQL editor-იდან; client-კოდის ცვლილებები — AI Studio-დან, ლოკალურად
 6. ყოველი Wave-ის/მნიშვნელოვანი commit-ის დასრულებისას ეს დოკუმენტი განახლდება
-7. **ახალი (Wave X-ის გამოცდილებით):** ამ ფაილის ყოველი ხელით/git-ით (AI Studio-ს ZIP workflow-ის გარეთ) განახლების შემდეგ, განახლებული ვერსია ხელით აიტვირთება AI Studio-ს project-შიც, რომ შემდეგმა ZIP export-მა არ დააბრუნოს ძველი ვერსია
+7. ამ ფაილის ყოველი ხელით/git-ით განახლების შემდეგ, განახლებული ვერსია ხელით აიტვირთება AI Studio-ს project-შიც
 
 **Lexo-ს სამუშაო კონტექსტი:** არ იცნობს SQL-ს ან Supabase-ის dashboard-ს — ყოველი ტექნიკური ნაბიჯი დეტალურად, ეტაპ-ეტაპად აღსაწერია.
 
 ## შემდეგი ნაბიჯი
 
-Wave X (PIN-based Parent/Child Identity Gate) სრულად დასრულებულია და დამოუკიდებლად დადასტურებული — identity-first ორსტადიანი flow, ტერმინოლოგიის sweep, Dashboard child-switcher. დამატებით გასწორდა განმეორებითი-არასწორი-პასუხის double-counting ბაგი ყველა თამაშში (Kveshmicera-ს გარდა, რომელიც უკვე სწორად მუშაობდა).
+Wave Y (Wish Approval Workflow) სრულად დასრულებულია და დამოუკიდებლად დადასტურებული — 5 commit (Stage 1, 3a, 3b, 3c + UI-rename), Storage-ვერიფიკაცია კოდის ცვლილების გარეშე დაიხურა, და ტესტირების დროს აღმოჩენილი launch-blocking security ბაგი (Service Worker cross-origin cache) გასწორებულია და დადასტურებული.
 
-GH Actions auto-pause mitigation workflow (`keep-supabase-alive.yml`) დანერგილია, push-ილია და manual test-run-ით დადასტურებულია. pin_hash backfill/NOT NULL-CHECK საკითხი დახურულია: საჭირო აღარ არის.
+რეკომენდებული თანმიმდევრობა: (1) launch-მდე ერთჯერადი მოქმედებები (სატესტო ანგარიშების წაშლა, სრული ნამდვილი ნაკადის გავლა — Wave Y-ის wish-ციკლის ჩათვლით, ყველა ტესტ-browser-ის service-worker hard-refresh); (2) Backup-სტრატეგია და `game_sessions` stuck-row-ის ხელახალი ტესტირება; (3) Wave "grade-range" architecture review.
 
-რეკომენდებული თანმიმდევრობა: (1) Wave Y (wish approval) architecture review; (2) launch-მდე — სატესტო ანგარიშების წაშლა და სრული ნამდვილი ნაკადის გავლა ახალი ანგარიშით (იხ. "launch-მდე ერთჯერადი მოქმედებები"); (3) Backup-სტრატეგია და `game_sessions` stuck-row-ის ხელახალი ტესტირება.
-
-[ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს Claude-ის და ChatGPT-ის Project-ებში, **და** AI Studio-ს project-ში (Wave X-ის დროს გამოვლენილი sync-რისკის გამო). ნამდვილად ატვირთეთ ეს ფაილი repo-შიც (`git add PROJECT_STATE.md && git commit && git push`).]
+[ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს Claude-ის და ChatGPT-ის Project-ებში, **და** AI Studio-ს project-ში. ნამდვილად ატვირთეთ ეს ფაილი repo-შიც (`git add PROJECT_STATE.md && git commit && git push`).]
