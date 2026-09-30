@@ -46,7 +46,7 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
     );
 
     // Click Thomthematica game mode card
-    const thomModeBtn = screen.getByText('თომთემატიკა');
+    const thomModeBtn = screen.getByText('მაგალითები');
     fireEvent.click(thomModeBtn);
 
     // Should show Auth Gate blocker
@@ -88,7 +88,7 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
     );
 
     // Click Thomthematica game mode
-    const thomModeBtn = screen.getByText('თომთემატიკა');
+    const thomModeBtn = screen.getByText('მაგალითები');
     fireEvent.click(thomModeBtn);
 
     // Should show the Child Selection Gate (with existing child)
@@ -129,7 +129,7 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
     );
 
     // Click Thomthematica game mode
-    const thomModeBtn = screen.getByText('თომთემატიკა');
+    const thomModeBtn = screen.getByText('მაგალითები');
     fireEvent.click(thomModeBtn);
 
     // Should show "დაამატეთ ბავშვის პროფილი" and "➕ პროფილის დამატება"
@@ -177,7 +177,7 @@ describe('Phase 2.5 App.tsx Auth & Child Gate', () => {
     );
 
     // Click Thomthematica
-    const thomModeBtn = screen.getByText('თომთემატიკა');
+    const thomModeBtn = screen.getByText('მაგალითები');
     fireEvent.click(thomModeBtn);
 
     // No blocker, input is ready

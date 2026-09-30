@@ -41,7 +41,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         }`}
       >
         <h2 className="text-2xl font-black text-indigo-900 flex items-center gap-2">
-          📊 მშობლის დაშბორდი
+          📊 მშობლის სტატისტიკა
         </h2>
         <button
           onClick={onClose}

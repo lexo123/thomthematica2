@@ -62,7 +62,7 @@ describe('App correct phrase pool draw behavior', () => {
     );
 
     // Click Thomthematica to start
-    const thomModeBtn = screen.getByText('თომთემატიკა');
+    const thomModeBtn = screen.getByText('მაგალითები');
     fireEvent.click(thomModeBtn);
 
     expect(selectFromPoolSpy).toHaveBeenCalledTimes(0);

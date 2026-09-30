@@ -1,9 +1,9 @@
 import { GameMode } from '../types';
 
 export const GAME_MODE_LABELS: Record<GameMode, string> = {
-  [GameMode.Thomthematica]: 'თომთემატიკა',
-  [GameMode.ThomravlebisTabula]: 'თომრავლების ტაბულა',
-  [GameMode.Gethometria]: 'გეთომეტრია',
+  [GameMode.Thomthematica]: 'მაგალითები',
+  [GameMode.ThomravlebisTabula]: 'გამრავლების ტაბულა',
+  [GameMode.Gethometria]: 'გეომეტრია',
   [GameMode.Kveshmicera]: 'ქვეშმიწერით გამრავლება',
 };
 

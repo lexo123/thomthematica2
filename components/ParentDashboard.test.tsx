@@ -215,7 +215,7 @@ describe('ParentDashboard UI Component', () => {
     expect(screen.getByText('2')).toBeDefined(); // perfect blocks
 
     // Recent sessions check (mapped mode labels)
-    expect(screen.getByText('თომთემატიკა')).toBeDefined();
+    expect(screen.getByText('მაგალითები')).toBeDefined();
     expect(screen.getByText('40/40')).toBeDefined();
     expect(screen.getByText('ქვეშმიწერით გამრავლება')).toBeDefined();
     expect(screen.getByText('38/40')).toBeDefined();
@@ -337,7 +337,7 @@ describe('ParentDashboard UI Component', () => {
     // Verify Child B data is displayed, NOT frozen Child A data
     expect(screen.getByText('✨ საჩუქარი B')).toBeDefined();
     expect(screen.getByText('93.8%')).toBeDefined();
-    expect(screen.getByText('გეთომეტრია')).toBeDefined();
+    expect(screen.getByText('გეომეტრია')).toBeDefined();
     expect(screen.queryByText('✨ საჩუქარი A')).toBeNull();
   });
 
@@ -373,7 +373,7 @@ describe('ParentDashboard UI Component', () => {
     });
 
     const { rerender } = render(<MainMenu onSelectMode={vi.fn()} />);
-    expect(screen.queryByText('📊 დაშბორდი')).toBeNull();
+    expect(screen.queryByText('📊 სტატისტიკა')).toBeNull();
 
     // B. Authenticated user in child mode -> dashboard button NOT shown
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
@@ -392,7 +392,7 @@ describe('ParentDashboard UI Component', () => {
     });
 
     rerender(<MainMenu onSelectMode={vi.fn()} />);
-    expect(screen.queryByText('📊 დაშბორდი')).toBeNull();
+    expect(screen.queryByText('📊 სტატისტიკა')).toBeNull();
 
     // C. Authenticated user in parent mode (even with activeChildId === null) -> dashboard button IS shown
     vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
@@ -402,7 +402,7 @@ describe('ParentDashboard UI Component', () => {
     });
 
     rerender(<MainMenu onSelectMode={vi.fn()} />);
-    expect(screen.getByText('📊 დაშბორდი')).toBeDefined();
+    expect(screen.getByText('📊 სტატისტიკა')).toBeDefined();
   });
 
   // 10. Regression: open -> close -> parent control card returns identically
@@ -454,17 +454,17 @@ describe('ParentDashboard UI Component', () => {
     const onSelectMode = vi.fn();
     render(<MainMenu onSelectMode={onSelectMode} />);
 
-    // Initially parent control card is rendered with "📊 დაშბორდი" and "➕ ბავშვის დამატება"
-    expect(screen.getByText('📊 დაშბორდი')).toBeDefined();
+    // Initially parent control card is rendered with "📊 სტატისტიკა" and "➕ ბავშვის დამატება"
+    expect(screen.getByText('📊 სტატისტიკა')).toBeDefined();
     expect(screen.getByText('➕ ბავშვის დამატება')).toBeDefined();
-    expect(screen.queryByText('📊 მშობლის დაშბორდი')).toBeNull();
+    expect(screen.queryByText('📊 მშობლის სტატისტიკა')).toBeNull();
 
     // Click dashboard button
-    const dashBtn = screen.getByText('📊 დაშბორდი');
+    const dashBtn = screen.getByText('📊 სტატისტიკა');
     fireEvent.click(dashBtn);
 
     // Dashboard is now rendered replacing parent control card (not overlay)
-    expect(screen.getByText('📊 მშობლის დაშბორდი')).toBeDefined();
+    expect(screen.getByText('📊 მშობლის სტატისტიკა')).toBeDefined();
     expect(screen.queryByText('➕ ბავშვის დამატება')).toBeNull();
 
     // Click close button on dashboard
@@ -472,8 +472,8 @@ describe('ParentDashboard UI Component', () => {
     fireEvent.click(closeBtn);
 
     // Dashboard is closed and parent control card is back
-    expect(screen.queryByText('📊 მშობლის დაშბორდი')).toBeNull();
-    expect(screen.getByText('📊 დაშბორდი')).toBeDefined();
+    expect(screen.queryByText('📊 მშობლის სტატისტიკა')).toBeNull();
+    expect(screen.getByText('📊 სტატისტიკა')).toBeDefined();
     expect(screen.getByText('➕ ბავშვის დამატება')).toBeDefined();
   });
 
@@ -588,11 +588,11 @@ describe('ParentDashboard UI Component', () => {
     expect(screen.getByText('🎮 თამაშის რეჟიმები')).toBeDefined();
 
     // Standard mapped mode labels
-    expect(screen.getByText('თომთემატიკა')).toBeDefined();
+    expect(screen.getByText('მაგალითები')).toBeDefined();
     expect(screen.getByText('76/80')).toBeDefined();
     expect(screen.getByText('სესიები: 2 • სიზუსტე: 95.0%')).toBeDefined();
 
-    expect(screen.getByText('გეთომეტრია')).toBeDefined();
+    expect(screen.getByText('გეომეტრია')).toBeDefined();
     expect(screen.getByText('19/20')).toBeDefined();
     expect(screen.getByText('სესიები: 1 • სიზუსტე: 95.0%')).toBeDefined();
 
@@ -718,4 +718,3 @@ describe('ParentDashboard UI Component', () => {
     expect(screen.getByText('✨ თვითმფრინავი')).toBeDefined();
   });
 });
-

@@ -121,9 +121,9 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
               <button
                 onClick={handleSwitchIdentity}
                 className="text-xs font-black bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl border border-white/20 transition-all flex items-center gap-1"
-                title="identity-დან გასვლა"
+                title="მომხმარებლის შეცვლა"
               >
-                🔒 გასვლა identity-დან
+                🔒 მომხმარებლის შეცვლა
               </button>
             </div>
           </div>
@@ -158,7 +158,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
               }}
               className="text-xl py-6 bg-indigo-600 hover:bg-indigo-700"
             >
-              📊 დაშბორდი
+              📊 სტატისტიკა
             </Button>
             <Button
               onClick={() => {
@@ -193,19 +193,19 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
               onClick={() => onSelectMode(GameMode.Thomthematica)}
               className="text-xl py-6 bg-indigo-600 hover:bg-indigo-700"
             >
-              თომთემატიკა
+              მაგალითები
             </Button>
             <Button 
               onClick={() => onSelectMode(GameMode.ThomravlebisTabula)}
               className="text-xl py-6 bg-purple-600 hover:bg-purple-700"
             >
-              თომრავლების ტაბულა
+              გამრავლების ტაბულა
             </Button>
             <Button 
               onClick={() => onSelectMode(GameMode.Gethometria)}
               className="text-xl py-6 bg-green-600 hover:bg-green-700"
             >
-              გეთომეტრია 📐
+              გეომეტრია 📐
             </Button>
             <Button 
               onClick={() => onSelectMode(GameMode.Kveshmicera)}

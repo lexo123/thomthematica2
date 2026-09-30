@@ -18,9 +18,9 @@ describe('Phase 2.5 Game Modes Gate & activeChildId Propagation', () => {
   });
 
   const gameModesList = [
-    { name: 'თომთემატიკა', expectedMode: 'thomthematica' },
-    { name: 'თომრავლების ტაბულა', expectedMode: 'thomravlebis_tabula' },
-    { name: 'გეთომეტრია 📐', expectedMode: 'gethometria' },
+    { name: 'მაგალითები', expectedMode: 'thomthematica' },
+    { name: 'გამრავლების ტაბულა', expectedMode: 'thomravlebis_tabula' },
+    { name: 'გეომეტრია 📐', expectedMode: 'gethometria' },
     { name: 'ქვეშმიწერით გამრავლება ✍️', expectedMode: 'kveshmicera' },
   ];
 

@@ -48,7 +48,7 @@ describe('MainMenu - Parent Control Card, Wish Inbox & Child Game Mode', () => {
     cleanup();
   });
 
-  it('renders "📊 დაშბორდი", "➕ ბავშვის დამატება", and "🔒 გასვლა identity-დან" in parent mode without game buttons or PIN-less switch', () => {
+  it('renders "📊 სტატისტიკა", "➕ ბავშვის დამატება", and "🔒 მომხმარებლის შეცვლა" in parent mode without game buttons or PIN-less switch', () => {
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
       childrenList: [
         { id: 'child-1', parent_id: 'parent-123', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy', created_at: '' },
@@ -76,18 +76,18 @@ describe('MainMenu - Parent Control Card, Wish Inbox & Child Game Mode', () => {
     render(<MainMenu onSelectMode={vi.fn()} />);
 
     // Parent controls are present
-    const dashboardBtn = screen.getByText('📊 დაშბორდი');
+    const dashboardBtn = screen.getByText('📊 სტატისტიკა');
     const addChildBtn = screen.getByText('➕ ბავშვის დამატება');
-    const exitIdentityBtn = screen.getByText('🔒 გასვლა identity-დან');
+    const exitIdentityBtn = screen.getByText('🔒 მომხმარებლის შეცვლა');
     expect(dashboardBtn).toBeDefined();
     expect(addChildBtn).toBeDefined();
     expect(exitIdentityBtn).toBeDefined();
 
     // PIN-less child switch and game buttons must be ABSENT in parent mode
     expect(screen.queryByText(/შვილის შეცვლა|ბავშვის შეცვლა/)).toBeNull();
-    expect(screen.queryByText('თომთემატიკა')).toBeNull();
-    expect(screen.queryByText('თომრავლების ტაბულა')).toBeNull();
-    expect(screen.queryByText('გეთომეტრია 📐')).toBeNull();
+    expect(screen.queryByText('მაგალითები')).toBeNull();
+    expect(screen.queryByText('გამრავლების ტაბულა')).toBeNull();
+    expect(screen.queryByText('გეომეტრია 📐')).toBeNull();
     expect(screen.queryByText('ქვეშმიწერით გამრავლება ✍️')).toBeNull();
 
     // Clicking "➕ ბავშვის დამატება" opens single-purpose ChildSelector
@@ -95,13 +95,13 @@ describe('MainMenu - Parent Control Card, Wish Inbox & Child Game Mode', () => {
     expect(setShowChildSelectorMock).toHaveBeenCalledWith(true);
     expect(resetSessionModeMock).not.toHaveBeenCalled();
 
-    // Clicking "🔒 გასვლა identity-დან" resets session and active child
+    // Clicking "🔒 მომხმარებლის შეცვლა" resets session and active child
     fireEvent.click(exitIdentityBtn);
     expect(resetSessionModeMock).toHaveBeenCalled();
     expect(setActiveChildIdMock).toHaveBeenCalledWith(null);
   });
 
-  it('renders game buttons and "🔒 გასვლა identity-დან" in child mode (hiding Dashboard and Add Child)', () => {
+  it('renders game buttons and "🔒 მომხმარებლის შეცვლა" in child mode (hiding Dashboard and Add Child)', () => {
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
       childrenList: [
         { id: 'child-1', parent_id: 'parent-123', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy', created_at: '' },
@@ -128,15 +128,15 @@ describe('MainMenu - Parent Control Card, Wish Inbox & Child Game Mode', () => {
 
     render(<MainMenu onSelectMode={vi.fn()} />);
 
-    // "🔒 გასვლა identity-დან" and all 4 game buttons are present
-    expect(screen.getByText('🔒 გასვლა identity-დან')).toBeDefined();
-    expect(screen.getByText('თომთემატიკა')).toBeDefined();
-    expect(screen.getByText('თომრავლების ტაბულა')).toBeDefined();
-    expect(screen.getByText('გეთომეტრია 📐')).toBeDefined();
+    // "🔒 მომხმარებლის შეცვლა" and all 4 game buttons are present
+    expect(screen.getByText('🔒 მომხმარებლის შეცვლა')).toBeDefined();
+    expect(screen.getByText('მაგალითები')).toBeDefined();
+    expect(screen.getByText('გამრავლების ტაბულა')).toBeDefined();
+    expect(screen.getByText('გეომეტრია 📐')).toBeDefined();
     expect(screen.getByText('ქვეშმიწერით გამრავლება ✍️')).toBeDefined();
 
     // Parent buttons must be ABSENT in child mode
-    expect(screen.queryByText('📊 დაშბორდი')).toBeNull();
+    expect(screen.queryByText('📊 სტატისტიკა')).toBeNull();
     expect(screen.queryByText('➕ ბავშვის დამატება')).toBeNull();
     expect(screen.queryByText(/შვილის შეცვლა|ბავშვის შეცვლა/)).toBeNull();
   });

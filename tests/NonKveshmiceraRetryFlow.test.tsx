@@ -84,7 +84,7 @@ describe('Non-Kveshmicera Question-Level Answer Recording & Timer Retry Guard', 
   }> = [
     {
       label: 'Thomthematica',
-      menuButtonText: 'თომთემატიკა',
+      menuButtonText: 'მაგალითები',
       mode: GameMode.Thomthematica,
       problems: [
         {
@@ -107,7 +107,7 @@ describe('Non-Kveshmicera Question-Level Answer Recording & Timer Retry Guard', 
     },
     {
       label: 'ThomravlebisTabula',
-      menuButtonText: 'თომრავლების ტაბულა',
+      menuButtonText: 'გამრავლების ტაბულა',
       mode: GameMode.ThomravlebisTabula,
       problems: [
         {
@@ -130,7 +130,7 @@ describe('Non-Kveshmicera Question-Level Answer Recording & Timer Retry Guard', 
     },
     {
       label: 'Gethometria',
-      menuButtonText: 'გეთომეტრია 📐',
+      menuButtonText: 'გეომეტრია 📐',
       mode: GameMode.Gethometria,
       problems: [
         {
@@ -229,7 +229,7 @@ describe('Non-Kveshmicera Question-Level Answer Recording & Timer Retry Guard', 
     });
 
     render(<App />);
-    fireEvent.click(screen.getByText('თომრავლების ტაბულა'));
+    fireEvent.click(screen.getByText('გამრავლების ტაბულა'));
 
     expect(screen.getByText('0/0')).toBeDefined();
 
