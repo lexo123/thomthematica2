@@ -8,6 +8,7 @@ import {
   parentApproveImage,
   parentRejectImage,
   fetchChildSafeWishes,
+  fetchFamilyPendingWishes,
   fetchChildWishes,
   fetchChildSessions,
   fetchChildSessionsForAggregate,
@@ -17,7 +18,7 @@ import {
 import { GameMode } from '../types';
 import * as supabaseModule from '../lib/supabase';
 
-describe('supabaseSyncService (Schema Alignment)', () => {
+describe('supabaseSyncService (Schema Alignment & Wish Approval Workflow)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -672,6 +673,76 @@ describe('supabaseSyncService (Schema Alignment)', () => {
 
       const errorResult = await fetchChildSafeWishes('child-123');
       expect(errorResult).toEqual({ data: null, error: 'Failed to fetch child-safe wishes' });
+    });
+  });
+
+  describe('fetchFamilyPendingWishes', () => {
+    it('selects exact columns, filters by status in [wish_pending, image_pending], and orders by created_at ascending', async () => {
+      const samplePendingWishes = [
+        {
+          id: 'wish-p1',
+          child_id: 'child-1',
+          wish_text: 'ველოსიპედი',
+          status: 'wish_pending',
+          correct_count: 40,
+          proposed_image_path: null,
+          created_at: '2026-09-29T09:00:00Z',
+        },
+        {
+          id: 'wish-p2',
+          child_id: 'child-2',
+          wish_text: 'დრონი',
+          status: 'image_pending',
+          correct_count: 20,
+          proposed_image_path: 'child-2/winner/drone.png',
+          created_at: '2026-09-29T10:00:00Z',
+        },
+      ];
+      const mockOrder = vi.fn().mockResolvedValue({
+        data: samplePendingWishes,
+        error: null,
+      });
+      const mockIn = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockSelect = vi.fn().mockReturnValue({ in: mockIn });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const result = await fetchFamilyPendingWishes();
+
+      expect(mockFrom).toHaveBeenCalledWith('wishes');
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+      const selectArg = mockSelect.mock.calls[0][0] as string;
+      expect(selectArg).toBe('id, child_id, wish_text, status, correct_count, proposed_image_path, created_at');
+      expect(selectArg).not.toBe('*');
+      expect(selectArg).not.toContain('wish_parent_note');
+      expect(selectArg).not.toContain('image_parent_note');
+      expect(mockIn).toHaveBeenCalledWith('status', ['wish_pending', 'image_pending']);
+      expect(mockOrder).toHaveBeenCalledWith('created_at', { ascending: true });
+      expect(result).toEqual({ data: samplePendingWishes, error: null });
+    });
+
+    it('returns error when Supabase query fails or client is not configured', async () => {
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue(null);
+      const unconfigured = await fetchFamilyPendingWishes();
+      expect(unconfigured).toEqual({ data: null, error: 'Supabase not configured' });
+
+      const mockOrder = vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Failed to fetch family pending wishes' },
+      });
+      const mockIn = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockSelect = vi.fn().mockReturnValue({ in: mockIn });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+      vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+        from: mockFrom,
+      } as any);
+
+      const errorResult = await fetchFamilyPendingWishes();
+      expect(errorResult).toEqual({ data: null, error: 'Failed to fetch family pending wishes' });
     });
   });
 

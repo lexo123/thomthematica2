@@ -114,7 +114,7 @@ export const syncGameSessionToSupabase = async (
 
 /**
  * Saves or updates a qualified wish (39/40 or 40/40) in the Supabase wishes table.
- * Uses exact schema column names: wish_text, correct_count (39 | 40), status ('pending' | 'fulfilled'), fulfilled_at.
+ * Uses exact schema column names: wish_text, correct_count (19 | 20 | 39 | 40), status, fulfilled_at.
  * If Supabase is not configured or childId is missing (e.g. Guest mode), returns clean error without throwing.
  */
 export const syncWishToSupabase = async (
@@ -264,6 +264,24 @@ export const fetchChildSafeWishes = async (
 
   if (error) return { data: null, error: error.message };
   return { data: data as ChildSafeWish[], error: null };
+};
+
+/**
+ * Fetches all family wishes currently awaiting parent review (wish_pending or image_pending),
+ * ordered oldest-first (FIFO) by created_at ascending.
+ */
+export const fetchFamilyPendingWishes = async (): Promise<{ data: Wish[] | null; error: string | null }> => {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: 'Supabase not configured' };
+
+  const { data, error } = await supabase
+    .from('wishes')
+    .select('id, child_id, wish_text, status, correct_count, proposed_image_path, created_at')
+    .in('status', ['wish_pending', 'image_pending'])
+    .order('created_at', { ascending: true });
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as Wish[], error: null };
 };
 
 /**

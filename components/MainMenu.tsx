@@ -8,7 +8,9 @@ import { AuthModal } from './AuthModal';
 import { UpdatePasswordModal } from './UpdatePasswordModal';
 import { ChildSelector } from './ChildSelector';
 import { ParentDashboard } from './ParentDashboard';
+import { ParentWishInbox } from './ParentWishInbox';
 import { getAvatarEmoji } from '../hooks/useChildren';
+import { useFamilyPendingWishes } from '../hooks/useFamilyPendingWishes';
 
 interface MainMenuProps {
   onSelectMode: (mode: GameMode) => void;
@@ -30,8 +32,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
   } = useChild();
   const { sessionMode, resetSessionMode } = useSessionMode();
 
+  // Single hook instance for Parent Wish Inbox badge and view
+  const familyPendingWishes = useFamilyPendingWishes(!!user && sessionMode === 'parent');
+
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showInbox, setShowInbox] = useState(false);
 
   const handleLogout = async () => {
     resetSessionMode();
@@ -127,6 +133,15 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
           childrenList={childrenList}
           onClose={() => setShowDashboard(false)}
         />
+      ) : showInbox ? (
+        <ParentWishInbox
+          wishes={familyPendingWishes.wishes}
+          loading={familyPendingWishes.loading}
+          error={familyPendingWishes.error}
+          refetch={familyPendingWishes.refetch}
+          childrenList={childrenList}
+          onClose={() => setShowInbox(false)}
+        />
       ) : user && sessionMode === 'parent' ? (
         <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-8 md:p-12 text-center space-y-8 border-b-8 border-indigo-200">
           <h1 className="text-4xl font-black text-indigo-900 tracking-tight">
@@ -134,10 +149,22 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
           </h1>
           <div className="grid gap-4">
             <Button
-              onClick={() => setShowDashboard(true)}
+              onClick={() => {
+                setShowInbox(false);
+                setShowDashboard(true);
+              }}
               className="text-xl py-6 bg-indigo-600 hover:bg-indigo-700"
             >
               📊 დაშბორდი
+            </Button>
+            <Button
+              onClick={() => {
+                setShowDashboard(false);
+                setShowInbox(true);
+              }}
+              className="text-xl py-6 bg-pink-600 hover:bg-pink-700"
+            >
+              📬 სურვილები{familyPendingWishes.wishes.length > 0 ? ` (${familyPendingWishes.wishes.length})` : ''}
             </Button>
             <Button
               onClick={() => setShowChildSelector(true)}
