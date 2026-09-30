@@ -1,4 +1,4 @@
-const CACHE_NAME = 'thomthematica-v6';
+const CACHE_NAME = 'thomthematica-v7';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -25,6 +25,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Cross-origin API request (Supabase და ნებისმიერი სხვა backend) —
+  // არასდროს cache, ყოველთვის პირდაპირ ქსელში. Auth-დამოკიდებული
+  // პასუხების URL-ის მიხედვით cache-ვა სხვადასხვა მომხმარებელს შორის
+  // მონაცემთა გაჟონვის რისკს ქმნის.
+  if (!req.url.startsWith(self.location.origin)) {
+    return;
+  }
+
   // Network-first for navigation (opening app/shortcut)
   if (req.mode === 'navigate') {
     event.respondWith(
@@ -48,7 +56,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate for other assets
+  // Stale-while-revalidate for other assets (მხოლოდ საკუთარი origin-ის ფაილები: JS/CSS/images)
   event.respondWith(
     caches.match(req).then((cachedResponse) => {
       const fetchPromise = fetch(req).then((networkResponse) => {
