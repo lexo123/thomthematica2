@@ -64,13 +64,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         }
 
         const pinHash = await hashPin(pin);
-        const { error } = await signUp(email, password, fullName, pinHash);
+        const { error, pinSaved } = await signUp(email, password, fullName, pinHash);
         if (error) {
           setError(error.message || 'რეგისტრაცია ვერ მოხერხდა.');
         } else {
-          setMessage('რეგისტრაცია წარმატებულია! შეგიძლიათ შეხვიდეთ სისტემაში.');
-          setMode('login');
           resetFormState();
+          setMessage(
+            pinSaved
+              ? 'რეგისტრაცია წარმატებულია! შეგიძლიათ შეხვიდეთ სისტემაში.'
+              : 'ანგარიში შეიქმნა. PIN-ს პირველ შესვლაზე დააყენებთ.'
+          );
+          setMode('login');
         }
       } else if (mode === 'forgot_password') {
         const { error } = await resetPassword(email);

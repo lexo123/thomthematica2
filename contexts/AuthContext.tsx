@@ -10,7 +10,7 @@ interface AuthContextType {
   isConfigured: boolean;
   isPasswordRecovery: boolean;
   setIsPasswordRecovery: (value: boolean) => void;
-  signUp: (email: string, password: string, fullName?: string, pinHash?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName?: string, pinHash?: string) => Promise<{ error: Error | null; pinSaved: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -90,10 +90,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signUp = async (email: string, password: string, fullName?: string, pinHash?: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName?: string,
+    pinHash?: string
+  ): Promise<{ error: Error | null; pinSaved: boolean }> => {
     const supabase = getSupabase();
     if (!supabase) {
-      return { error: new Error('Supabase არ არის კონფიგურირებული') };
+      return { error: new Error('Supabase არ არის კონფიგურირებული'), pinSaved: false };
     }
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -106,22 +111,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       });
       if (error) {
-        return { error: new Error(error.message) };
+        return { error: new Error(error.message), pinSaved: false };
       }
 
+      let pinSaved = false;
       if (data?.user && pinHash) {
-        const { error: pinUpdateError } = await supabase
+        const { data: updatedRows, error: pinUpdateError } = await supabase
           .from('profiles')
           .update({ pin_hash: pinHash })
-          .eq('id', data.user.id);
-        if (pinUpdateError) {
-          return { error: new Error('PIN-ის შენახვა ვერ მოხერხდა. სცადეთ ხელახლა.') };
+          .eq('id', data.user.id)
+          .select('id');
+        if (pinUpdateError === null && Array.isArray(updatedRows) && updatedRows.length === 1) {
+          pinSaved = true;
         }
       }
 
-      return { error: null };
+      return { error: null, pinSaved };
     } catch (err: any) {
-      return { error: new Error(err.message || 'რეგისტრაციის შეცდომა') };
+      return { error: new Error(err.message || 'რეგისტრაციის შეცდომა'), pinSaved: false };
     }
   };
 

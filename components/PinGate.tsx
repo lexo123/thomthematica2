@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { useAuth } from '../contexts/AuthContext';
 import { useChild } from '../contexts/ChildContext';
 import { useSessionMode } from '../contexts/SessionModeContext';
-import { getSupabase } from '../lib/supabase';
+import { getSupabase, cleanUrl, cleanKey } from '../lib/supabase';
 import { hashPin, isValidPinFormat } from '../utils/pinHash';
 import { getAvatarEmoji } from '../hooks/useChildren';
 
@@ -16,6 +17,34 @@ type SelectedIdentity =
   | { type: 'parent' }
   | { type: 'child'; childId: string; childName: string };
 
+export type ParentPinStatus = 'has_pin' | 'no_pin' | 'error';
+
+/**
+ * Fail-closed derivation of parent PIN status from profiles.pin_hash query result:
+ * - Any query error -> 'error'
+ * - Missing row (data === null / undefined, even when error === null) -> 'error'
+ * - Existing row with pin_hash === null or '' -> 'no_pin'
+ * - Existing row with non-empty string pin_hash -> 'has_pin'
+ */
+export function deriveParentPinStatus(
+  data: { pin_hash?: string | null } | null | undefined,
+  error: unknown
+): ParentPinStatus {
+  if (error !== null && error !== undefined) {
+    return 'error';
+  }
+  if (data === null || data === undefined) {
+    return 'error';
+  }
+  if (data.pin_hash === null || data.pin_hash === undefined || data.pin_hash === '') {
+    return 'no_pin';
+  }
+  if (typeof data.pin_hash === 'string' && data.pin_hash.length > 0) {
+    return 'has_pin';
+  }
+  return 'error';
+}
+
 export const PinGate: React.FC = () => {
   const { user, signOut } = useAuth();
   const { setActiveChildId } = useChild();
@@ -25,6 +54,17 @@ export const PinGate: React.FC = () => {
   const [parentFullName, setParentFullName] = useState<string>('');
   const [childrenMeta, setChildrenMeta] = useState<IdentityChildMeta[]>([]);
   const [metadataLoading, setMetadataLoading] = useState<boolean>(false);
+
+  // Stage 2 parent PIN status (3-state result only; hash value is never stored in state)
+  const [parentPinStatus, setParentPinStatus] = useState<ParentPinStatus | null>(null);
+  const parentPinReqIdRef = useRef(0);
+
+  // Parent NULL PIN setup local states
+  const [passwordVerified, setPasswordVerified] = useState<boolean>(false);
+  const [setupPassword, setSetupPassword] = useState<string>('');
+  const [setupPin, setSetupPin] = useState<string>('');
+  const [setupConfirmPin, setSetupConfirmPin] = useState<string>('');
+  const [setupSubmitting, setSetupSubmitting] = useState<boolean>(false);
 
   const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -96,12 +136,63 @@ export const PinGate: React.FC = () => {
     };
   }, [user]);
 
-  // Focus hidden input when entering Stage 2
+  // Stage 2 (Parent): Read profiles.pin_hash once on entering parent Stage 2
   useEffect(() => {
-    if (selectedIdentity) {
+    if (selectedIdentity?.type !== 'parent') {
+      setParentPinStatus(null);
+      return;
+    }
+
+    let isCancelled = false;
+    const currentReqId = ++parentPinReqIdRef.current;
+
+    const checkParentPinStatus = async () => {
+      if (!user) {
+        if (!isCancelled && currentReqId === parentPinReqIdRef.current) {
+          setParentPinStatus('error');
+        }
+        return;
+      }
+
+      const supabase = getSupabase();
+      if (!supabase) {
+        if (!isCancelled && currentReqId === parentPinReqIdRef.current) {
+          setParentPinStatus('error');
+        }
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('pin_hash')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (isCancelled || currentReqId !== parentPinReqIdRef.current) return;
+
+        const status = deriveParentPinStatus(data, error);
+        setParentPinStatus(status);
+      } catch {
+        if (!isCancelled && currentReqId === parentPinReqIdRef.current) {
+          setParentPinStatus('error');
+        }
+      }
+    };
+
+    checkParentPinStatus();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedIdentity, user]);
+
+  // Focus hidden input when entering Stage 2 PIN keypad
+  useEffect(() => {
+    if (selectedIdentity && (selectedIdentity.type === 'child' || parentPinStatus === 'has_pin' || parentPinStatus === null)) {
       inputRef.current?.focus();
     }
-  }, [selectedIdentity]);
+  }, [selectedIdentity, parentPinStatus]);
 
   const parentDisplayName = parentFullName || 'მშობელი';
   const selectedIdentityName =
@@ -111,14 +202,27 @@ export const PinGate: React.FC = () => {
       ? selectedIdentity.childName
       : '';
 
+  const resetSetupState = () => {
+    setPasswordVerified(false);
+    setSetupPassword('');
+    setSetupPin('');
+    setSetupConfirmPin('');
+    setSetupSubmitting(false);
+  };
+
   const handleSelectIdentity = (identity: SelectedIdentity) => {
     setSelectedIdentity(identity);
+    setParentPinStatus(null);
+    resetSetupState();
     setPin('');
     setErrorMsg(null);
   };
 
   const handleBackToStage1 = () => {
+    parentPinReqIdRef.current += 1;
     setSelectedIdentity(null);
+    setParentPinStatus(null);
+    resetSetupState();
     setPin('');
     setErrorMsg(null);
   };
@@ -162,7 +266,11 @@ export const PinGate: React.FC = () => {
     try {
       const supabase = getSupabase();
       if (!supabase) {
-        setErrorMsg(`არასწორი PIN ${selectedIdentityName}-სთვის`);
+        if (selectedIdentity.type === 'parent') {
+          setParentPinStatus('error');
+        } else {
+          setErrorMsg('შემოწმება ვერ მოხერხდა, სცადეთ თავიდან');
+        }
         setPin('');
         return;
       }
@@ -176,8 +284,19 @@ export const PinGate: React.FC = () => {
           .eq('id', user.id)
           .maybeSingle();
 
-        const targetHash = !error && typeof data?.pin_hash === 'string' ? data.pin_hash : null;
+        const status = deriveParentPinStatus(data, error);
+        if (status === 'error') {
+          setParentPinStatus('error');
+          setPin('');
+          return;
+        }
+        if (status === 'no_pin') {
+          setParentPinStatus('no_pin');
+          setPin('');
+          return;
+        }
 
+        const targetHash = typeof data?.pin_hash === 'string' ? data.pin_hash : null;
         if (targetHash && targetHash.length > 0 && candidateHash === targetHash) {
           setSessionMode('parent');
           return;
@@ -189,9 +308,22 @@ export const PinGate: React.FC = () => {
           .eq('id', selectedIdentity.childId)
           .maybeSingle();
 
-        const targetHash = !error && typeof data?.pin_hash === 'string' ? data.pin_hash : null;
+        if (error || !data) {
+          setErrorMsg('შემოწმება ვერ მოხერხდა, სცადეთ თავიდან');
+          setPin('');
+          inputRef.current?.focus();
+          return;
+        }
 
-        if (targetHash && targetHash.length > 0 && candidateHash === targetHash) {
+        const targetHash = typeof data.pin_hash === 'string' ? data.pin_hash : '';
+        if (targetHash.length === 0) {
+          setErrorMsg('ამ ბავშვს PIN არ აქვს დაყენებული. გთხოვეთ მშობელს.');
+          setPin('');
+          inputRef.current?.focus();
+          return;
+        }
+
+        if (candidateHash === targetHash) {
           // Synchronously set both in the same event handler to eliminate intermediate states
           setActiveChildId(selectedIdentity.childId);
           setSessionMode('child');
@@ -203,7 +335,11 @@ export const PinGate: React.FC = () => {
       setPin('');
       inputRef.current?.focus();
     } catch {
-      setErrorMsg(`არასწორი PIN ${selectedIdentityName}-სთვის`);
+      if (selectedIdentity.type === 'parent') {
+        setParentPinStatus('error');
+      } else {
+        setErrorMsg('შემოწმება ვერ მოხერხდა, სცადეთ თავიდან');
+      }
       setPin('');
       inputRef.current?.focus();
     } finally {
@@ -215,6 +351,97 @@ export const PinGate: React.FC = () => {
     e.preventDefault();
     if (pin.length === 4) {
       verifyPin(pin);
+    }
+  };
+
+  const handleVerifySetupPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !user.email) {
+      setErrorMsg('მომხმარებლის ელფოსტა ვერ მოიძებნა');
+      return;
+    }
+    if (!setupPassword) {
+      setErrorMsg('შეიყვანეთ ანგარიშის პაროლი');
+      return;
+    }
+
+    setSetupSubmitting(true);
+    setErrorMsg(null);
+
+    try {
+      const tempClient = createClient(cleanUrl, cleanKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      });
+
+      const { error } = await tempClient.auth.signInWithPassword({
+        email: user.email,
+        password: setupPassword,
+      });
+
+      if (error) {
+        setErrorMsg('არასწორი პაროლი');
+        return;
+      }
+
+      setPasswordVerified(true);
+      setSetupPassword('');
+      setErrorMsg(null);
+    } catch {
+      setErrorMsg('არასწორი პაროლი');
+    } finally {
+      setSetupSubmitting(false);
+    }
+  };
+
+  const handleSaveNewParentPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !passwordVerified) return;
+
+    if (!isValidPinFormat(setupPin)) {
+      setErrorMsg('PIN კოდი უნდა შედგებოდეს ზუსტად 4 ციფრისგან');
+      return;
+    }
+
+    if (setupPin !== setupConfirmPin) {
+      setErrorMsg('PIN კოდები არ ემთხვევა ერთმანეთს');
+      return;
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) {
+      setErrorMsg('PIN-ის შენახვა ვერ მოხერხდა, სცადეთ თავიდან');
+      return;
+    }
+
+    setSetupSubmitting(true);
+    setErrorMsg(null);
+
+    try {
+      const newPinHash = await hashPin(setupPin);
+      const { data: updatedRows, error: updateError } = await supabase
+        .from('profiles')
+        .update({ pin_hash: newPinHash })
+        .eq('id', user.id)
+        .select('id');
+
+      if (updateError !== null || !Array.isArray(updatedRows) || updatedRows.length !== 1) {
+        setErrorMsg('PIN-ის შენახვა ვერ მოხერხდა, სცადეთ თავიდან');
+        return;
+      }
+
+      // Return to regular Stage 2 PIN-entry so parent enters the newly set PIN
+      resetSetupState();
+      setPin('');
+      setErrorMsg(null);
+      setParentPinStatus('has_pin');
+    } catch {
+      setErrorMsg('PIN-ის შენახვა ვერ მოხერხდა, სცადეთ თავიდან');
+    } finally {
+      setSetupSubmitting(false);
     }
   };
 
@@ -300,6 +527,128 @@ export const PinGate: React.FC = () => {
                   </button>
                 ))}
               </div>
+            )}
+          </>
+        ) : selectedIdentity.type === 'parent' && parentPinStatus === 'error' ? (
+          /* Stage 2 (Parent) — Fail-Closed Error State */
+          <>
+            <div className="w-full flex justify-start mb-2">
+              <button
+                type="button"
+                onClick={handleBackToStage1}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors"
+              >
+                ← უკან
+              </button>
+            </div>
+
+            <div className="w-16 h-16 bg-rose-100 rounded-2xl flex items-center justify-center text-3xl shadow-inner mb-4">
+              ⚠️
+            </div>
+
+            <div className="w-full mb-6 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
+              შემოწმება ვერ მოხერხდა, სცადეთ თავიდან
+            </div>
+          </>
+        ) : selectedIdentity.type === 'parent' && parentPinStatus === 'no_pin' ? (
+          /* Stage 2 (Parent) — NULL PIN First-Time Setup Flow */
+          <>
+            <div className="w-full flex justify-start mb-2">
+              <button
+                type="button"
+                onClick={handleBackToStage1}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors"
+              >
+                ← უკან
+              </button>
+            </div>
+
+            <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center text-3xl shadow-inner mb-4">
+              🔑
+            </div>
+
+            <h1 className="text-2xl font-black text-indigo-950 tracking-tight">
+              მშობლის PIN-ის დაყენება
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 mb-6 font-medium">
+              {passwordVerified
+                ? 'შეიყვანეთ ახალი 4-ციფრიანი PIN კოდი'
+                : 'უსაფრთხოებისთვის შეიყვანეთ ანგარიშის პაროლი'}
+            </p>
+
+            {errorMsg && (
+              <div className="w-full mb-4 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold animate-shake">
+                {errorMsg}
+              </div>
+            )}
+
+            {!passwordVerified ? (
+              <form onSubmit={handleVerifySetupPassword} className="w-full space-y-4 mb-4">
+                <input
+                  type="password"
+                  value={setupPassword}
+                  onChange={(e) => {
+                    setSetupPassword(e.target.value);
+                    setErrorMsg(null);
+                  }}
+                  placeholder="ანგარიშის პაროლი"
+                  aria-label="ანგარიშის პაროლი"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-sm font-medium text-slate-800 outline-none transition-all"
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  disabled={setupSubmitting}
+                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-sm rounded-xl shadow-md transition-all disabled:opacity-50"
+                >
+                  {setupSubmitting ? 'მოწმდება...' : 'პაროლის დადასტურება'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleSaveNewParentPin} className="w-full space-y-4 mb-4">
+                <div>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    value={setupPin}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                      setSetupPin(val);
+                      setErrorMsg(null);
+                    }}
+                    placeholder="ახალი PIN"
+                    aria-label="ახალი PIN კოდი"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-sm font-medium text-slate-800 outline-none transition-all tracking-widest text-center"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    value={setupConfirmPin}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                      setSetupConfirmPin(val);
+                      setErrorMsg(null);
+                    }}
+                    placeholder="გაიმეორეთ PIN"
+                    aria-label="გაიმეორეთ PIN კოდი"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-sm font-medium text-slate-800 outline-none transition-all tracking-widest text-center"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={setupSubmitting}
+                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-sm rounded-xl shadow-md transition-all disabled:opacity-50"
+                >
+                  {setupSubmitting ? 'ინახება...' : 'PIN-ის შენახვა'}
+                </button>
+              </form>
             )}
           </>
         ) : (

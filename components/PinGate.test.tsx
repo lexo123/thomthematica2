@@ -2,11 +2,20 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup, waitFor } from '@testing-library/react';
-import { PinGate } from './PinGate';
+import * as supabaseJs from '@supabase/supabase-js';
+import { PinGate, deriveParentPinStatus } from './PinGate';
 import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
 import * as SessionModeContext from '../contexts/SessionModeContext';
 import * as supabaseModule from '../lib/supabase';
+
+vi.mock('@supabase/supabase-js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@supabase/supabase-js')>();
+  return {
+    ...actual,
+    createClient: vi.fn(),
+  };
+});
 
 // Real SHA-256 hashes:
 // SHA-256('1234')
@@ -22,9 +31,16 @@ describe('PinGate Component — Two-Stage Identity-First Flow', () => {
   let setActiveChildIdMock: any;
   let signOutMock: any;
   let profilesSelectSpy: any;
+  let profilesUpdateSpy: any;
+  let profilesUpdateEqSpy: any;
+  let profilesUpdateSelectSpy: any;
   let childrenSelectSpy: any;
   let childrenEqSpy: any;
   let parentFullNameMock: string | null;
+  let parentPinHashResultMock: { data: { pin_hash: string | null } | null; error: any };
+  let childPinHashResultOverride: Record<string, { data: { pin_hash: string | null } | null; error: any }>;
+  let mainSignInWithPasswordSpy: any;
+  let tempSignInWithPasswordSpy: any;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -35,6 +51,17 @@ describe('PinGate Component — Two-Stage Identity-First Flow', () => {
     setActiveChildIdMock = vi.fn();
     signOutMock = vi.fn();
     parentFullNameMock = 'გიორგი';
+    parentPinHashResultMock = { data: { pin_hash: HASH_PARENT_1234 }, error: null };
+    childPinHashResultOverride = {};
+
+    mainSignInWithPasswordSpy = vi.fn();
+    tempSignInWithPasswordSpy = vi.fn().mockResolvedValue({ data: { session: {} }, error: null });
+
+    vi.mocked(supabaseJs.createClient).mockReturnValue({
+      auth: {
+        signInWithPassword: tempSignInWithPasswordSpy,
+      },
+    } as any);
 
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: { id: 'parent-123', email: 'parent@example.com', user_metadata: { full_name: 'გიორგი' } } as any,
@@ -82,7 +109,7 @@ describe('PinGate Component — Two-Stage Identity-First Flow', () => {
                   return { data: { full_name: parentFullNameMock }, error: null };
                 }
                 if (columns === 'pin_hash') {
-                  return { data: { pin_hash: HASH_PARENT_1234 }, error: null };
+                  return parentPinHashResultMock;
                 }
               }
               return { data: null, error: null };
@@ -90,6 +117,17 @@ describe('PinGate Component — Two-Stage Identity-First Flow', () => {
           };
         }),
       };
+    });
+
+    profilesUpdateSelectSpy = vi.fn().mockResolvedValue({
+      data: [{ id: 'parent-123' }],
+      error: null,
+    });
+    profilesUpdateEqSpy = vi.fn().mockReturnValue({
+      select: profilesUpdateSelectSpy,
+    });
+    profilesUpdateSpy = vi.fn().mockReturnValue({
+      eq: profilesUpdateEqSpy,
     });
 
     childrenEqSpy = vi.fn().mockImplementation((col: string, val: string) => {
@@ -105,6 +143,9 @@ describe('PinGate Component — Two-Stage Identity-First Flow', () => {
       if (col === 'id') {
         return {
           maybeSingle: vi.fn().mockImplementation(async () => {
+            if (val in childPinHashResultOverride) {
+              return childPinHashResultOverride[val];
+            }
             if (val === 'child-a') {
               return { data: { pin_hash: HASH_CHILD_A_5678 }, error: null };
             }
@@ -126,7 +167,7 @@ describe('PinGate Component — Two-Stage Identity-First Flow', () => {
 
     const mockFrom = vi.fn().mockImplementation((table: string) => {
       if (table === 'profiles') {
-        return { select: profilesSelectSpy };
+        return { select: profilesSelectSpy, update: profilesUpdateSpy };
       }
       if (table === 'children') {
         return { select: childrenSelectSpy };
@@ -135,6 +176,9 @@ describe('PinGate Component — Two-Stage Identity-First Flow', () => {
     });
 
     vi.spyOn(supabaseModule, 'getSupabase').mockReturnValue({
+      auth: {
+        signInWithPassword: mainSignInWithPasswordSpy,
+      },
       from: mockFrom,
     } as any);
   });
@@ -370,5 +414,348 @@ describe('PinGate Component — Two-Stage Identity-First Flow', () => {
     expect(resetSessionModeMock).toHaveBeenCalled();
     expect(setActiveChildIdMock).toHaveBeenCalledWith(null);
     expect(signOutMock).toHaveBeenCalled();
+  });
+
+  // --- COMMIT 2: Parent NULL PIN Setup & Fail-Closed Semantics ---
+
+  describe('COMMIT 2: deriveParentPinStatus fail-closed semantics & Parent NULL PIN Setup', () => {
+    it('deriveParentPinStatus enforces strict 4-case fail-closed semantics', () => {
+      // 1. Row does not exist (error === null, data === null) -> 'error' (fail-closed, never 'no_pin')
+      expect(deriveParentPinStatus(null, null)).toBe('error');
+      // 2. Query error -> 'error'
+      expect(deriveParentPinStatus({ pin_hash: null }, { message: 'DB error' })).toBe('error');
+      // 3. Row exists, pin_hash is null -> 'no_pin'
+      expect(deriveParentPinStatus({ pin_hash: null }, null)).toBe('no_pin');
+      // 4. Row exists, pin_hash is empty string -> 'no_pin'
+      expect(deriveParentPinStatus({ pin_hash: '' }, null)).toBe('no_pin');
+      // 5. Row exists, pin_hash is populated -> 'has_pin'
+      expect(deriveParentPinStatus({ pin_hash: HASH_PARENT_1234 }, null)).toBe('has_pin');
+    });
+
+    it('does NOT query profiles.pin_hash on Stage 1 render, and queries it once when parent identity is clicked', async () => {
+      render(<PinGate />);
+
+      await waitFor(() => {
+        expect(screen.getByText('გიორგი')).toBeDefined();
+      });
+
+      expect(profilesSelectSpy).toHaveBeenCalledWith('full_name');
+      expect(profilesSelectSpy).not.toHaveBeenCalledWith('pin_hash');
+
+      fireEvent.click(screen.getByText('გიორგი'));
+
+      await waitFor(() => {
+        expect(profilesSelectSpy).toHaveBeenCalledWith('pin_hash');
+      });
+
+      // Existing PIN -> setup screen does NOT appear
+      expect(screen.queryByText('მშობლის PIN-ის დაყენება')).toBeNull();
+      expect(screen.getByText('შეიყვანეთ გიორგი-ის PIN')).toBeDefined();
+    });
+
+    it('renders setup screen (not "არასწორი PIN") when parent row exists with pin_hash: null or empty string', async () => {
+      parentPinHashResultMock = { data: { pin_hash: null }, error: null };
+
+      render(<PinGate />);
+
+      await waitFor(() => {
+        expect(screen.getByText('გიორგი')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('გიორგი'));
+
+      await waitFor(() => {
+        expect(screen.getByText('მშობლის PIN-ის დაყენება')).toBeDefined();
+      });
+
+      expect(screen.getByPlaceholderText('ანგარიშის პაროლი')).toBeDefined();
+      expect(screen.queryByText(/არასწორი PIN/)).toBeNull();
+      expect(setSessionModeMock).not.toHaveBeenCalled();
+    });
+
+    it('fail-closed on profiles.pin_hash query error or missing row (data === null): shows error message and "← უკან", does not open setup or change sessionMode', async () => {
+      // Case A: DB error
+      parentPinHashResultMock = { data: null, error: { message: 'RLS or network error' } };
+
+      const { unmount } = render(<PinGate />);
+
+      await waitFor(() => {
+        expect(screen.getByText('გიორგი')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('გიორგი'));
+
+      await waitFor(() => {
+        expect(screen.getByText('შემოწმება ვერ მოხერხდა, სცადეთ თავიდან')).toBeDefined();
+      });
+
+      expect(screen.getByText('← უკან')).toBeDefined();
+      expect(screen.queryByText('მშობლის PIN-ის დაყენება')).toBeNull();
+      expect(setSessionModeMock).not.toHaveBeenCalled();
+
+      unmount();
+
+      // Case B: error === null, data === null (missing profile row) -> fail-closed 'error'
+      parentPinHashResultMock = { data: null, error: null };
+      render(<PinGate />);
+
+      await waitFor(() => {
+        expect(screen.getByText('გიორგი')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('გიორგი'));
+
+      await waitFor(() => {
+        expect(screen.getByText('შემოწმება ვერ მოხერხდა, სცადეთ თავიდან')).toBeDefined();
+      });
+
+      expect(screen.queryByText('მშობლის PIN-ის დაყენება')).toBeNull();
+      expect(setSessionModeMock).not.toHaveBeenCalled();
+    });
+
+    it('wrong password during setup does not start PIN input step and uses temporary Supabase client (not main client)', async () => {
+      parentPinHashResultMock = { data: { pin_hash: null }, error: null };
+      tempSignInWithPasswordSpy.mockResolvedValue({
+        data: { session: null },
+        error: { message: 'Invalid login credentials' },
+      });
+
+      render(<PinGate />);
+
+      await waitFor(() => {
+        expect(screen.getByText('გიორგი')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('გიორგი'));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('ანგარიშის პაროლი')).toBeDefined();
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('ანგარიშის პაროლი'), {
+        target: { value: 'wrong-pass' },
+      });
+      fireEvent.click(screen.getByText('პაროლის დადასტურება'));
+
+      await waitFor(() => {
+        expect(screen.getByText('არასწორი პაროლი')).toBeDefined();
+      });
+
+      // Temporary client was created with non-persisting auth options
+      expect(supabaseJs.createClient).toHaveBeenCalledWith(
+        supabaseModule.cleanUrl,
+        supabaseModule.cleanKey,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        }
+      );
+      expect(tempSignInWithPasswordSpy).toHaveBeenCalledWith({
+        email: 'parent@example.com',
+        password: 'wrong-pass',
+      });
+      // Main client signInWithPassword must NEVER be called
+      expect(mainSignInWithPasswordSpy).not.toHaveBeenCalled();
+
+      // PIN inputs do not appear and update is not called
+      expect(screen.queryByPlaceholderText('ახალი PIN')).toBeNull();
+      expect(profilesUpdateSpy).not.toHaveBeenCalled();
+      expect(setSessionModeMock).not.toHaveBeenCalled();
+    });
+
+    it('when password is valid but profiles.update affects 0 rows, setup stays incomplete with error and sessionMode does not change', async () => {
+      parentPinHashResultMock = { data: { pin_hash: null }, error: null };
+      profilesUpdateSelectSpy.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+
+      render(<PinGate />);
+
+      await waitFor(() => {
+        expect(screen.getByText('გიორგი')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('გიორგი'));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('ანგარიშის პაროლი')).toBeDefined();
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('ანგარიშის პაროლი'), {
+        target: { value: 'correct-pass' },
+      });
+      fireEvent.click(screen.getByText('პაროლის დადასტურება'));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('ახალი PIN')).toBeDefined();
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('ახალი PIN'), { target: { value: '1234' } });
+      fireEvent.change(screen.getByPlaceholderText('გაიმეორეთ PIN'), { target: { value: '1234' } });
+      fireEvent.click(screen.getByText('PIN-ის შენახვა'));
+
+      await waitFor(() => {
+        expect(screen.getByText('PIN-ის შენახვა ვერ მოხერხდა, სცადეთ თავიდან')).toBeDefined();
+      });
+
+      expect(profilesUpdateSpy).toHaveBeenCalledWith({ pin_hash: HASH_PARENT_1234 });
+      expect(profilesUpdateEqSpy).toHaveBeenCalledWith('id', 'parent-123');
+      expect(profilesUpdateSelectSpy).toHaveBeenCalledWith('id');
+
+      // Stays on setup screen, does NOT transition to Stage 2 PIN keypad or parent mode
+      expect(screen.getByText('მშობლის PIN-ის დაყენება')).toBeDefined();
+      expect(screen.queryByText('შეიყვანეთ გიორგი-ის PIN')).toBeNull();
+      expect(setSessionModeMock).not.toHaveBeenCalled();
+    });
+
+    it('when password is valid and profiles.update updates 1 row, transitions back to Stage 2 PIN entry without auto-opening parent mode', async () => {
+      parentPinHashResultMock = { data: { pin_hash: null }, error: null };
+      profilesUpdateSelectSpy.mockResolvedValue({
+        data: [{ id: 'parent-123' }],
+        error: null,
+      });
+
+      render(<PinGate />);
+
+      await waitFor(() => {
+        expect(screen.getByText('გიორგი')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('გიორგი'));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('ანგარიშის პაროლი')).toBeDefined();
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('ანგარიშის პაროლი'), {
+        target: { value: 'correct-pass' },
+      });
+      fireEvent.click(screen.getByText('პაროლის დადასტურება'));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('ახალი PIN')).toBeDefined();
+      });
+
+      expect(mainSignInWithPasswordSpy).not.toHaveBeenCalled();
+
+      // Update mock so subsequent Stage 2 verification sees the saved hash
+      parentPinHashResultMock = { data: { pin_hash: HASH_PARENT_1234 }, error: null };
+
+      fireEvent.change(screen.getByPlaceholderText('ახალი PIN'), { target: { value: '1234' } });
+      fireEvent.change(screen.getByPlaceholderText('გაიმეორეთ PIN'), { target: { value: '1234' } });
+      fireEvent.click(screen.getByText('PIN-ის შენახვა'));
+
+      // Returns to regular Stage 2 PIN-entry screen
+      await waitFor(() => {
+        expect(screen.getByText('შეიყვანეთ გიორგი-ის PIN')).toBeDefined();
+      });
+
+      // Must NOT auto-enter parent mode before entering the PIN on Stage 2
+      expect(setSessionModeMock).not.toHaveBeenCalled();
+
+      // Now parent enters the newly set PIN on Stage 2
+      await act(async () => {
+        fireEvent.click(screen.getByText('1'));
+        fireEvent.click(screen.getByText('2'));
+        fireEvent.click(screen.getByText('3'));
+        fireEvent.click(screen.getByText('4'));
+      });
+
+      await waitFor(() => {
+        expect(setSessionModeMock).toHaveBeenCalledWith('parent');
+      });
+    });
+  });
+
+  // --- COMMIT 3: Child NULL PIN & Error Differentiation ---
+
+  describe('COMMIT 3: Child verifyPin distinguishes query error, NULL/empty PIN, and wrong PIN', () => {
+    it('(a) shows "შემოწმება ვერ მოხერხდა, სცადეთ თავიდან" and keeps access closed on children.pin_hash query error', async () => {
+      childPinHashResultOverride['child-a'] = {
+        data: null,
+        error: { message: 'Query failed' },
+      };
+
+      render(<PinGate />);
+
+      await waitFor(() => {
+        expect(screen.getByText('თომა')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('თომა'));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('5'));
+        fireEvent.click(screen.getByText('6'));
+        fireEvent.click(screen.getByText('7'));
+        fireEvent.click(screen.getByText('8'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('შემოწმება ვერ მოხერხდა, სცადეთ თავიდან')).toBeDefined();
+      });
+
+      expect(setSessionModeMock).not.toHaveBeenCalled();
+      expect(setActiveChildIdMock).not.toHaveBeenCalled();
+      expect(screen.queryByText('მშობლის PIN-ის დაყენება')).toBeNull();
+    });
+
+    it('(b) shows "ამ ბავშვს PIN არ აქვს დაყენებული. გთხოვეთ მშობელს." when child pin_hash is null or empty, without any setup screen', async () => {
+      childPinHashResultOverride['child-a'] = {
+        data: { pin_hash: null },
+        error: null,
+      };
+
+      render(<PinGate />);
+
+      await waitFor(() => {
+        expect(screen.getByText('თომა')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('თომა'));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('5'));
+        fireEvent.click(screen.getByText('6'));
+        fireEvent.click(screen.getByText('7'));
+        fireEvent.click(screen.getByText('8'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('ამ ბავშვს PIN არ აქვს დაყენებული. გთხოვეთ მშობელს.')).toBeDefined();
+      });
+
+      expect(setSessionModeMock).not.toHaveBeenCalled();
+      expect(setActiveChildIdMock).not.toHaveBeenCalled();
+      expect(screen.queryByText('მშობლის PIN-ის დაყენება')).toBeNull();
+    });
+
+    it('(c) shows "არასწორი PIN თომა-სთვის" when child pin_hash exists but does not match', async () => {
+      render(<PinGate />);
+
+      await waitFor(() => {
+        expect(screen.getByText('თომა')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('თომა'));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('9'));
+        fireEvent.click(screen.getByText('9'));
+        fireEvent.click(screen.getByText('9'));
+        fireEvent.click(screen.getByText('9'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('არასწორი PIN თომა-სთვის')).toBeDefined();
+      });
+
+      expect(setSessionModeMock).not.toHaveBeenCalled();
+      expect(setActiveChildIdMock).not.toHaveBeenCalled();
+    });
   });
 });
