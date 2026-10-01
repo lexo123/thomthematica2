@@ -1,6 +1,6 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: Wave Y (Wish Approval Workflow) სრულად დასრულებული და დამოუკიდებლად დადასტურებული (Stage 1 → 2 → 3a → 3b → 3c, commit 3d92e11-მდე); ამ პროცესში აღმოჩენილი და გასწორებული launch-blocking security ბაგი (Service Worker-ის cross-origin cache, commit 1f3e969); UI-ტექსტის 5 გადარქმევა (თამაშების სახელები, "დაშბორდი"→"სტატისტიკა", "გასვლა identity-დან"→"მომხმარებლის შეცვლა") დასრულებული_
+_ბოლო განახლება: Post-Wave-Y: რეგისტრაციის PIN-ის ჩუმი დაკარგვის ბაგი გასწორებული და ცოცხლად დადასტურებული (commit ecd892a); Wave Y (Wish Approval Workflow) სრულად დასრულებული და დამოუკიდებლად დადასტურებული (Stage 1 → 2 → 3a → 3b → 3c, commit 3d92e11-მდე); ამ პროცესში აღმოჩენილი და გასწორებული launch-blocking security ბაგი (Service Worker-ის cross-origin cache, commit 1f3e969); UI-ტექსტის 5 გადარქმევა (თამაშების სახელები, "დაშბორდი"→"სტატისტიკა", "გასვლა identity-დან"→"მომხმარებლის შეცვლა") დასრულებული_
 
 ## Repo
 https://github.com/lexo123/thomthematica2
@@ -244,6 +244,26 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 ---
 
+## Post-Wave-Y Fix — რეგისტრაციისას pin_hash-ის ჩუმი დაკარგვა ✅ (commit ecd892a)
+
+**სიმპტომი (რეალური ტესტირებიდან):** ახალი მშობლის რეგისტრაციის შემდეგ profiles.pin_hash NULL რჩებოდა, UI კი "წარმატებულს" აჩვენებდა. PinGate-ში NULL hash "არასწორი PIN"-ად ჩანდა და ასეთი მშობელი ვერასდროს შედიოდა.
+
+**დადასტურებული code-level მიზეზი:** AuthContext.signUp ამოწმებდა მხოლოდ error-ს profiles.update-ის შემდეგ. Supabase update, რომელიც 0 row-ს ცვლის, error-ს არ აბრუნებს.
+
+**ზუსტი root cause ვერ დადგინდა:** შესაძლო მიზეზები — ძველი build ბრაუზერის service worker-ის ქეშიდან, ან session/JWT race. გამორიცხულია: RLS (pg_policies ემთხვევა schema.sql-ს), email confirmation (გამორთულია), failed deploy (Actions მწვანე). ამიტომ fix ფარავს ორივე შესაძლო მიზეზს.
+
+**Fix (3 ნაწილი, ერთ commit-ში):**
+- signUp: update + .select('id'), pinSaved === true მხოლოდ error === null და ზუსტად 1 row-ზე. 0 row/error → { error: null, pinSaved: false } (ანგარიში უკვე შექმნილია), AuthModal აჩვენებს "PIN-ს პირველ შესვლაზე დააყენებთ".
+- PinGate: მშობლის identity-ზე დაჭერისას ერთხელ იკითხება profiles.pin_hash (3-მდგომარეობიანი ლოკალური status: has_pin/no_pin/error; hash state-ში არ ინახება). Fail-closed: query error ან row-ს არარსებობა = 'error', არასდროს 'no_pin'. 'no_pin' = row არსებობს და pin_hash null/ცარიელია. 'no_pin'-ზე გამოჩნდება PIN-ის დაყენების ეკრანი.
+- უსაფრთხოება: setup-მდე ანგარიშის პაროლის გადამოწმება დროებითი, ცალკე Supabase client-ით (persistSession/autoRefreshToken/detectSessionInUrl გამორთული), რათა მთავარ client-ზე SIGNED_IN არ აღიძვრას. ეს ბავშვს უშლის ხელს ცარიელი მშობლის PIN-ის დაკავებაში. setup-ის შემდეგ მშობელი ისევ ჩვეულებრივ PIN-entry-ზე ბრუნდება და parent mode ავტომატურად არ იხსნება.
+- ბავშვის NULL PIN: setup არ არსებობს, ცალკე შეტყობინება ("ამ ბავშვს PIN არ აქვს დაყენებული. გთხოვეთ მშობელს."), query error ცალკე შემთხვევაა.
+
+**Verification:** fresh clone, parent be6e0e3, 5 ფაილი (AuthContext, AuthModal, PinGate + ტესტები), tsc 0 შეცდომა, vitest 39/39 ფაილი, 306/306 ტესტი, build სუფთა. ცოცხალი ტესტი: ახალი რეგისტრაცია, pin_hash ხელით NULL-ზე დაყენება, setup-ეკრანი, პაროლის დაბლოკვა, ახალი PIN-ით შესვლა — ყველა გავიდა.
+
+**პროცესის შენიშვნა:** prompt სამ commit-ს ითხოვდა, AI Studio-მ ერთი გამოაგზავნა. შემდეგ prompt-ებში commit-ების რაოდენობა მკაფიოდ გაიწეროს.
+
+---
+
 ## საკვანძო არქიტექტურული გადაწყვეტილებები (არ შეიცვალოს განხილვის გარეშე)
 
 - DB schema: 5 table (`profiles`, `children`, `game_sessions`, `wishes`, `child_reward_images`) + `pin_hash` column ორივე `profiles`/`children`-ზე (განზრახ nullable) + `wishes.status`/`wish_parent_note`/`image_parent_note`/`proposed_image_path` (Wave Y)
@@ -263,6 +283,10 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 - **AI Studio ZIP revert risk** — ვრცელდება ნებისმიერ ფაილზე, რომელიც git-ში/GitHub-ზე იცვლება AI Studio-ს ZIP workflow-ის გარეთ. ყოველი ასეთი ცვლილების შემდეგ, განახლებული ფაილი ხელით უნდა აიტვირთოს AI Studio-ს project-შიც
 - **AI Studio-ს საბოლოო report-ს არასდროს ვენდობით ბრმად** — ყოველი commit fresh-clone-ით, დამოუკიდებლად მოწმდება (hash, scope/diff, tsc, vitest, build). Wave Y-ში ორჯერ დადასტურდა, რომ ეს წესი რეალურ ღირებულებას იძლევა (Stage 1-ის scope-განხილვა, UI-rename-ის report-ში არარსებული ცვლილების ხსენება)
 - Auto-pause mitigation: GitHub Actions scheduled workflow (`.github/workflows/keep-supabase-alive.yml`) — ✅ დანერგილია, push-ილია, manual test-run წარმატებული
+- **Supabase update/delete-ის წარმატება არასდროს მოწმდება მხოლოდ error-ით.** ყოველთვის .select('id') + row count (0 row error-ს არ აბრუნებს, RLS-ით გაფილტრული ან არარსებული row ჩუმად ჩავარდება).
+- **NULL pin_hash ≠ "PIN არ არის საჭირო".** NULL ნიშნავს "არ არის კონფიგურირებული" და წვდომას არასდროს იძლევა (fail-closed). query error არასდროს იგივდება NULL-თან.
+- **ანგარიშის პაროლის ხელახალი გადამოწმება PinGate-ში** ხდება დროებითი, ცალკე client-ით და არა მთავარით, რათა არსებული auth lifecycle (onAuthStateChange, ensureProfileExists, ChildContext) არ შეიცვალოს.
+- **Table Editor-ში profiles-დან row-ის წაშლა auth.users-ს არ შლის.** ანგარიშის წასაშლელად: Authentication → Users → Delete user (cascade: profiles → children). Storage ფაილები (child-reward-images) cascade-ით არ იშლება.
 
 ## დაგეგმილი მომდევნო Wave-ები (პრიორიტეტის მიხედვით)
 
@@ -290,6 +314,7 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 - სატესტო ანგარიშების წაშლა (Supabase Dashboard → Authentication → Users). წაშლის შემდეგ შეამოწმე, რომ მათი `children`, `game_sessions`, `wishes` ჩანაწერებიც წაიშალა და `child-reward-images` bucket-ში (მათ შორის `pending`-ქვესაქაღალდეებში) სატესტო სურათები არ დარჩა
 - სრული ნამდვილი ნაკადის ერთხელ გავლა ახალი ანგარიშით: რეგისტრაცია PIN-ით → ბავშვის დამატება PIN-ით → ბავშვის PIN-ით შესვლა და თამაში → wish-ის დაწერა → მშობლის PIN-ით შესვლა, Inbox, დადასტურება/უარყოფა → სურათის ატვირთვა/დადასტურება → `published`-ის ხელით დასმა
 - **ყველა ტესტ-browser-ში service worker-ის hard-refresh/unregister** (security fix-ის commit-ის შემდეგ) — ძველი, დაზიანებული cache-ლოგიკის მქონე service worker-ები ხელით უნდა ჩანაცვლდეს
+- - sw.js-ის CACHE_NAME ახლა v7 და ახალი deploy-ის შემდეგ stale-while-revalidate ძველ bundle-ს ერთხელ კიდევ აჩვენებს. ყოველი კრიტიკული deploy-ის შემდეგ ტესტი ინკოგნიტოში ან Unregister + Clear site data-ის შემდეგ.
 
 **აღარ ბლოკავს (ამ conversation-ის ფარგლებში დასრულებული):**
 - ~~Wave X (PIN gate)~~ ✅ დასრულებულია
