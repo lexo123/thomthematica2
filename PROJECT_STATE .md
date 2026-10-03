@@ -1,6 +1,6 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: Post-Wave-Y: რეგისტრაციის PIN-ის ჩუმი დაკარგვის ბაგი გასწორებული და ცოცხლად დადასტურებული (commit ecd892a); Wave Y (Wish Approval Workflow) სრულად დასრულებული და დამოუკიდებლად დადასტურებული (Stage 1 → 2 → 3a → 3b → 3c, commit 3d92e11-მდე); ამ პროცესში აღმოჩენილი და გასწორებული launch-blocking security ბაგი (Service Worker-ის cross-origin cache, commit 1f3e969); UI-ტექსტის 5 გადარქმევა (თამაშების სახელები, "დაშბორდი"→"სტატისტიკა", "გასვლა identity-დან"→"მომხმარებლის შეცვლა") დასრულებული_
+_ბოლო განახლება: Pre-Launch Bug-Fix Wave დასრულებული და ცოცხლად დადასტურებული (commits c8b6802, 111a659, 9f68acd, b28cb05): ბლოკის UI-state-ის თამაშებს/ბავშვებს შორის გადმოდინება, ორმაგი "completed" flush-ით duration=0, მენიუში გასვლისას rolling window-ს წაშლა, და Dashboard-ში გაჭედილი "active" სესიების უჩინარობა — ოთხივე გასწორებული. წინა: რეგისტრაციის PIN-ის ჩუმი დაკარგვა (ecd892a), Wave Y (3d92e11-მდე), Service Worker cross-origin cache leak (1f3e969)_
 
 ## Repo
 https://github.com/lexo123/thomthematica2
@@ -264,6 +264,37 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 ---
 
+## Pre-Launch Bug-Fix Wave (Post-Wave-Y) ✅ (სრულად დასრულებული და დამოუკიდებლად დადასტურებული)
+
+**წყარო:** Lexo-ს ცოცხალი ტესტირება ტელეფონზე და კომპიუტერზე (GitHub Pages ლინკით). Grade-range Wave-ზე გადასვლამდე ოთხი ბაგი დაიხურა.
+
+### ბაგი 1 — ბლოკის UI-state-ის გადმოდინება (commit c8b6802 + 111a659)
+- **სიმპტომი:** გამრავლების ტაბულაში ერთი შეცდომა → მენიუ → "მაგალითები" → 3 სწორი პასუხი → loser სურათი.
+- **Root cause (App.tsx):** `questionsInBlock`, `isPerfectBlock`, `consecutivePerfectBlocks`, `showRewardImage` და მასთან დაკავშირებული UI state არ ნულდებოდა არც 🏠-ზე, არც თამაშის შეცვლაზე, არც ბავშვის შეცვლაზე. rolling window (localStorage) ამას არ ეხებოდა — მისი გასაღები `gameProgress:${childId}:${gameMode}` mode-ით გამიჯნულია.
+- **Fix (c8b6802):** `resetBlockUIState` (`isPerfectBlock` → `true`!) გამოძახებული handleHomeClick-ში, mode-ის არჩევისას და `[activeChildId, gameMode]` ეფექტში.
+- **გაკვეთილი (111a659):** c8b6802-ის თავდაპირველი 2 ტესტი **ძველ კოდზეც გადიოდა** (ამოწმებდა ტექსტს, რომელსაც ResultOverlay caption-ით ფარავს) — უსარგებლო იყო. გადაიწერა ResultOverlay-ის mock-ით, props-ების უშუალო შემოწმებით; 5 ტესტი, **parent-ზე ვარდება, ახალზე გადის** (დამოუკიდებლად დადასტურებული).
+
+### ბაგი 2 — ორმაგი "completed" flush და duration = 0 (commit 9f68acd)
+- **სიმპტომი (Supabase-ში ცოცხლად):** `duration_seconds` უმრავლეს row-ზე 0.
+- **Root cause (useGameSession.ts):** `handleHomeClick → resetSession()` აგზავნის სწორ "completed"-ს; შემდეგ `resetActiveTimer()` ანულებს startedAt/duration-ს და `isCompletedRef=false`-ზე ბრუნდება; შემდეგ `setGameMode(null)`-ის effect-cleanup იგივე `sessionId`-ით მეორედ აგზავნის "completed"-ს (`latestRef` ჯერ ძველია) — ≈0 duration-ით. `.upsert` id-ზე row-ს მთლიანად ანაცვლებს, FIFO queue არასწორ მეორე payload-ს უცვლელად ატარებს.
+- **Fix:** `flushedSessionIdRef` — ინვარიანტი: **ერთი sessionId-ისთვის "completed" flush მაქსიმუმ ერთხელ**. `isCompletedRef`-ის სემანტიკა, `latestRef`, `resetActiveTimer`, queue — უცვლელი.
+- **ასევე:** `resetSession()`-იდან ამოღებულია `clearGameProgress` (🏠 ღილაკი rolling window-ს შლიდა — პროდუქტის მოთხოვნას ეწინააღმდეგებოდა). rolling window ახლა იშლება **მხოლოდ** wish-ის კვალიფიკაციისას.
+- **Step 0** (ტესტი, რომელიც კოდის შეცვლამდე ვარდება) მიღებული პროცედურაა; 3/5 ახალი ტესტი parent-ზე ვარდება, დანარჩენი 2 (mode-switch, beforeunload) არსებულ გზებს იცავს.
+- ძველი ნულოვანი-duration row-ების აღდგენა შეუძლებელია (startedAt-იც გადაწერილი იყო) — სატესტო მონაცემია.
+
+### ბაგი 3 — გაჭედილი "active" სესიები და Dashboard (commit b28cb05)
+- **ცოცხალი გაზომვა (ტელეფონი):** 🏠 → completed+duration ✅; ეკრანის ჩაქრობა → active, გაგრძელებისას მერე completed ✅; ტაბის დახურვა ჩვეულებრივ ფანჯარაში → completed ✅; ინკოგნიტოში ტაბის დახურვა და ბრაუზერის სრული დახურვა → row რჩება "active" (beforeunload/keepalive best-effort-ია, ბრაუზერის kill-ზე ივენთი საერთოდ არ ირთვება).
+- **დაკარგვა:** Dashboard-ის ყველა aggregate query ფილტრავდა `status='completed'`-ზე, ამიტომ გაჭედილი row-ის მონაცემი (ბოლო checkpoint-ის კითხვები) მშობელს არ ჩანდა.
+- **უარყოფილი ვარიანტები (ChatGPT-ის და Claude-ის cross-review-ით):** (ა) "active → completed" ავტომატური გადაყვანა ბავშვის არჩევისას 30-წუთიანი heuristic-ით — ორი მოწყობილობის კონფლიქტი, pause/resume, "მიტოვებული ≠ დასრულებული" სემანტიკა; (ბ) ახალი "abandoned" status და schema ცვლილება; (გ) ChatGPT-ის ალტერნატივა — completed-only aggregate + ცალკე "დაუმთავრებელი თამაშების" UI-სექცია — უარყოფილია როგორც ზედმეტად დიდი scope ~10 ბავშვისთვის.
+- **მიღებული გადაწყვეტილება (Lexo, "ვარიანტი 2"):** ბაზაში არაფერი იწერება/იცვლება; Dashboard ითვლის **ყველა row-ს** (active და completed ერთნაირად). `completedSessionCount` → `sessionCount`; ცარიელი მდგომარეობის ტექსტი "ჯერ არცერთი სესია არ არის". გაჭედილ row-ზე ბოლო 1–9 კითხვა შეიძლება აკლდეს (active იწერება ყოველ მე-10 კითხვაზე და ეკრანის ჩაქრობისას) — რიცხვები ქვედა ზღვარია და არა დამახინჯება; სიზუსტის პროცენტი პრაქტიკულად უცვლელია. ეს ცნობილი, მიღებული trade-off-ია.
+- **შენიშვნა:** Dashboard-ში საშუალო duration მეტრიკა **არ არსებობს**. თუ მომავალში დაემატება, ის უნდა იყოს მკაფიოდ `completed`-only (active row-ის duration checkpoint-ია და არა საბოლოო).
+- **ცოცხალი დადასტურება:** Dashboard-ის "სესიები/კითხვები/სწორი" ჯამი ემთხვევა Supabase SQL-ით გამოთვლილ active+completed ჯამს.
+
+### Rolling window-ს ცოცხალი დადასტურება
+კომპიუტერზე (ჩვეულებრივ ბრაუზერში): 27 სწორი პასუხი → ტაბის დახურვა → ხელახლა გახსნა → გაგრძელება → პასუხები შეგროვდა და სურვილის ფანჯარა გამოჩნდა. (ადრე 40+ კითხვაზე სურვილი არ გამოჩნდა — ახსნა: ინკოგნიტოს localStorage იშლება, ძველი build-ში 🏠 ფანჯარას შლიდა, ან ბოლო 40-ში >1 შეცდომა: წესი = ბოლო 40-დან მინიმუმ 39 სწორი, Kveshmicera-ზე 20-დან 19.)
+
+---
+
 ## საკვანძო არქიტექტურული გადაწყვეტილებები (არ შეიცვალოს განხილვის გარეშე)
 
 - DB schema: 5 table (`profiles`, `children`, `game_sessions`, `wishes`, `child_reward_images`) + `pin_hash` column ორივე `profiles`/`children`-ზე (განზრახ nullable) + `wishes.status`/`wish_parent_note`/`image_parent_note`/`proposed_image_path` (Wave Y)
@@ -288,6 +319,15 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 - **ანგარიშის პაროლის ხელახალი გადამოწმება PinGate-ში** ხდება დროებითი, ცალკე client-ით და არა მთავარით, რათა არსებული auth lifecycle (onAuthStateChange, ensureProfileExists, ChildContext) არ შეიცვალოს.
 - **Table Editor-ში profiles-დან row-ის წაშლა auth.users-ს არ შლის.** ანგარიშის წასაშლელად: Authentication → Users → Delete user (cascade: profiles → children). Storage ფაილები (child-reward-images) cascade-ით არ იშლება.
 
+- **Regression ტესტი ბაგს უნდა აფიქსირებდეს: სავალდებულოა დამოუკიდებლად დადასტურდეს, რომ ახალი ტესტი parent commit-ის წარმოების კოდზე ვარდება** (111a659-ის გაკვეთილი — პირველი ტესტები ძველ კოდზეც გადიოდა). AI Studio-ს prompt-ში "Step 0": ტესტი ჯერ კოდის შეცვლამდე ჩავარდეს და ჩავარდნის ტექსტი report-ში ჩაიწეროს.
+- **Session flush ინვარიანტი:** ერთი `sessionId`-ისთვის "completed" flush მაქსიმუმ ერთხელ (`flushedSessionIdRef`). `isCompletedRef`-ის სემანტიკა (ახალი სესიისთვის `false`-ზე დაბრუნება) არ იცვლება.
+- **`resetSession()` არ ეხება rolling window-ს** (localStorage). `gameProgress:${childId}:${gameMode}` იშლება მხოლოდ wish-ის კვალიფიკაციისას.
+- **ბლოკის UI-state ნულდება** 🏠-ზე, თამაშის შეცვლაზე და ბავშვის შეცვლაზე (`resetBlockUIState`); `isPerfectBlock` ახალ ბლოკზე `true`-ა.
+- **Dashboard ითვლის ყველა `game_sessions` row-ს სტატუსის მიუხედავად.** `active` row ავტომატურად არასდროს გადადის `completed`-ში (არც heuristic-ით, არც ახალი status-ით). ნებისმიერი მომავალი "completed-only" მეტრიკა (მაგ. საშუალო duration) მკაფიოდ უნდა ფილტრავდეს.
+- **`beforeunload`/keepalive best-effort-ია** (განსაკუთრებით მობილურზე, WebView-ში, ინკოგნიტოში). ტერმინალური "completed" მხოლოდ საიმედო გზებით (🏠, mode-ის შეცვლა) არის გარანტირებული.
+- **localStorage თითო origin-ზეა:** შესვლის სესია, არჩეული ბავშვი და rolling window არ გადადის GitHub Pages ↔ Vercel ↔ APK-ს შორის (სერვერზე შენახული სესიები/სურვილები საერთოა). ერთი ბავშვი ერთ URL-ზე უნდა თამაშობდეს; ერთი "canonical" URL, Supabase Auth Site URL-ში იგივე.
+- **AI Studio ვერ ხედავს GitHub-ის commit-ებს** (ის თავისი ასლით მუშაობს). prompt-ებში საბაზო მდგომარეობა მოწმდება **შიგთავსით** ("App.tsx შეიცავს resetBlockUIState-ს"), არა commit hash-ით. AI Studio-ს report-ის diff-stat რიცხვები არაერთხელ არ ემთხვეოდა რეალურს — ვენდობით მხოლოდ დამოუკიდებელ `git diff`-ს.
+
 ## დაგეგმილი მომდევნო Wave-ები (პრიორიტეტის მიხედვით)
 
 ### Wave "grade-range" (კლასის მიხედვით რიცხვითი დიაპაზონი) — შემდეგი პრიორიტეტი, ყველაზე სენსიტიური (problemGenerator.ts-ის ცენტრალურ ლოგიკას ეხება)
@@ -299,7 +339,9 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 ## ცნობილი, განზრახ გადადებული საკითხები
 
 - `SUPER_WINNER_GIFS`-ის დუბლირებული caption — გადაწყვეტილი, აღარ აქტუალური
-- `game_sessions`-ის ერთი stuck `'active'`-row — საჭიროებს ხელახალ ტესტირებას production launch-მდე
+- ~~`game_sessions`-ის stuck `'active'`-row~~ ✅ გამოკვლეულია: მიზეზი — beforeunload-ის არასაიმედოობა; გადაწყვეტა — Dashboard ითვლის ყველა row-ს (b28cb05)
+- `package-lock.json` სინქრონში არ არის `package.json`-თან (`npm ci` ვარდება; CI იყენებს `npm install`-ს და ამიტომ deploy არ ზიანდება) — დაბალი პრიორიტეტი
+- Vercel/APK (webintoapp) გადაწყვეტილება — ჯერ არ მიღებულა; ამჟამად ყველა GitHub Pages ლინკს იყენებს. იხ. localStorage-per-origin წესი ზემოთ
 - `metadata.json`-ის description-ის განახლება (თომას სახელი) — ჯერ არ გასწორებულა
 - Backup-სტრატეგია — ინფორმირებული, კონკრეტული გეგმა ჯერ არ არის; launch-მდე რეკომენდებული
 - კომერციალიზაცია (Georgia-first) — მომავალი ეტაპი, ჯერ არ აქტუალური 10-ბავშვიანი launch-ისთვის
@@ -327,11 +369,10 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 **არ ბლოკავს, მაგრამ რეკომენდებულია launch-მდე ან პარალელურად:**
 - Backup-სტრატეგია
-- `game_sessions` stuck-row-ის ხელახალი ტესტირება
 - `metadata.json`-ის description-ის განახლება
 - Saved query/view Lexo-ს image-approval სამუშაო რიგისთვის (Wave Y manual ნაბიჯების გასამარტივებლად)
 
-**Webintoapp.com (native app wrapper) გამოყენების გეგმა:** ტექნიკურად პასიური ცვლილება, ღირს ხელით ტესტირება ერთი ბავშვით სრულ flow-ზე (PIN gate-ისა და Wave Y-ის wish-ციკლის ჩათვლით), სანამ ყველას დაურიგდება.
+**Webintoapp.com (native app wrapper) გამოყენების გეგმა:** ჯერ არ გაკეთებულა. ტექნიკურად პასიური ცვლილება (APK უბრალოდ ფანჯარაა მითითებულ URL-ზე და ავტომატურად იღებს ახალ deploy-ს), მაგრამ Android WebView-ში beforeunload/visibilitychange ნაკლებად საიმედოა → მეტი "active" row (Dashboard ახლა მათაც ითვლის).  ღირს ხელით ტესტირება ერთი ბავშვით სრულ flow-ზე (PIN gate-ისა და Wave Y-ის wish-ციკლის ჩათვლით), სანამ ყველას დაურიგდება.
 
 ## Workflow (როგორ ვმუშაობთ)
 
@@ -347,8 +388,8 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 ## შემდეგი ნაბიჯი
 
-Wave Y (Wish Approval Workflow) სრულად დასრულებულია და დამოუკიდებლად დადასტურებული — 5 commit (Stage 1, 3a, 3b, 3c + UI-rename), Storage-ვერიფიკაცია კოდის ცვლილების გარეშე დაიხურა, და ტესტირების დროს აღმოჩენილი launch-blocking security ბაგი (Service Worker cross-origin cache) გასწორებულია და დადასტურებული.
+Pre-Launch Bug-Fix Wave (4 commit: c8b6802, 111a659, 9f68acd, b28cb05) სრულად დასრულებულია: ოთხივე ბაგი ცოცხლად დადასტურებული, თითოეული commit fresh-clone-ით დამოუკიდებლად ვერიფიცირებული (321/321 ტესტი, 41 ფაილი, tsc 0 შეცდომა, build სუფთა).
 
-რეკომენდებული თანმიმდევრობა: (1) launch-მდე ერთჯერადი მოქმედებები (სატესტო ანგარიშების წაშლა, სრული ნამდვილი ნაკადის გავლა — Wave Y-ის wish-ციკლის ჩათვლით, ყველა ტესტ-browser-ის service-worker hard-refresh); (2) Backup-სტრატეგია და `game_sessions` stuck-row-ის ხელახალი ტესტირება; (3) Wave "grade-range" architecture review.
+რეკომენდებული თანმიმდევრობა: (1) Vercel/APK გადაწყვეტილება (ერთი canonical URL, Supabase Auth Site URL, Vercel-ზე env vars `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`); (2) ბოლო launch-მდე გაწმენდა: ამ ბაგების ტესტებისას შექმნილი სატესტო ანგარიშების წაშლა + სრული ნამდვილი ნაკადის ერთხელ გავლა ახალი ანგარიშით; (3) Backup-სტრატეგია; (4) Wave "grade-range" architecture review.
 
 [ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს Claude-ის და ChatGPT-ის Project-ებში, **და** AI Studio-ს project-ში. ნამდვილად ატვირთეთ ეს ფაილი repo-შიც (`git add PROJECT_STATE.md && git commit && git push`).]
