@@ -122,6 +122,25 @@ const App: React.FC = () => {
     registerSubmitHandler,
   } = useColumnMultiplication(problem);
 
+  const resetBlockUIState = useCallback(() => {
+    setQuestionsInBlock(0);
+    setIsPerfectBlock(true);
+    setConsecutivePerfectBlocks(0);
+    setCurrentMessage('');
+    setShowRewardImage(false);
+    setHasFailedCurrentQuestion(false);
+    setUserAnswer('');
+    setGameState(GameState.Playing);
+    resetColMultState();
+    setShowKveshValidation(false);
+    setHasKveshFailedThisQuestion(false);
+  }, [resetColMultState, setShowKveshValidation, setHasKveshFailedThisQuestion]);
+
+  // Reset block UI state when active child profile or game mode changes
+  useEffect(() => {
+    resetBlockUIState();
+  }, [activeChildId, gameMode, resetBlockUIState]);
+
   useEffect(() => {
     if (sessionMode === 'parent') {
       setGameMode(null);
@@ -130,7 +149,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (gameMode && !isGameScreenBlocked) {
-      setProblem(generateProblem(gameMode, questionsInBlock));
+      setProblem(generateProblem(gameMode, 0));
       setHasFailedCurrentQuestion(false);
       if (gameMode === GameMode.ThomravlebisTabula) {
         startTimer();
@@ -296,9 +315,9 @@ const App: React.FC = () => {
 
   const handleHomeClick = () => {
     resetSession();
+    resetBlockUIState();
     setGameMode(null);
     setProblem(null);
-    setHasFailedCurrentQuestion(false);
     stopTimer();
   };
 
@@ -307,7 +326,14 @@ const App: React.FC = () => {
   }
 
   if (!gameMode) {
-    return <MainMenu onSelectMode={(mode) => setGameMode(mode)} />;
+    return (
+      <MainMenu
+        onSelectMode={(mode) => {
+          resetBlockUIState();
+          setGameMode(mode);
+        }}
+      />
+    );
   }
 
   // Block game screens if unauthenticated or no child selected
