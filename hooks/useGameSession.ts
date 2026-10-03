@@ -163,6 +163,7 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
   const sessionStartTimeMsRef = useRef<number>(Date.now());
   const sessionChildIdRef = useRef<string | null>(childId || null);
   const isCompletedRef = useRef<boolean>(false);
+  const flushedSessionIdRef = useRef<string | null>(null);
 
   // Active play duration tracking (accumulated active ms + last resume timestamp)
   const accumulatedActiveMsRef = useRef<number>(0);
@@ -250,7 +251,12 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
         return;
       }
 
+      if (latestRef.current.sessionId === flushedSessionIdRef.current) {
+        return;
+      }
+
       isCompletedRef.current = true;
+      flushedSessionIdRef.current = sessionId;
       const durationSeconds = getActiveDurationSeconds();
 
       if (currentChildId) {
@@ -566,24 +572,19 @@ export const useGameSession = (gameMode: GameMode | null, childId?: string | nul
   }, []);
 
   const resetSession = useCallback(() => {
-    // 1. Clear saved progress from localStorage for current child and gameMode
-    if (sessionChildIdRef.current && gameMode) {
-      clearGameProgress(sessionChildIdRef.current, gameMode);
-    }
-
-    // 2. Flush previous session
+    // 1. Flush previous session
     flushCompletedSession();
 
-    // 3. Generate a new session ID and reset session start time
+    // 2. Generate a new session ID and reset session start time
     sessionIdRef.current = generateSessionId();
     sessionChildIdRef.current = childId || null;
     isCompletedRef.current = false;
     resetActiveTimer();
 
-    // 4. Reset state
+    // 3. Reset state
     recentAnswersRef.current = [];
     dispatch({ type: 'RESET_SESSION' });
-  }, [flushCompletedSession, childId, gameMode, resetActiveTimer]);
+  }, [flushCompletedSession, childId, resetActiveTimer]);
 
   return {
     ...state,

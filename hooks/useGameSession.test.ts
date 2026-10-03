@@ -1046,5 +1046,216 @@ describe('useGameSession (Supabase Sync)', () => {
       expect(loadGameProgress('child-restore-kvesh-1', GameMode.Kveshmicera)).toBeNull();
     });
   });
+
+  describe('Commit 2: Single completed flush invariant & rolling window preservation', () => {
+    it('(ა) invariant: resetSession + gameMode -> null flushes completed sync exactly 1 time with pre-reset duration', async () => {
+      vi.useFakeTimers();
+      const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+
+      const { result, rerender } = renderHook(
+        ({ mode, childId }) => useGameSession(mode, childId),
+        { initialProps: { mode: GameMode.Thomthematica as GameMode | null, childId: 'child-step0' as string | null } }
+      );
+
+      const session1Id = result.current.sessionId;
+
+      // Simulate playing for 20 seconds, answering 3 questions
+      act(() => {
+        vi.advanceTimersByTime(5000);
+        result.current.recordAnswer(true);
+        vi.advanceTimersByTime(5000);
+        result.current.recordAnswer(true);
+        vi.advanceTimersByTime(10000);
+        result.current.recordAnswer(false);
+      });
+
+      // handleHomeClick executes: resetSession() then setGameMode(null) synchronously in the same handler
+      await act(async () => {
+        result.current.resetSession();
+        rerender({ mode: null, childId: 'child-step0' });
+      });
+
+      const completedCalls = syncGameSessionSpy.mock.calls
+        .map(c => c[0] as any)
+        .filter(payload => payload.id === session1Id && payload.status === 'completed');
+
+      // INVARIANT: Exactly 1 completed flush per sessionId!
+      expect(completedCalls.length).toBe(1);
+
+      // Duration must match pre-reset active duration (20s)
+      expect(completedCalls[0].durationSeconds).toBe(20);
+
+      vi.useRealTimers();
+    });
+
+    it('(ბ) preserves rolling window in localStorage after resetSession', async () => {
+      const childId = 'child-rolling-1';
+      const mode = GameMode.Thomthematica;
+
+      const { result } = renderHook(
+        ({ m, c }) => useGameSession(m, c),
+        { initialProps: { m: mode as GameMode | null, c: childId as string | null } }
+      );
+
+      act(() => {
+        result.current.recordAnswer(true);
+        result.current.recordAnswer(false);
+        result.current.recordAnswer(true);
+      });
+
+      // Progress saved in localStorage
+      expect(loadGameProgress(childId, mode)).toEqual([true, false, true]);
+
+      // Call resetSession
+      await act(async () => {
+        result.current.resetSession();
+      });
+
+      // Progress must STILL be preserved in localStorage!
+      expect(loadGameProgress(childId, mode)).toEqual([true, false, true]);
+    });
+
+    it('(გ) mode switch without resetSession (A -> B): flushes A exactly once, B gets new sessionId and flushes once', async () => {
+      const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+      const childId = 'child-mode-switch';
+
+      const { result, rerender } = renderHook(
+        ({ mode, cId }) => useGameSession(mode, cId),
+        { initialProps: { mode: GameMode.Thomthematica as GameMode | null, cId: childId as string | null } }
+      );
+
+      const sessAId = result.current.sessionId;
+
+      act(() => {
+        result.current.recordAnswer(true);
+        result.current.recordAnswer(true);
+      });
+
+      // Switch mode from Thomthematica (A) to ThomravlebisTabula (B)
+      await act(async () => {
+        rerender({ mode: GameMode.ThomravlebisTabula, cId: childId });
+      });
+
+      const sessBId = result.current.sessionId;
+      expect(sessBId).not.toBe(sessAId);
+
+      const completedCallsA = syncGameSessionSpy.mock.calls
+        .map(c => c[0] as any)
+        .filter(p => p.id === sessAId && p.status === 'completed');
+      expect(completedCallsA.length).toBe(1);
+      expect(completedCallsA[0].gameMode).toBe(GameMode.Thomthematica);
+
+      // Play in Mode B
+      act(() => {
+        result.current.recordAnswer(false);
+        result.current.recordAnswer(true);
+      });
+
+      // Exit to null
+      await act(async () => {
+        rerender({ mode: null, cId: childId });
+      });
+
+      const completedCallsB = syncGameSessionSpy.mock.calls
+        .map(c => c[0] as any)
+        .filter(p => p.id === sessBId && p.status === 'completed');
+      expect(completedCallsB.length).toBe(1);
+      expect(completedCallsB[0].gameMode).toBe(GameMode.ThomravlebisTabula);
+
+      // Verify A was not flushed again
+      const allCompletedCallsA = syncGameSessionSpy.mock.calls
+        .map(c => c[0] as any)
+        .filter(p => p.id === sessAId && p.status === 'completed');
+      expect(allCompletedCallsA.length).toBe(1);
+    });
+
+    it('(დ) beforeunload triggers keepalive sync with completed status exactly once without duplication', async () => {
+      const syncGameSessionSpy = vi.spyOn(supabaseSyncService, 'syncGameSessionToSupabase').mockResolvedValue({ success: true } as any);
+      const childId = 'child-beforeunload';
+
+      const { result, unmount } = renderHook(
+        ({ mode, cId }) => useGameSession(mode, cId),
+        { initialProps: { mode: GameMode.Thomthematica as GameMode | null, cId: childId as string | null } }
+      );
+
+      const sessionId = result.current.sessionId;
+
+      act(() => {
+        result.current.recordAnswer(true);
+        result.current.recordAnswer(true);
+      });
+
+      // Trigger beforeunload event
+      act(() => {
+        window.dispatchEvent(new Event('beforeunload'));
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const completedCalls = syncGameSessionSpy.mock.calls
+        .map(c => c[0] as any)
+        .filter(p => p.id === sessionId && p.status === 'completed');
+      expect(completedCalls.length).toBe(1);
+
+      // Subsequent unmount must NOT duplicate the completed call for this sessionId
+      unmount();
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const completedCallsAfterUnmount = syncGameSessionSpy.mock.calls
+        .map(c => c[0] as any)
+        .filter(p => p.id === sessionId && p.status === 'completed');
+      expect(completedCallsAfterUnmount.length).toBe(1);
+    });
+
+    it('(ე) child switch: child A rolling window is preserved, child B has separate rolling window', async () => {
+      const mode = GameMode.Thomthematica;
+      const childA = 'child-roll-A';
+      const childB = 'child-roll-B';
+
+      const { result, rerender } = renderHook(
+        ({ m, c }) => useGameSession(m, c),
+        { initialProps: { m: mode as GameMode | null, c: childA as string | null } }
+      );
+
+      // Child A answers 4 questions
+      act(() => {
+        result.current.recordAnswer(true);
+        result.current.recordAnswer(true);
+        result.current.recordAnswer(false);
+        result.current.recordAnswer(true);
+      });
+
+      expect(loadGameProgress(childA, mode)).toEqual([true, true, false, true]);
+
+      // Switch to Child B
+      await act(async () => {
+        rerender({ m: mode, c: childB });
+      });
+
+      // Child B starts fresh, answers 2 questions
+      act(() => {
+        result.current.recordAnswer(false);
+        result.current.recordAnswer(false);
+      });
+
+      expect(loadGameProgress(childB, mode)).toEqual([false, false]);
+
+      // Child A's window must be intact!
+      expect(loadGameProgress(childA, mode)).toEqual([true, true, false, true]);
+
+      // Even after resetSession, both progress files remain preserved
+      await act(async () => {
+        result.current.resetSession();
+      });
+
+      expect(loadGameProgress(childA, mode)).toEqual([true, true, false, true]);
+      expect(loadGameProgress(childB, mode)).toEqual([false, false]);
+    });
+  });
 });
 
