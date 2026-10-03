@@ -135,19 +135,19 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     );
   }
 
-  // 5. stats.completedSessionCount === 0 -> "ჯერ არცერთი დასრულებული სესია არ არის"
-  if (stats.completedSessionCount === 0) {
+  // 5. stats.sessionCount === 0 -> "ჯერ არცერთი სესია არ არის"
+  if (stats.sessionCount === 0) {
     return (
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6 md:p-8 space-y-6 border-b-8 border-indigo-200">
         {renderHeaderAndPicker(false)}
         <div className="text-center py-12 text-gray-500 font-medium">
-          ჯერ არცერთი დასრულებული სესია არ არის
+          ჯერ არცერთი სესია არ არის
         </div>
       </div>
     );
   }
 
-  // 6 & 7. stats.completedSessionCount > 0 -> Populated stats (accuracy may be null or number)
+  // 6 & 7. stats.sessionCount > 0 -> Populated stats (accuracy may be null or number)
   return (
     <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6 md:p-8 space-y-6 border-b-8 border-indigo-200 max-h-[90vh] overflow-y-auto">
       {/* 1. Header + Close Button + Child Picker */}
@@ -158,7 +158,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3.5 text-center">
           <div className="text-xs font-bold text-indigo-600">სესიები</div>
           <div className="text-2xl font-black text-indigo-950 mt-1">
-            {stats.completedSessionCount}
+            {stats.sessionCount}
           </div>
         </div>
 

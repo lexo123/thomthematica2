@@ -335,7 +335,7 @@ export const fetchChildSessions = async (childId: string): Promise<{ data: GameS
 };
 
 /**
- * Fetches completed game session statistics for aggregate metrics calculation.
+ * Fetches game session statistics for aggregate metrics calculation across all sessions.
  * Intentionally unbounded by limit to cover full history, but with narrow column-scope.
  */
 export const fetchChildSessionsForAggregate = async (
@@ -350,8 +350,7 @@ export const fetchChildSessionsForAggregate = async (
     const { data, error } = await supabase
       .from('game_sessions')
       .select('total_questions, total_correct, perfect_blocks_count, status')
-      .eq('child_id', childId)
-      .eq('status', 'completed');
+      .eq('child_id', childId);
 
     if (error) {
       return { data: null, error: error.message };
@@ -392,10 +391,8 @@ export const fetchChildSessionsRecent = async (
 };
 
 /**
- * Fetches completed game session data grouped-ready for per-game-mode breakdown.
- * Narrow column-scope, DB-level filtered to status='completed'.
- * `status` is intentionally included in the select for the same double-safety
- * client-side re-filter pattern used by deriveDashboardStats().
+ * Fetches game session data grouped-ready for per-game-mode breakdown across all sessions.
+ * Narrow column-scope, status is included for derivation inspection.
  */
 export const fetchChildSessionsGameModeBreakdown = async (
   childId: string
@@ -409,8 +406,7 @@ export const fetchChildSessionsGameModeBreakdown = async (
     const { data, error } = await supabase
       .from('game_sessions')
       .select('game_mode, total_questions, total_correct, status')
-      .eq('child_id', childId)
-      .eq('status', 'completed');
+      .eq('child_id', childId);
 
     if (error) {
       return { data: null, error: error.message };

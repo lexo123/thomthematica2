@@ -763,11 +763,10 @@ describe('supabaseSyncService (Schema Alignment & Wish Approval Workflow)', () =
     });
 
     it('returns error when Supabase query returns an error', async () => {
-      const mockEqStatus = vi.fn().mockResolvedValue({
+      const mockEqChild = vi.fn().mockResolvedValue({
         data: null,
         error: { message: 'Failed to fetch aggregate' },
       });
-      const mockEqChild = vi.fn().mockReturnValue({ eq: mockEqStatus });
       const mockSelect = vi.fn().mockReturnValue({ eq: mockEqChild });
       const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
 
@@ -779,7 +778,6 @@ describe('supabaseSyncService (Schema Alignment & Wish Approval Workflow)', () =
       expect(mockFrom).toHaveBeenCalledWith('game_sessions');
       expect(mockSelect).toHaveBeenCalledWith('total_questions, total_correct, perfect_blocks_count, status');
       expect(mockEqChild).toHaveBeenCalledWith('child_id', 'child-123');
-      expect(mockEqStatus).toHaveBeenCalledWith('status', 'completed');
       expect(result.data).toBeNull();
       expect(result.error).toBe('Failed to fetch aggregate');
     });
@@ -789,11 +787,10 @@ describe('supabaseSyncService (Schema Alignment & Wish Approval Workflow)', () =
         { total_questions: 40, total_correct: 38, perfect_blocks_count: 0, status: 'completed' },
         { total_questions: 40, total_correct: 40, perfect_blocks_count: 1, status: 'completed' },
       ];
-      const mockEqStatus = vi.fn().mockResolvedValue({
+      const mockEqChild = vi.fn().mockResolvedValue({
         data: sampleData,
         error: null,
       });
-      const mockEqChild = vi.fn().mockReturnValue({ eq: mockEqStatus });
       const mockSelect = vi.fn().mockReturnValue({ eq: mockEqChild });
       const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
 
@@ -871,11 +868,10 @@ describe('supabaseSyncService (Schema Alignment & Wish Approval Workflow)', () =
     });
 
     it('returns error when Supabase query returns an error', async () => {
-      const mockEqStatus = vi.fn().mockResolvedValue({
+      const mockEqChild = vi.fn().mockResolvedValue({
         data: null,
         error: { message: 'Failed to fetch game mode breakdown' },
       });
-      const mockEqChild = vi.fn().mockReturnValue({ eq: mockEqStatus });
       const mockSelect = vi.fn().mockReturnValue({ eq: mockEqChild });
       const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
 
@@ -887,7 +883,6 @@ describe('supabaseSyncService (Schema Alignment & Wish Approval Workflow)', () =
       expect(mockFrom).toHaveBeenCalledWith('game_sessions');
       expect(mockSelect).toHaveBeenCalledWith('game_mode, total_questions, total_correct, status');
       expect(mockEqChild).toHaveBeenCalledWith('child_id', 'child-123');
-      expect(mockEqStatus).toHaveBeenCalledWith('status', 'completed');
       expect(result.data).toBeNull();
       expect(result.error).toBe('Failed to fetch game mode breakdown');
     });
@@ -897,11 +892,10 @@ describe('supabaseSyncService (Schema Alignment & Wish Approval Workflow)', () =
         { game_mode: 'thomthematica', total_questions: 40, total_correct: 38, status: 'completed' },
         { game_mode: 'gethometria', total_questions: 20, total_correct: 20, status: 'completed' },
       ];
-      const mockEqStatus = vi.fn().mockResolvedValue({
+      const mockEqChild = vi.fn().mockResolvedValue({
         data: sampleData,
         error: null,
       });
-      const mockEqChild = vi.fn().mockReturnValue({ eq: mockEqStatus });
       const mockSelect = vi.fn().mockReturnValue({ eq: mockEqChild });
       const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
 

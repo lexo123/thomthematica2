@@ -87,7 +87,7 @@ describe('useChildDashboard (Parent Dashboard Orchestration Hook)', () => {
     expect(result.current.recentSessions).toEqual(mockRecentSessions);
     expect(result.current.wishes).toEqual(mockWishes);
     expect(result.current.stats).toEqual({
-      completedSessionCount: 2,
+      sessionCount: 2,
       totalQuestions: 80,
       totalCorrect: 76,
       accuracyPercent: 95,
@@ -138,7 +138,7 @@ describe('useChildDashboard (Parent Dashboard Orchestration Hook)', () => {
     expect(result.current.error).toBe('Failed to retrieve wishes from Supabase');
     // Successful queries data preserved!
     expect(result.current.stats).toEqual({
-      completedSessionCount: 1,
+      sessionCount: 1,
       totalQuestions: 40,
       totalCorrect: 40,
       accuracyPercent: 100,
@@ -311,7 +311,7 @@ describe('useChildDashboard (Parent Dashboard Orchestration Hook)', () => {
 
     // Assert that result.current.stats still shows F3 data (999), and was NOT overwritten by stale F1 (111)
     expect(result.current.stats?.totalQuestions).toBe(999);
-    expect(result.current.stats?.completedSessionCount).toBe(1);
+    expect(result.current.stats?.sessionCount).toBe(1);
   });
 
   it('populates gameModeBreakdown when fetchChildSessionsGameModeBreakdown succeeds', async () => {
@@ -390,7 +390,7 @@ describe('useChildDashboard (Parent Dashboard Orchestration Hook)', () => {
     expect(result.current.error).toBe('Breakdown query failed');
     // Stats remain intact thanks to Promise.allSettled
     expect(result.current.stats).toEqual({
-      completedSessionCount: 1,
+      sessionCount: 1,
       totalQuestions: 40,
       totalCorrect: 40,
       accuracyPercent: 100,

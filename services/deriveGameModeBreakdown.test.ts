@@ -88,7 +88,7 @@ describe('deriveGameModeBreakdown', () => {
     });
   });
 
-  it('filters out sessions where status !== "completed" (double-safety re-filter)', () => {
+  it('includes sessions regardless of status (active or completed) in per-mode breakdown', () => {
     const sessions = [
       {
         game_mode: 'thomthematica',
@@ -100,25 +100,30 @@ describe('deriveGameModeBreakdown', () => {
         game_mode: 'thomthematica',
         total_questions: 20,
         total_correct: 10,
-        status: 'abandoned' as any,
+        status: 'active' as const,
       },
       {
         game_mode: 'kveshmicera',
         total_questions: 15,
         total_correct: 5,
-        status: 'in_progress' as any,
+        status: 'active' as const,
       },
     ];
 
     const result = deriveGameModeBreakdown(sessions);
 
     expect(result['thomthematica']).toEqual({
-      sessionCount: 1,
-      totalQuestions: 40,
-      totalCorrect: 40,
-      accuracyPercent: 100,
+      sessionCount: 2,
+      totalQuestions: 60,
+      totalCorrect: 50,
+      accuracyPercent: (50 / 60) * 100,
     });
-    expect(result['kveshmicera']).toBeUndefined();
+    expect(result['kveshmicera']).toEqual({
+      sessionCount: 1,
+      totalQuestions: 15,
+      totalCorrect: 5,
+      accuracyPercent: (5 / 15) * 100,
+    });
   });
 
   it('sets accuracyPercent to null if totalQuestions is 0', () => {

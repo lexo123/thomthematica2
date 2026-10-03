@@ -6,7 +6,7 @@ describe('deriveDashboardStats (Pure derivation function)', () => {
     const result = deriveDashboardStats([]);
 
     expect(result).toEqual({
-      completedSessionCount: 0,
+      sessionCount: 0,
       totalQuestions: 0,
       totalCorrect: 0,
       accuracyPercent: null,
@@ -23,14 +23,14 @@ describe('deriveDashboardStats (Pure derivation function)', () => {
 
     const result = deriveDashboardStats(sessions);
 
-    expect(result.completedSessionCount).toBe(3);
+    expect(result.sessionCount).toBe(3);
     expect(result.totalQuestions).toBe(100);
     expect(result.totalCorrect).toBe(96);
     expect(result.perfectBlocksCount).toBe(1);
     expect(result.accuracyPercent).toBe(96);
   });
 
-  it('strictly excludes active sessions from aggregation', () => {
+  it('includes active sessions alongside completed sessions in aggregation', () => {
     const sessions = [
       { total_questions: 40, total_correct: 35, perfect_blocks_count: 0, status: 'completed' as const },
       { total_questions: 15, total_correct: 10, perfect_blocks_count: 0, status: 'active' as const },
@@ -38,11 +38,11 @@ describe('deriveDashboardStats (Pure derivation function)', () => {
 
     const result = deriveDashboardStats(sessions);
 
-    expect(result.completedSessionCount).toBe(1);
-    expect(result.totalQuestions).toBe(40);
-    expect(result.totalCorrect).toBe(35);
+    expect(result.sessionCount).toBe(2);
+    expect(result.totalQuestions).toBe(55);
+    expect(result.totalCorrect).toBe(45);
     expect(result.perfectBlocksCount).toBe(0);
-    expect(result.accuracyPercent).toBe(87.5);
+    expect(result.accuracyPercent).toBeCloseTo((45 / 55) * 100, 5);
   });
 
   it('handles sessions with total_questions: 0 without division by zero or errors', () => {
@@ -51,7 +51,7 @@ describe('deriveDashboardStats (Pure derivation function)', () => {
       { total_questions: 0, total_correct: 0, perfect_blocks_count: 0, status: 'completed' as const },
     ];
     const zeroResult = deriveDashboardStats(zeroOnly);
-    expect(zeroResult.completedSessionCount).toBe(1);
+    expect(zeroResult.sessionCount).toBe(1);
     expect(zeroResult.totalQuestions).toBe(0);
     expect(zeroResult.totalCorrect).toBe(0);
     expect(zeroResult.accuracyPercent).toBeNull();
@@ -62,7 +62,7 @@ describe('deriveDashboardStats (Pure derivation function)', () => {
       { total_questions: 50, total_correct: 45, perfect_blocks_count: 2, status: 'completed' as const },
     ];
     const mixedResult = deriveDashboardStats(mixed);
-    expect(mixedResult.completedSessionCount).toBe(2);
+    expect(mixedResult.sessionCount).toBe(2);
     expect(mixedResult.totalQuestions).toBe(50);
     expect(mixedResult.totalCorrect).toBe(45);
     expect(mixedResult.accuracyPercent).toBe(90);
@@ -77,7 +77,7 @@ describe('deriveDashboardStats (Pure derivation function)', () => {
 
     const result = deriveDashboardStats(sessions);
 
-    expect(result.completedSessionCount).toBe(2);
+    expect(result.sessionCount).toBe(2);
     expect(result.totalQuestions).toBe(80);
     expect(result.totalCorrect).toBe(80);
     expect(result.perfectBlocksCount).toBe(2);
@@ -93,7 +93,7 @@ describe('deriveDashboardStats (Pure derivation function)', () => {
 
     const result = deriveDashboardStats(sessions);
 
-    expect(result.completedSessionCount).toBe(3);
+    expect(result.sessionCount).toBe(3);
     expect(result.totalQuestions).toBe(70);
     expect(result.totalCorrect).toBe(67);
     expect(result.perfectBlocksCount).toBe(1);

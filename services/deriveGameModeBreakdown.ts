@@ -10,7 +10,7 @@ export interface GameModeBreakdownEntry {
 export type GameModeBreakdown = Record<string, GameModeBreakdownEntry>;
 
 /**
- * Pure derivation function grouping completed game sessions by raw game_mode string.
+ * Pure derivation function grouping all game sessions (active and completed) by raw game_mode string.
  * Independent of Supabase or any network layer, fully unit-testable.
  *
  * Grouping key is the raw `game_mode` string (NOT the GameMode enum) — consistent
@@ -26,13 +26,12 @@ export const deriveGameModeBreakdown = (
     return {};
   }
 
-  // Double-safety re-filter, consistent with deriveDashboardStats() convention
-  // (even though the query already filters status === 'completed').
-  const completed = sessions.filter((s) => s && s.status === 'completed');
+  // Count all valid sessions regardless of status
+  const validSessions = sessions.filter((s) => Boolean(s && s.game_mode));
 
   const breakdown: GameModeBreakdown = {};
 
-  for (const s of completed) {
+  for (const s of validSessions) {
     const key = s.game_mode;
     if (!breakdown[key]) {
       breakdown[key] = {

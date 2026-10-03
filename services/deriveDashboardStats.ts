@@ -1,7 +1,7 @@
 import { GameSession } from '../types';
 
 export interface DashboardStats {
-  completedSessionCount: number;
+  sessionCount: number;
   totalQuestions: number;
   totalCorrect: number;
   accuracyPercent: number | null; // null if totalQuestions === 0 (division-by-zero guard)
@@ -9,7 +9,7 @@ export interface DashboardStats {
 }
 
 /**
- * Pure derivation function calculating aggregate stats across completed game sessions.
+ * Pure derivation function calculating aggregate stats across all game sessions (active and completed).
  * Independent of Supabase or any network layer, fully unit-testable.
  */
 export const deriveDashboardStats = (
@@ -17,7 +17,7 @@ export const deriveDashboardStats = (
 ): DashboardStats => {
   if (!sessions || !Array.isArray(sessions)) {
     return {
-      completedSessionCount: 0,
+      sessionCount: 0,
       totalQuestions: 0,
       totalCorrect: 0,
       accuracyPercent: null,
@@ -25,16 +25,16 @@ export const deriveDashboardStats = (
     };
   }
 
-  // Filter only status === 'completed' (double-safety even if query already filters)
-  const completed = sessions.filter((s) => s && s.status === 'completed');
+  // Count all valid sessions, regardless of status (active or completed)
+  const validSessions = sessions.filter((s) => Boolean(s));
 
-  const totalQuestions = completed.reduce((sum, s) => sum + (s.total_questions || 0), 0);
-  const totalCorrect = completed.reduce((sum, s) => sum + (s.total_correct || 0), 0);
-  const perfectBlocksCount = completed.reduce((sum, s) => sum + (s.perfect_blocks_count || 0), 0);
+  const totalQuestions = validSessions.reduce((sum, s) => sum + (s.total_questions || 0), 0);
+  const totalCorrect = validSessions.reduce((sum, s) => sum + (s.total_correct || 0), 0);
+  const perfectBlocksCount = validSessions.reduce((sum, s) => sum + (s.perfect_blocks_count || 0), 0);
   const accuracyPercent = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : null;
 
   return {
-    completedSessionCount: completed.length,
+    sessionCount: validSessions.length,
     totalQuestions,
     totalCorrect,
     accuracyPercent,

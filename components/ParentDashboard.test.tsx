@@ -98,11 +98,11 @@ describe('ParentDashboard UI Component', () => {
     expect(screen.getByText('მონაცემები არ არის ხელმისაწვდომი')).toBeDefined();
   });
 
-  // 5. Empty state: stats.completedSessionCount === 0
-  it('renders empty sessions message when completedSessionCount is 0', () => {
+  // 5. Empty state: stats.sessionCount === 0
+  it('renders empty sessions message when sessionCount is 0', () => {
     vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
       stats: {
-        completedSessionCount: 0,
+        sessionCount: 0,
         totalQuestions: 0,
         totalCorrect: 0,
         accuracyPercent: null,
@@ -118,14 +118,14 @@ describe('ParentDashboard UI Component', () => {
 
     render(<ParentDashboard childId="child-1" onClose={mockOnClose} />);
 
-    expect(screen.getByText('ჯერ არცერთი დასრულებული სესია არ არის')).toBeDefined();
+    expect(screen.getByText('ჯერ არცერთი სესია არ არის')).toBeDefined();
   });
 
   // 6. Populated stats with accuracyPercent === null
   it('renders stats with "მონაცემი არ არის" when accuracyPercent is null', () => {
     vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
       stats: {
-        completedSessionCount: 1,
+        sessionCount: 1,
         totalQuestions: 0,
         totalCorrect: 0,
         accuracyPercent: null,
@@ -149,7 +149,7 @@ describe('ParentDashboard UI Component', () => {
   it('renders full populated stats, recent sessions with mapped labels, and all wishes without truncation', () => {
     vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
       stats: {
-        completedSessionCount: 5,
+        sessionCount: 5,
         totalQuestions: 200,
         totalCorrect: 190,
         accuracyPercent: 95.0,
@@ -238,7 +238,7 @@ describe('ParentDashboard UI Component', () => {
       if (id === 'child-A') {
         return {
           stats: {
-            completedSessionCount: 1,
+            sessionCount: 1,
             totalQuestions: 40,
             totalCorrect: 40,
             accuracyPercent: 100.0,
@@ -277,7 +277,7 @@ describe('ParentDashboard UI Component', () => {
       if (id === 'child-B') {
         return {
           stats: {
-            completedSessionCount: 8,
+            sessionCount: 8,
             totalQuestions: 320,
             totalCorrect: 300,
             accuracyPercent: 93.8,
@@ -437,7 +437,7 @@ describe('ParentDashboard UI Component', () => {
 
     vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
       stats: {
-        completedSessionCount: 2,
+        sessionCount: 2,
         totalQuestions: 80,
         totalCorrect: 78,
         accuracyPercent: 97.5,
@@ -483,7 +483,7 @@ describe('ParentDashboard UI Component', () => {
       if (id === 'child-1') {
         return {
           stats: {
-            completedSessionCount: 2,
+            sessionCount: 2,
             totalQuestions: 40,
             totalCorrect: 40,
             accuracyPercent: 100.0,
@@ -500,7 +500,7 @@ describe('ParentDashboard UI Component', () => {
       if (id === 'child-2') {
         return {
           stats: {
-            completedSessionCount: 4,
+            sessionCount: 4,
             totalQuestions: 80,
             totalCorrect: 76,
             accuracyPercent: 95.0,
@@ -549,7 +549,7 @@ describe('ParentDashboard UI Component', () => {
   it('renders game mode breakdown section with formatted stats when data is populated', () => {
     vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
       stats: {
-        completedSessionCount: 3,
+        sessionCount: 3,
         totalQuestions: 100,
         totalCorrect: 95,
         accuracyPercent: 95,
@@ -606,7 +606,7 @@ describe('ParentDashboard UI Component', () => {
   it('renders empty-state message when gameModeBreakdown is empty', () => {
     vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
       stats: {
-        completedSessionCount: 1,
+        sessionCount: 1,
         totalQuestions: 40,
         totalCorrect: 38,
         accuracyPercent: 95,
@@ -659,7 +659,7 @@ describe('ParentDashboard UI Component', () => {
     // 3. Empty sessions
     vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
       stats: {
-        completedSessionCount: 0,
+        sessionCount: 0,
         totalQuestions: 0,
         totalCorrect: 0,
         accuracyPercent: null,
@@ -679,7 +679,7 @@ describe('ParentDashboard UI Component', () => {
   it('correctly formats wish badges for 20-block sizes (20/20 perfect and 19/20 near-perfect)', () => {
     vi.spyOn(useChildDashboardModule, 'useChildDashboard').mockReturnValue({
       stats: {
-        completedSessionCount: 1,
+        sessionCount: 1,
         totalQuestions: 20,
         totalCorrect: 20,
         accuracyPercent: 100.0,
