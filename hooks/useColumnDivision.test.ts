@@ -42,8 +42,10 @@ describe('useColumnDivision', () => {
       'q-0',
       'p-0-0',
       'w-0-0',
+      'w-0-1',
       'q-1',
       'p-1-0',
+      'p-1-1',
       'w-1-0',
       'w-1-1',
       'q-2',
@@ -448,6 +450,55 @@ describe('useColumnDivision', () => {
       });
     }).not.toThrow();
 
+    expect(inputs['w-0-1'].focus).not.toHaveBeenCalled();
+    expect(inputs['q-1'].focus).not.toHaveBeenCalled();
+  });
+
+  it('13. 215 ÷ 5 behavior: entering digit on q-1 focuses p-1-0 (skipping s-0); entering digit on s-0 does not schedule focus anywhere; Backspace on empty s-0 does nothing', () => {
+    const layout215 = buildDivisionLayout(215, 5);
+    const { result } = renderHook(() => useColumnDivision(layout215));
+    const allIds = layout215.cells.map((c) => c.id);
+    const inputs = setupMockInputs(result.current.registerCellRef, allIds);
+
+    // 1. Entering digit on q-1 schedules focus to p-1-0 (skips s-0)
+    act(() => {
+      result.current.handleCellChange('q-1', '3');
+    });
+    expect(result.current.answers['q-1']).toBe('3');
+    expect(inputs['s-0'].focus).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(DIVISION_CELL_FOCUS_DELAY_MS);
+    });
+    expect(inputs['p-1-0'].focus).toHaveBeenCalledTimes(1);
+    expect(inputs['s-0'].focus).not.toHaveBeenCalled();
+
+    // 2. Entering digit on s-0 stores value, does not schedule focus anywhere and does not throw
+    act(() => {
+      result.current.handleCellChange('s-0', '0');
+    });
+    expect(result.current.answers['s-0']).toBe('0');
+
+    act(() => {
+      vi.advanceTimersByTime(DIVISION_CELL_FOCUS_DELAY_MS * 2);
+    });
+    expect(inputs['final'].focus).not.toHaveBeenCalled();
+    expect(inputs['q-0'].focus).not.toHaveBeenCalled();
+
+    // 3. Backspace on empty s-0 does nothing
+    act(() => {
+      result.current.handleCellChange('s-0', '');
+    });
+    expect(result.current.answers['s-0']).toBe('');
+
+    const preventDefault = vi.fn();
+    act(() => {
+      result.current.handleKeyDown('s-0', {
+        key: 'Backspace',
+        preventDefault,
+      } as unknown as React.KeyboardEvent<HTMLInputElement>);
+    });
+    expect(preventDefault).toHaveBeenCalled();
     expect(inputs['q-1'].focus).not.toHaveBeenCalled();
   });
 });

@@ -23,7 +23,7 @@ export const getDivisionCellGridPosition = (
   dividendDigitsCount: number
 ): { gridRow: number; gridColumn: number } => {
   const n = dividendDigitsCount;
-  if (cell.kind === 'quotient') {
+  if (cell.kind === 'quotient' || cell.kind === 'spare') {
     return {
       gridRow: 2,
       gridColumn: n + 3 + cell.col,
@@ -60,8 +60,7 @@ export const ColumnDivision: React.FC<ColumnDivisionProps> = ({
   }
 
   const n = layout.dividendDigits.length;
-  const qCells = layout.cells.filter((c) => c.kind === 'quotient');
-  const qLen = qCells.length;
+  const qLen = n;
   const maxStep = Math.max(...layout.cells.map((c) => c.step));
   const maxRows = 4 + 3 * maxStep;
 
@@ -154,16 +153,27 @@ export const ColumnDivision: React.FC<ColumnDivisionProps> = ({
           {layout.cells.map((cell) => {
             const { gridRow, gridColumn } = getDivisionCellGridPosition(cell, n);
 
-            let cellClass =
+            const neutralClass =
               'bg-white border-indigo-200 focus:border-amber-400 focus:ring-amber-200 text-indigo-900';
+            const correctClass =
+              'bg-emerald-50 border-emerald-500 text-emerald-950 focus:border-emerald-600 focus:ring-emerald-200';
+            const wrongClass =
+              'bg-rose-50 border-rose-500 text-rose-950 focus:border-rose-600 focus:ring-rose-200';
+
+            let cellClass = neutralClass;
             if (showValidation) {
               const status = statuses[cell.id];
+              const rawVal = answers[cell.id];
+              const isEmpty = rawVal === undefined || rawVal === null || rawVal === '';
+
               if (status === 'correct') {
-                cellClass =
-                  'bg-emerald-50 border-emerald-500 text-emerald-950 focus:border-emerald-600 focus:ring-emerald-200';
+                if (isEmpty && cell.rule !== 'required') {
+                  cellClass = neutralClass;
+                } else {
+                  cellClass = correctClass;
+                }
               } else {
-                cellClass =
-                  'bg-rose-50 border-rose-500 text-rose-950 focus:border-rose-600 focus:ring-rose-200';
+                cellClass = wrongClass;
               }
             }
 

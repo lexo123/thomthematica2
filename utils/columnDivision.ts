@@ -1,12 +1,14 @@
-export type DivisionCellKind = 'quotient' | 'product' | 'working' | 'final';
+export type DivisionCellKind = 'quotient' | 'product' | 'working' | 'final' | 'spare';
+export type DivisionCellRule = 'required' | 'optional' | 'blank';
 
 export interface DivisionCell {
-  id: string; // უნიკალური, სტაბილური: მაგ. 'q-0', 'p-1-0', 'w-1-1', 'final'
+  id: string; // უნიკალური, სტაბილური: მაგ. 'q-0', 'p-1-0', 'w-1-1', 'final', 's-0'
   kind: DivisionCellKind;
   step: number; // ნაბიჯის ინდექსი (final-ზე = ბოლო ნაბიჯი)
   row: 'quotient' | { stepRow: number; part: 'product' | 'working' } | 'final';
   col: number; // სვეტი (quotient-ისთვის: პოზიცია განაყოფში)
-  expected: string; // ერთი ციფრი
+  expected: string; // ერთი ციფრი, ან '' spare უჯრისთვის
+  rule: DivisionCellRule;
 }
 
 export interface DivisionLayout {
@@ -61,13 +63,15 @@ export function buildDivisionLayout(dividend: number, divisor: number): Division
     e0 = 1;
   }
 
-  let step = 0;
+  const numSteps = e0 === 0 ? n : n - 1;
+  const last = numSteps - 1;
 
-  while (true) {
+  for (let step = 0; step < numSteps; step++) {
     const qDigit = Math.floor(W / divisor);
     const P = qDigit * divisor;
     const r = W - P;
     const e_i = e0 + step;
+    const isLastStep = step === last;
 
     // 1. Quotient cell
     const qId = `q-${step}`;
@@ -78,89 +82,136 @@ export function buildDivisionLayout(dividend: number, divisor: number): Division
       row: 'quotient',
       col: step,
       expected: qDigit.toString(),
+      rule: 'required',
     };
     cells.push(qCell);
     solvingSequence.push(qId);
 
-    // 2. Product cells (digits of P, right-aligned at e_i)
-    const pStr = P.toString();
-    const pStartCol = e_i - pStr.length + 1;
-    for (let digitIdx = 0; digitIdx < pStr.length; digitIdx++) {
-      const pId = `p-${step}-${digitIdx}`;
+    // If spare quotient cell is needed (numSteps < n, on last step)
+    if (isLastStep && numSteps < n) {
+      const spareCell: DivisionCell = {
+        id: 's-0',
+        kind: 'spare',
+        step: last,
+        row: 'quotient',
+        col: numSteps,
+        expected: '',
+        rule: 'blank',
+      };
+      cells.push(spareCell);
+      // NOTE: spare cell is intentionally NOT pushed to solvingSequence
+    }
+
+    // 2. Product cells
+    if (step === 0 && e0 === 0) {
+      // Step 0 with e0 === 0: single cell p-0-0
+      const pId = `p-0-0`;
       const pCell: DivisionCell = {
         id: pId,
         kind: 'product',
-        step,
-        row: { stepRow: step, part: 'product' },
-        col: pStartCol + digitIdx,
-        expected: pStr[digitIdx],
+        step: 0,
+        row: { stepRow: 0, part: 'product' },
+        col: 0,
+        expected: P.toString(),
+        rule: isLastStep ? 'optional' : 'required',
       };
       cells.push(pCell);
       solvingSequence.push(pId);
+    } else {
+      // All other steps: two cells p-i-0 (col e_i - 1) and p-i-1 (col e_i)
+      const pId0 = `p-${step}-0`;
+      const pId1 = `p-${step}-1`;
+
+      if (P >= 10) {
+        const pStr = P.toString();
+        const pCell0: DivisionCell = {
+          id: pId0,
+          kind: 'product',
+          step,
+          row: { stepRow: step, part: 'product' },
+          col: e_i - 1,
+          expected: pStr[0],
+          rule: isLastStep ? 'optional' : 'required',
+        };
+        const pCell1: DivisionCell = {
+          id: pId1,
+          kind: 'product',
+          step,
+          row: { stepRow: step, part: 'product' },
+          col: e_i,
+          expected: pStr[1],
+          rule: isLastStep ? 'optional' : 'required',
+        };
+        cells.push(pCell0, pCell1);
+      } else {
+        // Single-digit product P < 10
+        const pCell0: DivisionCell = {
+          id: pId0,
+          kind: 'product',
+          step,
+          row: { stepRow: step, part: 'product' },
+          col: e_i - 1,
+          expected: '0',
+          rule: 'optional',
+        };
+        const pCell1: DivisionCell = {
+          id: pId1,
+          kind: 'product',
+          step,
+          row: { stepRow: step, part: 'product' },
+          col: e_i,
+          expected: P.toString(),
+          rule: isLastStep ? 'optional' : 'required',
+        };
+        cells.push(pCell0, pCell1);
+      }
+      solvingSequence.push(pId0, pId1);
     }
 
-    // 3. Working cells (if more digits remain to be brought down)
-    if (nextDigitIdx < n) {
+    // 3. Working cells (if not last step)
+    if (!isLastStep) {
       const broughtDownDigit = dividendDigits[nextDigitIdx];
-      const broughtDownCol = e_i + 1;
+      const wId0 = `w-${step}-0`;
+      const wCell0: DivisionCell = {
+        id: wId0,
+        kind: 'working',
+        step,
+        row: { stepRow: step, part: 'working' },
+        col: e_i,
+        expected: r.toString(),
+        rule: r === 0 ? 'optional' : 'required',
+      };
 
-      if (r === 0) {
-        // Only 1 cell: brought down digit
-        const wId = `w-${step}-0`;
-        const wCell: DivisionCell = {
-          id: wId,
-          kind: 'working',
-          step,
-          row: { stepRow: step, part: 'working' },
-          col: broughtDownCol,
-          expected: broughtDownDigit,
-        };
-        cells.push(wCell);
-        solvingSequence.push(wId);
-      } else {
-        // 2 cells: remainder r at broughtDownCol - 1, and brought down digit at broughtDownCol
-        const wId0 = `w-${step}-0`;
-        const wCell0: DivisionCell = {
-          id: wId0,
-          kind: 'working',
-          step,
-          row: { stepRow: step, part: 'working' },
-          col: broughtDownCol - 1,
-          expected: r.toString(),
-        };
-        cells.push(wCell0);
-        solvingSequence.push(wId0);
+      const wId1 = `w-${step}-1`;
+      const wCell1: DivisionCell = {
+        id: wId1,
+        kind: 'working',
+        step,
+        row: { stepRow: step, part: 'working' },
+        col: e_i + 1,
+        expected: broughtDownDigit,
+        rule: 'required',
+      };
 
-        const wId1 = `w-${step}-1`;
-        const wCell1: DivisionCell = {
-          id: wId1,
-          kind: 'working',
-          step,
-          row: { stepRow: step, part: 'working' },
-          col: broughtDownCol,
-          expected: broughtDownDigit,
-        };
-        cells.push(wCell1);
-        solvingSequence.push(wId1);
-      }
+      cells.push(wCell0, wCell1);
+      solvingSequence.push(wId0, wId1);
 
       W = r * 10 + Number(broughtDownDigit);
       nextDigitIdx++;
-      step++;
     } else {
-      // Last step: r must be 0, record final '0' cell
+      // Last step: remainder must be 0, record final '0' cell
       const finalId = 'final';
       const finalCell: DivisionCell = {
         id: finalId,
         kind: 'final',
-        step,
+        step: last,
         row: 'final',
-        col: e_i,
+        col: n - 1,
         expected: '0',
+        rule: 'optional',
       };
       cells.push(finalCell);
       solvingSequence.push(finalId);
-      break;
     }
   }
 
@@ -176,7 +227,10 @@ export function buildDivisionLayout(dividend: number, divisor: number): Division
 
 /**
  * Validates user answers against expected layout digits.
- * Empty answers are considered 'empty' and cause isAllCorrect to be false.
+ * Rule-based evaluation:
+ * - 'required': empty -> 'empty' (invalid), match -> 'correct', mismatch -> 'wrong'
+ * - 'optional': empty -> 'correct', match -> 'correct', mismatch -> 'wrong'
+ * - 'blank': empty -> 'correct', non-empty -> 'wrong'
  */
 export function validateDivisionAnswers(
   layout: DivisionLayout,
@@ -187,14 +241,34 @@ export function validateDivisionAnswers(
 
   for (const cell of layout.cells) {
     const rawVal = answers[cell.id];
-    if (rawVal === undefined || rawVal === null || rawVal === '') {
-      statuses[cell.id] = 'empty';
-      isAllCorrect = false;
-    } else if (rawVal === cell.expected) {
-      statuses[cell.id] = 'correct';
-    } else {
-      statuses[cell.id] = 'wrong';
-      isAllCorrect = false;
+    const isEmpty = rawVal === undefined || rawVal === null || rawVal === '';
+
+    if (cell.rule === 'required') {
+      if (isEmpty) {
+        statuses[cell.id] = 'empty';
+        isAllCorrect = false;
+      } else if (rawVal === cell.expected) {
+        statuses[cell.id] = 'correct';
+      } else {
+        statuses[cell.id] = 'wrong';
+        isAllCorrect = false;
+      }
+    } else if (cell.rule === 'optional') {
+      if (isEmpty) {
+        statuses[cell.id] = 'correct';
+      } else if (rawVal === cell.expected) {
+        statuses[cell.id] = 'correct';
+      } else {
+        statuses[cell.id] = 'wrong';
+        isAllCorrect = false;
+      }
+    } else if (cell.rule === 'blank') {
+      if (isEmpty) {
+        statuses[cell.id] = 'correct';
+      } else {
+        statuses[cell.id] = 'wrong';
+        isAllCorrect = false;
+      }
     }
   }
 
