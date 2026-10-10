@@ -747,5 +747,51 @@ describe('Commit 3 - Kveshdivision Flow & App-level Integration Tests', () => {
       vi.useRealTimers();
     }
   });
+
+  it('S. Validation banner on Q2 does not leak stale praise message from Q1', () => {
+    const q1: MathProblem = {
+      category: 'math',
+      num1: 345,
+      num2: 3,
+      operation: Operation.Divide,
+      answer: 115,
+    };
+    const q2: MathProblem = {
+      category: 'math',
+      num1: 215,
+      num2: 5,
+      operation: Operation.Divide,
+      answer: 43,
+    };
+    setupDeterministicProblems([q1, q2]);
+
+    render(<App />);
+    fireEvent.click(screen.getByText('ქვეშმიწერით გაყოფა ➗'));
+
+    // Step 1: Fill Q1 correctly and submit
+    fillDivision(345, 3, { wrong: false });
+    submitDivision();
+
+    // Step 2: Extract praise from ResultOverlay
+    const overlayHeading = screen.getByRole('heading', { level: 2 });
+    const praise = overlayHeading.textContent?.trim() || '';
+    expect(praise.length).toBeGreaterThan(0);
+
+    // Step 3: Advance to Q2 via Next button
+    const nextBtn = screen.getByRole('button', { name: /შემდეგი/ });
+    fireEvent.click(nextBtn);
+
+    // Step 4: Fill Q2 incorrectly (q-0 wrong) and submit
+    fillDivision(215, 5, { wrong: true });
+    submitDivision();
+
+    // Step 5: Banner text matches default error text exactly
+    const banner = document.querySelector('.text-rose-700');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent?.trim()).toBe('ზოგიერთი ციფრი არასწორია! შეასწორე წითელი უჯრები.');
+
+    // Step 6: Banner does not contain stale praise text
+    expect(banner?.textContent).not.toContain(praise);
+  });
 });
 
