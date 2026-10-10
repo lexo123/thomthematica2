@@ -95,7 +95,7 @@ export const ColumnDivision: React.FC<ColumnDivisionProps> = ({
             <div
               key={`dividend-${colIdx}`}
               style={{ gridRow: 1, gridColumn: colIdx + 2 }}
-              className="w-8 h-9 text-xl md:w-12 md:h-14 md:text-3xl flex items-center justify-center font-black text-indigo-900 select-none"
+              className="w-7 h-9 text-xl md:w-12 md:h-14 md:text-3xl flex items-center justify-center font-black text-indigo-900 select-none"
             >
               {digit}
             </div>
@@ -104,7 +104,7 @@ export const ColumnDivision: React.FC<ColumnDivisionProps> = ({
           {/* 2. Static divisor (Row 1, column n+3) */}
           <div
             style={{ gridRow: 1, gridColumn: n + 3 }}
-            className="w-8 h-9 text-xl md:w-12 md:h-14 md:text-3xl flex items-center justify-center font-black text-indigo-900 select-none"
+            className="w-7 h-9 text-xl md:w-12 md:h-14 md:text-3xl flex items-center justify-center font-black text-indigo-900 select-none"
           >
             {layout.divisor}
           </div>
@@ -194,7 +194,7 @@ export const ColumnDivision: React.FC<ColumnDivisionProps> = ({
                 onChange={(e) => onCellChange(cell.id, e.target.value)}
                 onKeyDown={(e) => onKeyDown(cell.id, e)}
                 style={{ gridRow, gridColumn }}
-                className={`w-8 h-9 text-xl md:w-12 md:h-14 md:text-3xl rounded-lg md:rounded-xl border-2 font-black text-center outline-none transition-all shadow-sm ${cellClass}`}
+                className={`w-7 h-9 text-xl md:w-12 md:h-14 md:text-3xl rounded-lg md:rounded-xl border-2 font-black text-center outline-none transition-all shadow-sm ${cellClass}`}
               />
             );
           })}

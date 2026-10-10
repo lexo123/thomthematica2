@@ -213,6 +213,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
             >
               ქვეშმიწერით გამრავლება ✍️
             </Button>
+            <Button 
+              onClick={() => onSelectMode(GameMode.Kveshdivision)}
+              className="text-xl py-6 bg-rose-600 hover:bg-rose-700"
+            >
+              ქვეშმიწერით გაყოფა ➗
+            </Button>
           </div>
         </div>
       )}

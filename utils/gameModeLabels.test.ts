@@ -8,12 +8,14 @@ describe('gameModeLabels util', () => {
     expect(getGameModeLabel(GameMode.ThomravlebisTabula)).toBe('გამრავლების ტაბულა');
     expect(getGameModeLabel(GameMode.Gethometria)).toBe('გეომეტრია');
     expect(getGameModeLabel(GameMode.Kveshmicera)).toBe('ქვეშმიწერით გამრავლება');
+    expect(getGameModeLabel(GameMode.Kveshdivision)).toBe('ქვეშმიწერით გაყოფა');
 
     // Also check direct string value of enum
     expect(getGameModeLabel('thomthematica')).toBe('მაგალითები');
     expect(getGameModeLabel('thomravlebis_tabula')).toBe('გამრავლების ტაბულა');
     expect(getGameModeLabel('gethometria')).toBe('გეომეტრია');
     expect(getGameModeLabel('kveshmicera')).toBe('ქვეშმიწერით გამრავლება');
+    expect(getGameModeLabel('kveshdivision')).toBe('ქვეშმიწერით გაყოფა');
   });
 
   it('returns input string untouched for unknown or legacy mode strings', () => {
@@ -27,5 +29,6 @@ describe('gameModeLabels util', () => {
     expect(GAME_MODE_LABELS[GameMode.ThomravlebisTabula]).toBe('გამრავლების ტაბულა');
     expect(GAME_MODE_LABELS[GameMode.Gethometria]).toBe('გეომეტრია');
     expect(GAME_MODE_LABELS[GameMode.Kveshmicera]).toBe('ქვეშმიწერით გამრავლება');
+    expect(GAME_MODE_LABELS[GameMode.Kveshdivision]).toBe('ქვეშმიწერით გაყოფა');
   });
 });

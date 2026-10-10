@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { deriveGameModeBreakdown } from './deriveGameModeBreakdown';
+import { getGameModeLabel } from '../utils/gameModeLabels';
+import { GameMode } from '../types';
 
 describe('deriveGameModeBreakdown', () => {
   it('returns empty object when sessions array is empty, null, or undefined', () => {
@@ -166,5 +168,27 @@ describe('deriveGameModeBreakdown', () => {
     });
     expect(result['Unknown']).toBeUndefined();
     expect(result['unknown']).toBeUndefined();
+  });
+
+  it('correctly aggregates kveshdivision sessions and maps to label "ქვეშმიწერით გაყოფა"', () => {
+    const sessions = [
+      {
+        game_mode: 'kveshdivision',
+        total_questions: 20,
+        total_correct: 19,
+        status: 'completed' as const,
+      },
+    ];
+
+    const result = deriveGameModeBreakdown(sessions);
+
+    expect(result['kveshdivision']).toEqual({
+      sessionCount: 1,
+      totalQuestions: 20,
+      totalCorrect: 19,
+      accuracyPercent: 95,
+    });
+    expect(getGameModeLabel('kveshdivision')).toBe('ქვეშმიწერით გაყოფა');
+    expect(getGameModeLabel(GameMode.Kveshdivision)).toBe('ქვეშმიწერით გაყოფა');
   });
 });

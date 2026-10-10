@@ -1,4 +1,5 @@
 import { MathProblem, Operation, GameMode, FigureType, MeasurementType, MissingPart, ShapeVariant } from '../types';
+import { generateDivisionProblem } from '../utils/divisionProblemGenerator';
 
 export const CORRECT_PHRASES = [
   "ყოჩაღ, {vocative}, კარგი {gender} ხარ",
@@ -49,6 +50,8 @@ export const IRREGULAR_HEXAGONS: ShapeVariant[] = [
 ];
 
 export const generateProblem = (mode: GameMode, questionIndex: number = 0): MathProblem => {
+  if (mode === GameMode.Kveshdivision) return generateDivisionProblem();
+
   if (mode === GameMode.Kveshmicera) {
     let n1 = Math.floor(Math.random() * 88) + 11; // 11-99
     let n2 = Math.floor(Math.random() * 88) + 11; // 11-99

@@ -57,4 +57,20 @@ describe('problemGenerator', () => {
       }
     }
   });
+
+  it('generates exact division problems for GameMode.Kveshdivision across 200 iterations', () => {
+    for (let i = 0; i < 200; i++) {
+      const problem = generateProblem(GameMode.Kveshdivision, i);
+      expect(problem.category).toBe('math');
+      if ('operation' in problem && 'num1' in problem && 'num2' in problem) {
+        expect(problem.operation).toBe(Operation.Divide);
+        expect(problem.num1).toBeGreaterThanOrEqual(100);
+        expect(problem.num1).toBeLessThanOrEqual(9999);
+        expect(problem.num2).toBeGreaterThanOrEqual(2);
+        expect(problem.num2).toBeLessThanOrEqual(9);
+        expect(problem.num1 % problem.num2).toBe(0);
+        expect(problem.answer).toBe(problem.num1 / problem.num2);
+      }
+    }
+  });
 });

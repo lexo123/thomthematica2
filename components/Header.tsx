@@ -33,7 +33,9 @@ export const Header: React.FC<HeaderProps> = ({
         <h1 className="text-xs sm:text-lg md:text-2xl font-black text-indigo-900 tracking-tight truncate">
           {gameMode === GameMode.Thomthematica ? 'მაგალითები 👑' : 
            gameMode === GameMode.ThomravlebisTabula ? 'გამრავლების ტაბულა ✖️' : 
-           gameMode === GameMode.Gethometria ? 'გეომეტრია 📐' : 'ქვეშმიწერით გამრავლება ✍️'}
+           gameMode === GameMode.Gethometria ? 'გეომეტრია 📐' : 
+           gameMode === GameMode.Kveshmicera ? 'ქვეშმიწერით გამრავლება ✍️' : 
+           gameMode === GameMode.Kveshdivision ? 'ქვეშმიწერით გაყოფა ➗' : ''}
         </h1>
       </div>
       
