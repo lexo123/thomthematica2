@@ -5,6 +5,7 @@ export const GAME_MODE_LABELS: Record<GameMode, string> = {
   [GameMode.ThomravlebisTabula]: 'გამრავლების ტაბულა',
   [GameMode.Gethometria]: 'გეომეტრია',
   [GameMode.Kveshmicera]: 'ქვეშმიწერით გამრავლება',
+  [GameMode.Kveshdivision]: 'ქვეშმიწერით გაყოფა',
 };
 
 const isGameMode = (mode: string): mode is GameMode => {

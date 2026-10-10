@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MathProblem, GameState, GameMode } from './types';
 import { Button } from './components/Button';
 import { ResultOverlay } from './components/ResultOverlay';
 import { Header } from './components/Header';
 import { MainMenu } from './components/MainMenu';
 import { ColumnMultiplication } from './components/ColumnMultiplication';
+import { ColumnDivision } from './components/ColumnDivision';
 import { GeometryQuiz } from './components/GeometryQuiz';
 import { MathQuiz } from './components/MathQuiz';
 import { WishModal } from './components/WishModal';
@@ -24,12 +25,16 @@ import {
 import { getExpectedDigits } from './utils/columnMultiplication';
 import { useTimer } from './hooks/useTimer';
 import { useColumnMultiplication } from './hooks/useColumnMultiplication';
+import { useColumnDivision } from './hooks/useColumnDivision';
+import { validateDivisionAnswers } from './utils/columnDivision';
+import { getDivisionLayoutForProblem } from './utils/divisionProblemLayout';
 import { useGameSession } from './hooks/useGameSession';
 import { personalize } from './utils/personalizeMessage';
 import { selectFromPool } from './utils/poolSelector';
 
 /** Delay (ms) to allow DOM rendering before focusing the first cell in Kveshmicera mode */
 const KVESH_FIRST_CELL_FOCUS_DELAY_MS = 120;
+const DIVISION_FIRST_CELL_FOCUS_DELAY_MS = 120;
 
 const App: React.FC = () => {
   const { user } = useAuth();
@@ -122,6 +127,24 @@ const App: React.FC = () => {
     registerSubmitHandler,
   } = useColumnMultiplication(problem);
 
+  const isDivisionMode = gameMode === GameMode.Kveshdivision;
+  const divisionLayout = useMemo(() => (isDivisionMode ? getDivisionLayoutForProblem(problem) : null), [isDivisionMode, problem]);
+
+  const {
+    answers: divisionAnswers,
+    showDivisionValidation,
+    setShowDivisionValidation,
+    hasFailedThisDivision,
+    setHasFailedThisDivision,
+    handleCellChange: handleDivisionCellChange,
+    handleKeyDown: handleDivisionKeyDown,
+    isDivisionFilled,
+    resetDivisionState,
+    registerCellRef: registerDivisionCellRef,
+    focusFirstCell: focusFirstDivisionCell,
+    registerSubmitHandler: registerDivisionSubmitHandler,
+  } = useColumnDivision(divisionLayout);
+
   const resetBlockUIState = useCallback(() => {
     setQuestionsInBlock(0);
     setIsPerfectBlock(true);
@@ -134,7 +157,8 @@ const App: React.FC = () => {
     resetColMultState();
     setShowKveshValidation(false);
     setHasKveshFailedThisQuestion(false);
-  }, [resetColMultState, setShowKveshValidation, setHasKveshFailedThisQuestion]);
+    resetDivisionState();
+  }, [resetColMultState, setShowKveshValidation, setHasKveshFailedThisQuestion, resetDivisionState]);
 
   // Reset block UI state when active child profile or game mode changes
   useEffect(() => {
@@ -165,16 +189,23 @@ const App: React.FC = () => {
             focusFirstCell(problem);
           }
         }, KVESH_FIRST_CELL_FOCUS_DELAY_MS);
+      } else if (isDivisionMode) {
+        const t = setTimeout(() => {
+          if (divisionLayout) focusFirstDivisionCell(divisionLayout);
+        }, DIVISION_FIRST_CELL_FOCUS_DELAY_MS);
+        return () => clearTimeout(t);
       } else {
         inputRef.current?.focus();
       }
     }
-  }, [gameState, gameMode, problem, focusFirstCell, isGameScreenBlocked]);
+  }, [gameState, gameMode, problem, focusFirstCell, isGameScreenBlocked, divisionLayout, isDivisionMode, focusFirstDivisionCell]);
 
   const processAnswerResult = (isCorrect: boolean, actualUserAnswer: string) => {
     const shouldRecord =
       gameMode === GameMode.Kveshmicera
         ? !hasKveshFailedThisQuestion
+        : isDivisionMode
+        ? !hasFailedThisDivision
         : !hasFailedCurrentQuestion;
 
     if (shouldRecord) {
@@ -188,6 +219,16 @@ const App: React.FC = () => {
       } else {
         setHasKveshFailedThisQuestion(true);
         setShowKveshValidation(true);
+      }
+    }
+
+    if (isDivisionMode) {
+      if (isCorrect) {
+        setShowDivisionValidation(false);
+        setHasFailedThisDivision(false);
+      } else {
+        setHasFailedThisDivision(true);
+        setShowDivisionValidation(true);
       }
     }
 
@@ -221,7 +262,7 @@ const App: React.FC = () => {
       setIsPerfectBlock(false);
       setConsecutivePerfectBlocks(0);
 
-      if (gameMode === GameMode.Kveshmicera) {
+      if (gameMode === GameMode.Kveshmicera || isDivisionMode) {
         return;
       }
 
@@ -239,7 +280,8 @@ const App: React.FC = () => {
     if (!problem) return false;
     if (gameState !== GameState.Playing) return false;
 
-    if (gameMode !== GameMode.Kveshmicera && !userAnswer) return false;
+    if (gameMode !== GameMode.Kveshmicera && !isDivisionMode && !userAnswer) return false;
+    if (isDivisionMode && !isDivisionFilled()) return false;
 
     stopTimer();
 
@@ -258,6 +300,12 @@ const App: React.FC = () => {
       isCorrect = isAllCorrect;
       const nonZeroRes = colMultState.res.filter(v => v !== "");
       actualUserAnswer = nonZeroRes.join('') || "0";
+    } else if (isDivisionMode) {
+      if (!divisionLayout) return false;
+      if (!isDivisionFilled()) return false;
+      const { isAllCorrect } = validateDivisionAnswers(divisionLayout, divisionAnswers);
+      isCorrect = isAllCorrect;
+      actualUserAnswer = String(problem.answer);
     } else {
       const val = parseInt(userAnswer, 10);
       if (isNaN(val)) return false;
@@ -272,11 +320,16 @@ const App: React.FC = () => {
     registerSubmitHandler(handleSubmit);
   }, [registerSubmitHandler, handleSubmit]);
 
+  useEffect(() => {
+    registerDivisionSubmitHandler(handleSubmit);
+  }, [registerDivisionSubmitHandler, handleSubmit]);
+
   const handleNext = (force: boolean = false) => {
     if (showWishModal && !force) return;
     if (gameState === GameState.Incorrect) {
       setUserAnswer('');
       resetColMultState();
+      resetDivisionState();
       setGameState(GameState.Playing);
       if (gameMode === GameMode.ThomravlebisTabula) {
         startTimer();
@@ -298,6 +351,7 @@ const App: React.FC = () => {
       setHasFailedCurrentQuestion(false);
       setUserAnswer('');
       resetColMultState();
+      resetDivisionState();
       setGameState(GameState.Playing);
       setShowRewardImage(false);
       if (gameMode === GameMode.ThomravlebisTabula) {
@@ -419,6 +473,7 @@ const App: React.FC = () => {
   }
 
   if (!problem) return <div className="min-h-screen flex items-center justify-center">იტვირთება...</div>;
+  if (isDivisionMode && !divisionLayout) return <div className="min-h-screen flex items-center justify-center">იტვირთება...</div>;
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center p-2 sm:p-4 relative overflow-x-hidden">
@@ -432,7 +487,7 @@ const App: React.FC = () => {
         onHomeClick={handleHomeClick}
       />
 
-      <main className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-6 md:p-12 relative overflow-hidden border-b-8 border-indigo-200 my-auto">
+      <main className={`bg-white w-full max-w-lg rounded-3xl shadow-2xl ${isDivisionMode ? 'md:max-w-2xl p-3 sm:p-6 md:p-12' : 'p-6 md:p-12'} relative overflow-hidden border-b-8 border-indigo-200 my-auto`}>
         <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400" />
 
         <div className="text-center space-y-8">
@@ -449,13 +504,25 @@ const App: React.FC = () => {
               isColMultFilled={isColMultFilled}
               registerCellRef={registerCellRef}
             />
+          ) : isDivisionMode && divisionLayout ? (
+            <ColumnDivision
+              layout={divisionLayout}
+              answers={divisionAnswers}
+              showValidation={showDivisionValidation}
+              currentMessage=""
+              onCellChange={handleDivisionCellChange}
+              onKeyDown={handleDivisionKeyDown}
+              onSubmit={handleSubmit}
+              isFilled={isDivisionFilled}
+              registerCellRef={registerDivisionCellRef}
+            />
           ) : problem.category === 'geometry' ? (
             <GeometryQuiz problem={problem} />
           ) : (
             <MathQuiz problem={problem} />
           )}
 
-          {gameMode !== GameMode.Kveshmicera && (
+          {gameMode !== GameMode.Kveshmicera && !isDivisionMode && (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="relative">
                 <input
@@ -511,3 +578,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

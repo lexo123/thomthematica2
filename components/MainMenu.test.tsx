@@ -7,6 +7,7 @@ import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
 import * as SessionModeContext from '../contexts/SessionModeContext';
 import * as supabaseSyncService from '../services/supabaseSyncService';
+import { GameMode } from '../types';
 
 describe('MainMenu - Parent Control Card, Wish Inbox & Child Game Mode', () => {
   let setShowChildSelectorMock: any;
@@ -128,17 +129,52 @@ describe('MainMenu - Parent Control Card, Wish Inbox & Child Game Mode', () => {
 
     render(<MainMenu onSelectMode={vi.fn()} />);
 
-    // "🔒 მომხმარებლის შეცვლა" and all 4 game buttons are present
+    // "🔒 მომხმარებლის შეცვლა" and all 5 game buttons are present
     expect(screen.getByText('🔒 მომხმარებლის შეცვლა')).toBeDefined();
     expect(screen.getByText('მაგალითები')).toBeDefined();
     expect(screen.getByText('გამრავლების ტაბულა')).toBeDefined();
     expect(screen.getByText('გეომეტრია 📐')).toBeDefined();
     expect(screen.getByText('ქვეშმიწერით გამრავლება ✍️')).toBeDefined();
+    expect(screen.getByText('ქვეშმიწერით გაყოფა ➗')).toBeDefined();
 
     // Parent buttons must be ABSENT in child mode
     expect(screen.queryByText('📊 სტატისტიკა')).toBeNull();
     expect(screen.queryByText('➕ ბავშვის დამატება')).toBeNull();
     expect(screen.queryByText(/შვილის შეცვლა|ბავშვის შეცვლა/)).toBeNull();
+  });
+
+  it('renders fifth game button "ქვეშმიწერით გაყოფა ➗" and clicking it calls onSelectMode with GameMode.Kveshdivision', () => {
+    vi.spyOn(ChildContext, 'useChild').mockReturnValue({
+      childrenList: [
+        { id: 'child-1', parent_id: 'parent-123', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy', created_at: '' },
+      ],
+      activeChild: { id: 'child-1', parent_id: 'parent-123', name: 'თომა', avatar_id: 'avatar_1', gender: 'boy', created_at: '' },
+      activeChildId: 'child-1',
+      childRewardImages: null,
+      loading: false,
+      error: null,
+      hasFetchedOnce: true,
+      setActiveChildId: setActiveChildIdMock,
+      setActiveChild: vi.fn(),
+      addChild: vi.fn(),
+      fetchChildren: vi.fn(),
+      showChildSelector: false,
+      setShowChildSelector: setShowChildSelectorMock,
+    });
+
+    vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
+      sessionMode: 'child',
+      setSessionMode: vi.fn(),
+      resetSessionMode: resetSessionModeMock,
+    });
+
+    const onSelectMode = vi.fn();
+    render(<MainMenu onSelectMode={onSelectMode} />);
+
+    const divBtn = screen.getByText('ქვეშმიწერით გაყოფა ➗');
+    expect(divBtn).toBeDefined();
+    fireEvent.click(divBtn);
+    expect(onSelectMode).toHaveBeenCalledWith(GameMode.Kveshdivision);
   });
 
   it('renders "📬 სურვილები (N)" badge in parent mode, opens ParentWishInbox, and updates badge count after refetch', async () => {

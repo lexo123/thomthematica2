@@ -9,7 +9,12 @@ export const DEFAULT_WISH_BLOCK_SIZE = 40;
  * All other game modes require a 40-question block.
  */
 export function getWishBlockSize(gameMode: GameMode | string | null | undefined): number {
-  if (gameMode === GameMode.Kveshmicera || gameMode === 'kveshmicera') {
+  if (
+    gameMode === GameMode.Kveshmicera ||
+    gameMode === 'kveshmicera' ||
+    gameMode === GameMode.Kveshdivision ||
+    gameMode === 'kveshdivision'
+  ) {
     return KVESHMICERA_WISH_BLOCK_SIZE;
   }
   return DEFAULT_WISH_BLOCK_SIZE;

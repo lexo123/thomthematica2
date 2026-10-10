@@ -13,6 +13,11 @@ describe('wishBlockSize utils', () => {
     expect(getWishBlockSize('kveshmicera')).toBe(20);
   });
 
+  it('returns 20 for GameMode.Kveshdivision', () => {
+    expect(getWishBlockSize(GameMode.Kveshdivision)).toBe(20);
+    expect(getWishBlockSize('kveshdivision')).toBe(20);
+  });
+
   it('returns 40 for all other game modes', () => {
     expect(getWishBlockSize(GameMode.Thomthematica)).toBe(40);
     expect(getWishBlockSize(GameMode.ThomravlebisTabula)).toBe(40);
