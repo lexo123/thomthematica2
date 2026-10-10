@@ -793,5 +793,34 @@ describe('Commit 3 - Kveshdivision Flow & App-level Integration Tests', () => {
     // Step 6: Banner does not contain stale praise text
     expect(banner?.textContent).not.toContain(praise);
   });
+
+  it('T. Main element sizing: division mode has md:max-w-2xl class, but returning to Kveshmicera does not contain md:max-w-2xl', () => {
+    const qDiv: MathProblem = {
+      category: 'math',
+      num1: 345,
+      num2: 3,
+      operation: Operation.Divide,
+      answer: 115,
+    };
+    setupDeterministicProblems([qDiv]);
+
+    render(<App />);
+
+    // 1. Enter Division
+    fireEvent.click(screen.getByText('ქვეშმიწერით გაყოფა ➗'));
+    const mainDivision = document.querySelector('main');
+    expect(mainDivision).not.toBeNull();
+    expect(mainDivision?.className).toContain('md:max-w-2xl');
+
+    // 2. Click Home (🏠)
+    const homeBtn = screen.getByTitle('მთავარი მენიუ');
+    fireEvent.click(homeBtn);
+
+    // 3. Enter Kveshmicera
+    fireEvent.click(screen.getByText('ქვეშმიწერით გამრავლება ✍️'));
+    const mainKveshmicera = document.querySelector('main');
+    expect(mainKveshmicera).not.toBeNull();
+    expect(mainKveshmicera?.className).not.toContain('md:max-w-2xl');
+  });
 });
 

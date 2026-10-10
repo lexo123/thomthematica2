@@ -487,7 +487,7 @@ const App: React.FC = () => {
         onHomeClick={handleHomeClick}
       />
 
-      <main className={`bg-white w-full max-w-lg rounded-3xl shadow-2xl ${isDivisionMode ? 'p-3 sm:p-6 md:p-12' : 'p-6 md:p-12'} relative overflow-hidden border-b-8 border-indigo-200 my-auto`}>
+      <main className={`bg-white w-full max-w-lg rounded-3xl shadow-2xl ${isDivisionMode ? 'md:max-w-2xl p-3 sm:p-6 md:p-12' : 'p-6 md:p-12'} relative overflow-hidden border-b-8 border-indigo-200 my-auto`}>
         <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400" />
 
         <div className="text-center space-y-8">
