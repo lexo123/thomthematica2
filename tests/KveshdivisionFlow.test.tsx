@@ -7,9 +7,10 @@ import * as AuthContext from '../contexts/AuthContext';
 import * as ChildContext from '../contexts/ChildContext';
 import * as SessionModeContext from '../contexts/SessionModeContext';
 import * as problemGenerator from '../services/problemGenerator';
-import { GameMode, Operation, MathProblem } from '../types';
-import { buildDivisionLayout } from '../utils/columnDivision';
+import { GameMode, Operation, MathProblem, Child } from '../types';
+import { buildDivisionLayout, DivisionLayout } from '../utils/columnDivision';
 import { saveGameProgress, clearGameProgress } from '../services/gameProgressStorage';
+import type { User, Session } from '@supabase/supabase-js';
 
 const focusFirstCellSpy = vi.fn();
 
@@ -17,15 +18,19 @@ vi.mock('../hooks/useColumnDivision', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../hooks/useColumnDivision')>();
   return {
     ...actual,
-    useColumnDivision: (layout: any) => {
+    useColumnDivision: (layout: DivisionLayout | null) => {
       const hookResult = actual.useColumnDivision(layout);
-      const originalFocus = hookResult.focusFirstCell;
+      const latestFocusRef = React.useRef(hookResult.focusFirstCell);
+      latestFocusRef.current = hookResult.focusFirstCell;
+
+      const stableFocusFirstCell = React.useCallback((targetLayout: DivisionLayout) => {
+        focusFirstCellSpy(targetLayout);
+        return latestFocusRef.current(targetLayout);
+      }, []);
+
       return {
         ...hookResult,
-        focusFirstCell: (l: any) => {
-          focusFirstCellSpy(l);
-          return originalFocus(l);
-        },
+        focusFirstCell: stableFocusFirstCell,
       };
     },
   };
@@ -41,6 +46,15 @@ describe('Commit 3 - Kveshdivision Flow & App-level Integration Tests', () => {
     clearGameProgress(childId, GameMode.Kveshdivision);
     clearGameProgress(childId, GameMode.Kveshmicera);
 
+    const mockChild: Child = {
+      id: childId,
+      parent_id: 'parent-123',
+      name: 'თომა',
+      avatar_id: 'avatar_1',
+      gender: 'boy',
+      created_at: '',
+    };
+
     vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
       sessionMode: 'child',
       setSessionMode: vi.fn(),
@@ -48,26 +62,33 @@ describe('Commit 3 - Kveshdivision Flow & App-level Integration Tests', () => {
     });
 
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
-      user: { id: 'parent-123', email: 'parent@example.com' } as any,
-      session: { user: { id: 'parent-123' } } as any,
+      user: { id: 'parent-123', email: 'parent@example.com' } as unknown as User,
+      session: { user: { id: 'parent-123' } } as unknown as Session,
       loading: false,
-      loginWithOtp: vi.fn(),
-      verifyOtp: vi.fn(),
+      isConfigured: true,
+      isPasswordRecovery: false,
+      setIsPasswordRecovery: vi.fn(),
+      signUp: vi.fn(),
+      signIn: vi.fn(),
       signOut: vi.fn(),
+      resetPassword: vi.fn(),
+      updatePassword: vi.fn(),
     });
 
     vi.spyOn(ChildContext, 'useChild').mockReturnValue({
-      childrenList: [
-        { id: childId, parent_id: 'parent-123', name: 'თომა', avatar_url: null, avatar_id: 'avatar_1', gender: 'boy', created_at: '' } as any,
-      ],
-      activeChild: { id: childId, parent_id: 'parent-123', name: 'თომა', avatar_url: null, avatar_id: 'avatar_1', gender: 'boy', created_at: '' } as any,
+      childrenList: [mockChild],
+      activeChild: mockChild,
       activeChildId: childId,
+      childRewardImages: null,
       loading: false,
+      error: null,
+      hasFetchedOnce: true,
+      setActiveChildId: vi.fn(),
       setActiveChild: vi.fn(),
       addChild: vi.fn(),
-      updateChild: vi.fn(),
-      deleteChild: vi.fn(),
-      refreshChildren: vi.fn(),
+      fetchChildren: vi.fn(),
+      showChildSelector: false,
+      setShowChildSelector: vi.fn(),
     });
   });
 
@@ -727,3 +748,4 @@ describe('Commit 3 - Kveshdivision Flow & App-level Integration Tests', () => {
     }
   });
 });
+

@@ -509,7 +509,7 @@ const App: React.FC = () => {
               layout={divisionLayout}
               answers={divisionAnswers}
               showValidation={showDivisionValidation}
-              currentMessage={currentMessage}
+              currentMessage=""
               onCellChange={handleDivisionCellChange}
               onKeyDown={handleDivisionKeyDown}
               onSubmit={handleSubmit}
@@ -578,3 +578,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
