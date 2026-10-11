@@ -1,20 +1,64 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: Pre-Launch Bug-Fix Wave დასრულებული და ცოცხლად დადასტურებული (commits c8b6802, 111a659, 9f68acd, b28cb05): ბლოკის UI-state-ის თამაშებს/ბავშვებს შორის გადმოდინება, ორმაგი "completed" flush-ით duration=0, მენიუში გასვლისას rolling window-ს წაშლა, და Dashboard-ში გაჭედილი "active" სესიების უჩინარობა — ოთხივე გასწორებული. წინა: რეგისტრაციის PIN-ის ჩუმი დაკარგვა (ecd892a), Wave Y (3d92e11-მდე), Service Worker cross-origin cache leak (1f3e969)_
+_ბოლო განახლება: 2026-10-12. მეხუთე თამაში "ქვეშმიწერით გაყოფა" (`Kveshdivision`) დასრულებულია და `main`-შია (PR #1, merge commit `549f654`, 2026-10-10). მიმდინარე checkpoint და როლების ახალი განაწილება — ქვემოთ, პირველ ორ სექციაში. ძველი ისტორია უცვლელია; შეცვლილი ფაქტები მონიშნულია. წინა განახლება: Pre-Launch Bug-Fix Wave (c8b6802, 111a659, 9f68acd, b28cb05)._
+
+## Current Checkpoint (გადამოწმებულია 2026-10-12, fresh clone-ით)
+
+| პუნქტი | მდგომარეობა |
+|---|---|
+| Repo | https://github.com/lexo123/thomthematica2 |
+| `main` HEAD | `549f654` — Merge pull request #1 from lexo123/feature/long-division (2026-10-10 14:14 +04:00) ✅ VERIFIED |
+| `feature/long-division` | HEAD `09aaa9f`, მთლიანად `main`-შია გაერთიანებული (`git merge-base --is-ancestor` დადასტურდა). ბრანჩი GitHub-ზე ჯერ არ წაშლილა |
+| tsc `--noEmit` | 0 შეცდომა ✅ VERIFIED (`main`, `549f654`) |
+| vitest | 49 ფაილი / **410 ტესტი**, ყველა გადის ✅ VERIFIED |
+| `vite build` | სუფთად სრულდება ✅ VERIFIED |
+| გაყოფის ორაკული | `utils/columnDivision.oracle.test.ts`, SHA-256 `ecf26a7aa60beb7ae49d7c9ec68a7df6ffb20d5c1e5ea92f9738a5e153bcdd08`, `main`-ზე უცვლელია ✅ VERIFIED |
+| დაცული ფაილები ამ merge-ში | `supabase/schema.sql`, `public/sw.js`, `hooks/useGameSession.ts`, `services/supabaseSyncService.ts` — `6af22e6`-დან `549f654`-მდე ხელუხლებელი ✅ VERIFIED |
+| `public/sw.js` | `CACHE_NAME = 'thomthematica-v7'` ✅ VERIFIED (გაყოფის ცვლილებას არ შეხებია) |
+| GameMode enum | 5 მნიშვნელობა: `thomthematica`, `thomravlebis_tabula`, `gethometria`, `kveshmicera`, `kveshdivision` ✅ VERIFIED |
+| **Development status** | **COMPLETE** — გაყოფის კოდი `main`-შია, ლოკალური/fresh-clone შემოწმებები (tsc, 410 ტესტი, build) გადის ✅ VERIFIED |
+| **Release verification** | ✅ **VERIFIED** (Lexo-ს ხელით შემოწმება, 2026-10-12) — სამივე პუნქტი (Pages deploy, 360×740, რეალური ტელეფონი/APK + Dashboard ლეიბლი) Lexo-მ შეამოწმა და შედეგი კარგია. კონკრეტული რიცხვები/ეკრანები ამ სესიაში არ მოუწოდებია; Claude-ს დამოუკიდებლად არ გადაუმოწმებია |
+| Deploy მექანიზმი (`.github/workflows/deploy.yml`) | `push` `main`-ზე (და `workflow_dispatch`) → `npm install` → `npm run typecheck` → `npm test` → `npm run build` (Supabase env: `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` secrets/vars-იდან) → GitHub Pages. ანუ deploy ტესტებზეა დამოკიდებული; ჩავარდნილი typecheck/test deploy-ს აჩერებს ✅ VERIFIED (workflow ფაილი წაკითხულია) |
+| GitHub Pages deploy `549f654`-ისთვის | ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12: deploy და გამოქვეყნებული ვერსია შემოწმებულია, ყველაფერი რიგზეა (Claude-ს Actions-ის run ვერ უნახავს, GitHub API 403) |
+| APK (webintoapp.com wrapper) | APK გაკეთებულია და GitHub Pages URL-ს ეხსნება. ტექნიკურად wrapper პასიურია: ახალ deploy-ს ავტომატურად იღებს, ცალკე rebuild არ სჭირდება. ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12: გაყოფის რეჟიმი რეალურ ტელეფონზე/APK-ში შემოწმებულია, ყველაფერი რიგზეა (Claude-ს დამოუკიდებლად არ გადაუმოწმებია). Android WebView-ში `beforeunload`/`visibilitychange` ნაკლებად საიმედოა (იხ. Pre-Launch ბაგი 3) |
+| ხელით შემოწმება 360×740-ზე (გაყოფა) | ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12: 360×740-ზე ყველაფერი რიგზეა (ზუსტი `scrollWidth`/`clientWidth` არ მოუწოდებია). ჩემი Chromium-ის გაზომვა: 360–767px → 294/294, ≥768px → 530/530; Lexo-ს დესკტოპზე: 530/530 (viewport 1299) |
+| გაყოფა რეალურ ტელეფონზე / APK-ში; Dashboard-ის ლეიბლი ცოცხლად | ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12 (Dashboard-ის ლეიბლი ასევე ტესტით დაფარულია: `deriveGameModeBreakdown`) |
+| უშუალოდ შემდეგი ნაბიჯი | (1) Lexo-ს მიერ 360px + ტელეფონის შემოწმება გამოქვეყნებულ ვერსიაზე; (2) Kveshmicera-ს "ძველი შექება შეცდომის ბანერში" ბაგის ცალკე შესწორება (იხ. Known issues); (3) შემდეგ Pre-Launch პუნქტები (Vercel/APK გადაწყვეტილება, სატესტო ანგარიშების გაწმენდა, Backup) და Wave "grade-range" architecture review |
+
+---
+
+## როლები და სამუშაო პროცესი (2026-10-12-დან)
+
+ეს ცვლის ქვემოთ, "Workflow" სექციაში აღწერილ ძველ განაწილებას (იქ Claude წერდა prompt-ებს). გაყოფის Commit 1–3d ძველი განაწილებით შესრულდა.
+
+| როლი | პასუხისმგებლობა |
+|---|---|
+| **ChatGPT — Lead Architect** | არქიტექტურული გეგმა, ტექნიკური ალტერნატივების შეფასება, scope-ის განსაზღვრა, არსებული არქიტექტურისა და დაცული ინვარიანტების შენარჩუნება, Claude-ის შენიშვნების განხილვა, **ერთი საბოლოო implementation prompt AI Studio-სთვის**, განხორციელებული commit-ის არქიტექტურული შეფასება |
+| **Claude — Independent Architecture & Code Reviewer** | ChatGPT-ის გეგმების კრიტიკული შეფასება, გამორჩენილი სცენარები, უსაფრთხოებისა/მონაცემთა მთლიანობის/regression-რისკები, **რეალური Git commit/diff-ის დამოუკიდებელი შემოწმება** (fresh clone), ტესტებისა და mutation checks-ის ადეკვატურობა. ChatGPT-ს ავტომატურად არ ეთანხმება; უთანხმოებას პირდაპირ მიუთითებს. ძირითადი implementation prompt-ის ავტორი აღარ არის, თუ Lexo კონკრეტულად არ დაავალებს |
+| **Google AI Studio (Gemini) — Implementer** | მხოლოდ დამტკიცებული scope-ის განხორციელება, კოდი და ტესტები, tsc/test suite/build, ფაილებისა და შედეგების რეპორტი, STOP-პირობების დაცვა. თავად არ წყვეტს შემდეგ ფაზაზე გადასვლას, არქიტექტურის შეცვლას ან დამატებით ფუნქციას |
+| **Lexo — Project Owner / Final Decision Maker** | პროდუქტის მიზნები და პრიორიტეტები, არქიტექტურული ცვლილებების დამტკიცება/შეჩერება, საბოლოო გადაწყვეტილება უთანხმოებისას (APPROVED / CHANGES REQUESTED / STOP), Git workflow, production ცვლილებები, merge |
+
+**ChatGPT-ის რეკომენდაცია არ აუქმებს Lexo-ს საბოლოო გადაწყვეტილების უფლებას. თუ ChatGPT-სა და Claude-ს დასკვნა განსხვავდება, უთანხმოება კოდის წერამდე უნდა გადაწყდეს.**
+
+**პროცესი:** (1) Lexo სვამს მოთხოვნას → (2) ChatGPT ამზადებს არქიტექტურულ გეგმას → (3) Claude დამოუკიდებლად ამოწმებს → (4) უთანხმოებები განიხილება კოდამდე → (5) ChatGPT ამზადებს ერთ საბოლოო prompt-ს → (6) Lexo ამტკიცებს AI Studio-ში გაგზავნას → (7) AI Studio ახორციელებს მხოლოდ შეთანხმებულ scope-ს → (8) tests, typecheck, build, საჭიროებისას mutation checks → (9) Claude ამოწმებს რეალურ diff-სა და კოდს → (10) ChatGPT აფასებს განხორციელებას → (11) Lexo წყვეტს → (12) ახალი ფაზა მხოლოდ დასრულებული checkpoint-ის შემდეგ. მცირე ცვლილებებისთვის პროცესი Lexo-ს თანხმობით შეიძლება გამარტივდეს, მაგრამ **რეალური diff-ის შემოწმება და დაცული ლოგიკის შენარჩუნება სავალდებულოა**.
+
+**AI Studio-ს რეპორტი არასდროს ითვლება დამოუკიდებელ მტკიცებულებად. Git repository და კონკრეტული commit არის source of truth.** (გაყოფის სამუშაოზე ეს წესი კიდევ ოთხჯერ გამართლდა — იხ. "გაკვეთილები" ქვემოთ.)
+
+---
 
 ## Repo
 https://github.com/lexo123/thomthematica2
 
 ## პროექტის მოკლე აღწერა
-React/TypeScript საგანმანათლებლო მათემატიკის აპლიკაცია ბავშვებისთვის, თავდაპირველად აშენებული ერთი ბავშვისთვის (thomthematica), ახლა გადადის multi-user/Parent→Child მოდელზე Supabase-ის (Auth + Postgres + RLS) გამოყენებით. კოდი იწერება Google AI Studio-ს (Gemini) მიერ vibe-coding მიდგომით; Claude და ChatGPT ცალ-ცალკე აკეთებენ code review-ს ყოველ commit-ზე, სანამ შემდეგი ეტაპი დაიწყება. Lexo — project manager/reviewer, არა კოდის ავტორი. **პროექტი ახლოვდება production launch-ს — თავდაპირველად ~10 ახლობელი ბავშვისთვის.**
+React/TypeScript საგანმანათლებლო მათემატიკის აპლიკაცია ბავშვებისთვის, თავდაპირველად აშენებული ერთი ბავშვისთვის (thomthematica), ახლა გადადის multi-user/Parent→Child მოდელზე Supabase-ის (Auth + Postgres + RLS) გამოყენებით. კოდი იწერება Google AI Studio-ს (Gemini) მიერ vibe-coding მიდგომით; არქიტექტურას გეგმავს ChatGPT (Lead Architect), Claude დამოუკიდებლად ამოწმებს გეგმებსა და რეალურ commit-ებს (იხ. "როლები და სამუშაო პროცესი" ზემოთ). Lexo — Project Owner/საბოლოო გადაწყვეტილების მიმღები, არა კოდის ავტორი. **მისი გარემო: Ubuntu (Linux); ინსტრუქციები მხოლოდ Ubuntu ტერმინალისთვის (იხ. `AGENTS.md`).** **პროექტი ახლოვდება production launch-ს — თავდაპირველად ~10 ახლობელი ბავშვისთვის.**
 
 ## დასრულებული ფაზები
 
 ### Phase 1: Authentication ✅
 - Supabase Auth (email/password), AuthContext.tsx, AuthModal.tsx
 - Password recovery flow (PASSWORD_RECOVERY event handling, UpdatePasswordModal.tsx)
-- supabase/schema.sql — 5 table: profiles, children, game_sessions, wishes, child_reward_images
-- RLS policies ყველა ცხრილზე, WITH CHECK კლაუზებით (არა მხოლოდ USING)
+- supabase/schema.sql — Phase 1-ის საწყისი სქემა შეიცავდა 4 application table-ს (`profiles`, `children`, `game_sessions`, `wishes`). მეხუთე, `child_reward_images`, დაემატა Wave 3 Part 2-ში. Production-ში ამჟამად 5 application table-ია, ხოლო რეპოზიტორიის `schema.sql` ნაწილობრივ მოძველებულია (გადამოწმებულია `main` `549f654`-ზე; იხ. "Schema drift" Known issues-ში)
+- RLS მოქმედებს application table-ებზე; client-side INSERT/UPDATE პოლიტიკებში გამოიყენება შესაბამისი ownership `WITH CHECK` (არა მხოლოდ `USING`), ხოლო `child_reward_images`-ის client წვდომა SELECT-only-ა (განზრახ; INSERT/UPDATE/DELETE მხოლოდ Lexo-ს service-role-ით, იხ. Wave 3 Part 2)
 - updated_at auto-update trigger (BEFORE UPDATE) — საჭირო abandoned-session დეტექციისთვის
 - handle_new_user() trigger — ავტომატური profiles row auth.users insert-ზე
 - lib/ensureProfile.ts — client-side self-healing fallback (ON CONFLICT DO NOTHING, legacy ანგარიშებისთვის)
@@ -215,7 +259,7 @@ image_approved → Lexo ხელით child_reward_images-ში → published
 - **Stage 3c** (e9d6efd) — ბავშვის მხარე: `useChildOwnWishes`, `ChildWishStatusPanel.tsx`, `MainMenu.tsx`-ის child-mode ბლოკში ჩართვა. ტესტებში დამატებულია მკაცრი `FORBIDDEN_UI_LITERALS` assertion (status-სტრინგები/`proposed_image_path`/`image_parent_note` არასდროს ჩანს rendered UI ტექსტში)
 
 ### Storage/Data-boundary Discovery (Wave Y-ის ყველაზე მნიშვნელოვანი არქიტექტურული დასკვნა)
-ვინაიდან "ბავშვი" და "მშობელი" ერთი ოჯახის ფარგლებში იზიარებენ ერთსა და იმავე `auth.uid()`-ს (იხ. Wave X-ის სექცია ზემოთ), **Storage/DB RLS ვერასდროს ვერ დაიცავს "ბავშვმა არ უნდა ნახოს X" წესს** — ეს შესაძლებელია მხოლოდ client-code-ის დონეზე (query projection). ეს აღმოჩენა პირდაპირ გავლენას მოახდინა Stage 3a-ს დიზაინზე (`fetchChildSafeWishes`-ის ცხადი column-selection) და ზოგადი წესია ნებისმიერი მომავალი child-visible/parent-only მონაცემისთვის: **`select('*')` არასდროს გამოიყენო query-ში, რომლის შედეგიც child-mode-ის React state-ში შეიძლება მოხვდეს.**
+ვინაიდან "ბავშვი" და "მშობელი" ერთი ოჯახის ფარგლებში იზიარებენ ერთსა და იმავე `auth.uid()`-ს (იხ. Wave X-ის სექცია ზემოთ), **Storage/DB RLS ვერასდროს ვერ დაიცავს "ბავშვმა არ უნდა ნახოს X" წესს** — ეს შესაძლებელია მხოლოდ client-code-ის დონეზე (query projection), ანუ შემთხვევითი გამჟღავნებისგან დაცვის ზომაა და არა server-side authorization (DevTools-ით ოჯახის მონაცემი ტექნიკურად წაკითხვადია). ეს აღმოჩენა პირდაპირ გავლენას მოახდინა Stage 3a-ს დიზაინზე (`fetchChildSafeWishes`-ის ცხადი column-selection) და ზოგადი წესია ნებისმიერი მომავალი child-visible/parent-only მონაცემისთვის: **`select('*')` არასდროს გამოიყენო query-ში, რომლის შედეგიც child-mode-ის React state-ში შეიძლება მოხვდეს.**
 
 ### 🔴 Production Security Incident — Service Worker Cross-Origin Cache Leak ✅ გასწორებული (commit 1f3e969)
 
@@ -295,9 +339,62 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 ---
 
+## ქვეშმიწერით გაყოფა — მეხუთე თამაში `Kveshdivision` ✅ (`main`-შია, `549f654`)
+
+**რას აკეთებს:** ბავშვი ავსებს ქვეშმიწერით გაყოფის (სვეტად გაყოფა) ცხრილს უჯრა-უჯრა, როგორც Kveshmicera-ში. გასაყოფი 3–4 ციფრიანია (100–9999), გამყოფი 2–9, გაყოფა ყოველთვის უნაშთოა (5-ნიშნა გასაყოფი, ნაშთიანი გაყოფა — **PLANNED, ჯერ არ დაწყებულა**). ეს ცალკე, მეხუთე `GameMode`-ია (ვარიანტი A), არა Kveshmicera-ს ქვე-რეჟიმი.
+
+### პროდუქტის გადაწყვეტილებები (Lexo, stated)
+- ერთი ამოცანა = ერთი კითხვა; სურვილი 20-დან 19 სწორზე (`wishBlockSize(Kveshdivision) = 20`, წესი Kveshmicera-ს იდენტურია)
+- ერთი ამოცანა ითვლება მაქსიმუმ ერთ არასწორ პასუხად, რამდენჯერაც არ უნდა შეცდეს (`hasFailedThisDivision`)
+- არასწორი პასუხისას ცხრილი რჩება ეკრანზე: სწორი უჯრები მწვანდება, არასწორი წითლდება, ფერები live-ად იცვლება, არაფერი იბლოკება და არ იწმინდება; ბანერი "ზოგიერთი ციფრი არასწორია! შეასწორე წითელი უჯრები."; Incorrect-overlay არ ჩნდება
+- ნულოვანი განაყოფის ციფრიც იგივე უჯრების სტილით ივსება (რიგი არ გამოტოვდება)
+- ბოლო `0` (ბოლო ნაშთი) და მის ზემოთ ბოლო ნამრავლი — **optional**: ცარიელი დატოვება შეცდომა არ არის, არასწორი ციფრი კი შეცდომაა
+- ნაშთის უჯრა: **ყოველ ხაზზე წინასწარ გამოყოფილი შესავსები ადგილი** (რომ ბავშვმა წინასწარ არ იცოდეს, სად რჩება ნაშთი); ნაშთის ადგილას `0` optional
+- განაყოფის რიგში ყოველთვის იმდენი უჯრაა, რამდენი ციფრიც აქვს გასაყოფს; განაყოფი მარცხნიდან მარჯვნივ იწერება, ზედმეტი უჯრები ბოლოშია (`spare`), წინ `0` არ დაიშვება; ყველა ნამრავლის რიგში ყოველთვის ორ-ორი უჯრაა; პირველ რიგში მარცხნივ გადმოსული უჯრა არ არსებობს
+
+### განხორციელება (ფაილები)
+- `utils/columnDivision.ts` — წმინდა ლოგიკა: `buildDivisionLayout(dividend, divisor)`, `validateDivisionAnswers(layout, answers)`, `DivisionCell {id, kind, step, row, col, expected, rule: 'required'|'optional'|'blank'}`
+- `utils/divisionProblemGenerator.ts` — `generateDivisionProblem(rng)`: 3/4 ციფრი 50/50, გამყოფი 2–9, `num1`=გასაყოფი, `num2`=გამყოფი, `answer`=განაყოფი
+- `utils/divisionProblemLayout.ts` — `getDivisionLayoutForProblem(problem)`: უსაფრთხო wrapper, რომელიც `null`-ს აბრუნებს (და არასდროს ისვრის) თუ ამოცანა გაყოფის არ არის (მაგ. რეჟიმის გადართვისას ერთი რენდერით "ძველი" `problem`-ი)
+- `hooks/useColumnDivision.ts` — state, ფოკუსი `solvingSequence`-ის მიხედვით (განაყოფის ციფრი → ნამრავლი → სამუშაო რიცხვი), Space/Enter/ისრები, ცარიელი უჯრიდან წინსვლა, ბოლო უჯრაზე Enter → submit
+- `components/ColumnDivision.tsx` — grid UI; `type="tel" inputMode="numeric" maxLength=1`, სისტემური კლავიატურა; ერთი და იგივე className ყველა უჯრაზე (`w-7 h-9 text-xl md:w-12 md:h-14 md:text-3xl ...`)
+- `App.tsx` — ინტეგრაცია (`isDivisionMode`, `divisionLayout` `useMemo`-ში, `useColumnDivision(divisionLayout)` უპირობოდ, ცალკე ფოკუსის ტოტი cleanup-ით, `shouldRecord` გაყოფისთვის, `resetDivisionState` `resetBlockUIState`/`handleNext`-ში, generic რიცხვითი ფორმა გაყოფაზე არ რენდერდება)
+- `types.ts` (`Kveshdivision = 'kveshdivision'`), `services/problemGenerator.ts` (გაყოფის ტოტი პირველია), `utils/gameModeLabels.ts` ("ქვეშმიწერით გაყოფა"), `utils/wishBlockSize.ts`, `components/MainMenu.tsx` (მეხუთე ღილაკი), `components/Header.tsx` (ცხადი ტოტი გაყოფისთვის)
+- DB: `game_sessions.game_mode`-ს CHECK constraint არ აქვს (production-ში SQL-ით დადასტურებულია) → `'kveshdivision'` იწერება ცვლილების გარეშე; migration არ ყოფილა და არ იყო საჭირო
+
+### ორაკული (დამოუკიდებელი ვერიფიკაცია)
+`utils/columnDivision.oracle.test.ts` — **არა ალგორითმის ასლი**, არამედ არითმეტიკული ინვარიანტებით დაწერილი ტესტი: ამოწმებს ყველა 18,106 უნაშთო წყვილს (3–4 ციფრი × გამყოფი 2–9). ფაილი **არასდროს უნდა მიეცეს AI Studio-ს და არასდროს უნდა შეიცვალოს ტესტის გასავლელად**; SHA-256 ზემოთ Current Checkpoint-შია. თუ ტესტი ჩავარდება, კოდს ვასწორებთ და არა ორაკულს. (Commit 3-ის ლოკალური გადაწერისას `git status`-მა ორაკული შეცვლილად აჩვენა. მიზეზი **დადგენილი არ არის**: შეცვლის diff Lexo-მ არ მოგვაწოდა. `git restore`-ით დაბრუნდა, ჰეში გადამოწმდა, ტესტები გავიდა. ეს ორაკულის დაცვის სარგებლობის მაგალითია.)
+
+### Commit-ების ისტორია (`feature/long-division` → `main`, PR #1)
+| Commit | შინაარსი |
+|---|---|
+| `fa4b648` | Commit 1 — წმინდა ლოგიკა და ტესტები (4 ახალი ფაილი); vitest 43 ფაილი / 338 ტესტი |
+| `08acc1e` | Commit 2 — `useColumnDivision` hook, `ColumnDivision` კომპონენტი, ორაკული; 46 ფაილი / 365 ტესტი |
+| `833b819` | Commit 2b — ერთგვაროვანი რიგები, optional უჯრები, `spare` უჯრა განაყოფის რიგში (პროდუქტის გადაწყვეტილებების შესაბამისად); 46 / 375 |
+| `8a1d394` | Commit 3 — აპში ჩართვა (`App.tsx`, მენიუ, ლეიბლი, wish block, Header, მობილური ზომები, `tests/KveshdivisionFlow.test.tsx`, ტესტები B–R); 49 / 408 |
+| `093b9e1` | Commit 3b — `currentMessage=""` გაყოფის ბანერზე (ძველი შექება ჩანდა შეცდომის ბანერში); ტესტში `any`-ების მოცილება; სტაბილური `focusFirstCell` mock |
+| `9bf8922` | Commit 3c — regression ტესტი S (Q1 სწორი → Q2 არასწორი: ბანერში ძველი შექება არ ჩანს); ჩაიჭრება მუტაციაზე `currentMessage={currentMessage}`; 49 / 409 |
+| `09aaa9f` | Commit 3d (commit message: "fixing sizes") — `md:max-w-2xl` გაყოფის რეჟიმის `main`-ზე + ტესტი T; 49 / 410 |
+| `549f654` | Merge PR #1 → `main` |
+
+### გაზომილი განლაგება (Chromium, რეალური კომპონენტი + `App.tsx`-ის რეალური კლასები)
+4-ნიშნა გასაყოფზე (ყველაზე ფართო შემთხვევა), `scrollWidth/clientWidth` ბარათის შიგნით: **360–767px → 294/294** (უჯრა 28px, `main p-3`); **768–1920px → 530/530** (`md:max-w-2xl`; `md:max-w-2xl`-ის გარეშე იყო 472/414 და ბოლო განაყოფის უჯრა იჭრებოდა). 320px-იან ძალიან პატარა ეკრანზე 28px-იანი უჯრები სქროლს იძლევა (`overflow-x-auto` ბოლო დაცვაა). **გაკვეთილი:** პირველ გაზომვაში მხოლოდ ტელეფონის სიგანეები შემოწმდა; ≥768px (`md:`-ის ზღვარი) გამორჩა და Lexo-მ დესკტოპზე ნახა.
+
+### ტესტირების სტრატეგია
+- `tests/KveshdivisionFlow.test.tsx` (19 ტესტი, B–T): B–I — Kveshmicera-ს retry-flow-ს სარკე; J–K ოფციონალური/spare უჯრების წესები; L ცარიელი Enter არ ითვლება; M state-ის გადმოდინება 🏠-ის შემდეგ; N "ძველი" ამოცანა რეჟიმის გადართვისას (console.error/warn არ გამოძახებულა); O რეჟიმებს შორის გადართვა; P generic რიცხვითი ფორმა გაყოფაზე არ არსებობს; Q ფოკუსი პირველ უჯრაზე; R ფოკუსის ტაიმერის `clearTimeout`; S ძველი შექება ბანერში არ ჩანს; T `md:max-w-2xl` მხოლოდ გაყოფაზეა
+- დამოუკიდებლად გაშვებული მუტაციები (Claude, fresh clone, `8a1d394`): `resetDivisionState` ამოღება, `isDivisionFilled` შემოწმებების ამოღება (ორივე ადგილას ერთად — ტესტი L ჩაიჭრა; ერთ-ერთის ცალკე ამოღება არ ჩაიჭრება, რადგან შემოწმება ორ ადგილას დუბლირებულია, ეს არ არის ტესტის ხვრელი), `getDivisionLayoutForProblem`-ის try/catch, Header-ის ტოტი, `wishBlockSize`, `!isDivisionMode` generic ფორმაზე, `clearTimeout`, ფოკუსის ტოტი — ყველა ჩაიჭრა; `shouldRecord` swap (`hasFailedThisDivision` ↔ `hasFailedCurrentQuestion`) ეკვივალენტური მუტაციაა (ორივე flag ერთნაირად იწერება), არა ხვრელი
+
+### გაკვეთილები გაყოფის Wave-იდან
+1. **AI Studio-ს რეპორტი ისევ არაზუსტი იყო:** 3b/3c-ში ზოგი რიცხვი და ფაილის ცვლილება რეალურ commit-ს არ ემთხვეოდა (3c: "App.tsx შეიცვალა და ცარიელი სტრიქონი წაშალაო", რეალურად `App.tsx` commit-ში არ მოხვდა; 3c/3d: "4 ტესტი ჩავარდა ორაკულზეო", ჩვენთან 410/410 გადიოდა). Commit 3b-ში აღწერილი ტესტი S საერთოდ არ დამატებულა (ChatGPT-მ დაიჭირა) და ცალკე Commit 3c-ში დაემატა.
+2. **ტესტი S-ის მსგავსი რეგრესიული ტესტი უნდა ვარდებოდეს შესაბამის მუტაციაზე** — მუდმივი წესი (111a659-ის გაკვეთილის გაგრძელება).
+3. **ზომების გაზომვა ყველა breakpoint-ზე, არა მხოლოდ მიზნობრივზე** (იხ. ზემოთ).
+4. **ZIP-ის ჩანაცვლებისას ორაკული შეიძლება შეიცვალოს/დაბრუნდეს ძველზე:** ყოველი ჩანაცვლების შემდეგ `sha256sum utils/columnDivision.oracle.test.ts` და `git status`; commit-ში ფაილები სახელებით ემატება, `git add -A`-ის გარეშე (`oracle-change.diff`/`test-out.txt` მსგავსი დროებითი ფაილების გამო). `npm install` ცვლის `package-lock.json`-ს — commit-მდე `git restore package-lock.json`.
+
+---
+
 ## საკვანძო არქიტექტურული გადაწყვეტილებები (არ შეიცვალოს განხილვის გარეშე)
 
-- DB schema: 5 table (`profiles`, `children`, `game_sessions`, `wishes`, `child_reward_images`) + `pin_hash` column ორივე `profiles`/`children`-ზე (განზრახ nullable) + `wishes.status`/`wish_parent_note`/`image_parent_note`/`proposed_image_path` (Wave Y)
+- DB schema (production-ის ფაქტობრივი მდგომარეობა, Supabase-ში): 5 table (`profiles`, `children`, `game_sessions`, `wishes`, `child_reward_images`) + `pin_hash` column ორივე `profiles`/`children`-ზე (განზრახ nullable) + `wishes.status`/`wish_parent_note`/`image_parent_note`/`proposed_image_path` (Wave Y). **Source of truth DB-ის სტრუქტურისთვის არის production Supabase, არა `supabase/schema.sql`** (იხ. Schema drift)
 - useGameSession(gameMode, childId) — mode-აგნოსტიკური
 - Guest Mode არ არსებობს
 - 40-question rolling window — ხელუხლებელი
@@ -306,10 +403,10 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 - Per-name static content (Record<string,string>) vs. per-child DB storage — კრიტერიუმი: სახელის/ცნების თვისება → static repo-ფაილი; კონკრეტული ბავშვის ინდივიდუალური მონაცემი → DB table
 - Schema-migration-ის დამტკიცებული pattern: `ADD COLUMN (nullable) → backfill → verify count=0 → SET NOT NULL → CHECK` — Commit #6A-ში დამტკიცებული; Wave X-ში (pin_hash) და Wave Y-ში (wishes.status — ძველი production მონაცემის კოლაფსი ახალ ტერმინალურ მნიშვნელობაში) ორივეგან **განზრახ, საკუთარი მიზეზით, არ გამოყენებულა ზუსტად ეს pattern** — თითოეული გადაწყვეტილების მიზეზი საკუთარ სექციაშია
 - Production migration (DB/Storage/RLS SQL) — ყოველთვის Lexo-ს ხელით, Supabase Dashboard/SQL editor-იდან; AI Studio-ს არასდროს გადაეცემა ეს პასუხისმგებლობა
-- **PIN gate — client-side UI identity-gate, არა DB-level access-control.** RLS ოჯახის მასშტაბით ღიაა. Parent და child mode ერთსა და იმავე `auth.uid()`-ს იზიარებენ — **ამიტომ ნებისმიერი "მხოლოდ მშობლისთვის"/"მხოლოდ ბავშვისთვის" მონაცემი მხოლოდ query-level column-selection-ით/UI-ით არის დაცვადი, არასდროს RLS/Storage-policy-ით** (Wave Y Storage Discovery)
+- **PIN gate — client-side UI identity-gate, არა DB-level access-control.** RLS ოჯახის მასშტაბით ღიაა. Parent და child mode ერთსა და იმავე `auth.uid()`-ს იზიარებენ — **ამიტომ ნებისმიერი "მხოლოდ მშობლისთვის"/"მხოლოდ ბავშვისთვის" მონაცემი მხოლოდ query-level column-selection-ით/UI-ით არის დაცვადი, არასდროს RLS/Storage-policy-ით** (Wave Y Storage Discovery) **დაზუსტება: query projection (ცხადი column-ების არჩევა) და UI-ფილტრი არის შემთხვევითი გამჟღავნებისგან დაცვის ზომები (ბავშვმა ჩვეულებრივი გამოყენებისას არ ნახოს მშობლის/Lexo-ს მონაცემი), და არა server-side authorization.** ტექნიკურად ცნობიერ ბავშვს (DevTools, პირდაპირი Supabase request იმავე სესიით) შეუძლია ოჯახის ნებისმიერი მონაცემის წაკითხვა. Parent და Child ერთი auth identity-ით მუშაობის ეს შეგნებული შეზღუდვა უცვლელია; მისი მოხსნა (ცალკე auth identity ბავშვისთვის ან server-side წესები) ცალკე არქიტექტურული გადაწყვეტილებაა და ახლა არ იგეგმება
 - **PIN-ის გარეშე identity-switch აკრძალულია architecture-ის დონეზე**
 - **Wave Y-ის wishes-workflow**: 7-state machine (`wish_pending/wish_approved/wish_rejected/image_pending/image_approved/image_rejected/published`), **ერთი ბავშვის მრავალი ერთდროული wish განზრახ დაშვებულია** (არა DB-constraint), **rejected wish resubmit-ავს იმავე row-ს** (არა ახალი row+FK), **`image_approved→published` მუდმივად Lexo-ს ხელით ოპერაციაა**
-- **`select('*')` აკრძალულია ნებისმიერ query-ზე, რომლის შედეგი child-mode-ის (ან ზოგადად ნაკლებად-პრივილეგირებული mode-ის) React state-ში შეიძლება მოხვდეს** — ცხადი column-ების ჩამონათვალი ყოველთვის სავალდებულოა
+- **`select('*')` აკრძალულია ნებისმიერ query-ზე, რომლის შედეგი child-mode-ის (ან ზოგადად ნაკლებად-პრივილეგირებული mode-ის) React state-ში შეიძლება მოხვდეს** — ცხადი column-ების ჩამონათვალი ყოველთვის სავალდებულოა (ეს query-level დაცვა ხელს უშლის მხოლოდ შემთხვევით გამჟღავნებას/ჩვეულებრივ UI-ში გამოჩენას; server-side authorization არ არის — იხ. PIN gate-ის დაზუსტება ზემოთ)
 - **🔴 Service worker (`public/sw.js`) არასდროს არ უნდა cache-ავდეს cross-origin (Supabase) request-ს** — მხოლოდ საკუთარი origin-ის static assets/navigate. ეს production security incident-იდან (Wave Y) ნასწავლი, mandatory წესია ნებისმიერი მომავალი `sw.js`-ის ცვლილებისთვის
 - **AI Studio ZIP revert risk** — ვრცელდება ნებისმიერ ფაილზე, რომელიც git-ში/GitHub-ზე იცვლება AI Studio-ს ZIP workflow-ის გარეთ. ყოველი ასეთი ცვლილების შემდეგ, განახლებული ფაილი ხელით უნდა აიტვირთოს AI Studio-ს project-შიც
 - **AI Studio-ს საბოლოო report-ს არასდროს ვენდობით ბრმად** — ყოველი commit fresh-clone-ით, დამოუკიდებლად მოწმდება (hash, scope/diff, tsc, vitest, build). Wave Y-ში ორჯერ დადასტურდა, რომ ეს წესი რეალურ ღირებულებას იძლევა (Stage 1-ის scope-განხილვა, UI-rename-ის report-ში არარსებული ცვლილების ხსენება)
@@ -328,9 +425,18 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 - **localStorage თითო origin-ზეა:** შესვლის სესია, არჩეული ბავშვი და rolling window არ გადადის GitHub Pages ↔ Vercel ↔ APK-ს შორის (სერვერზე შენახული სესიები/სურვილები საერთოა). ერთი ბავშვი ერთ URL-ზე უნდა თამაშობდეს; ერთი "canonical" URL, Supabase Auth Site URL-ში იგივე.
 - **AI Studio ვერ ხედავს GitHub-ის commit-ებს** (ის თავისი ასლით მუშაობს). prompt-ებში საბაზო მდგომარეობა მოწმდება **შიგთავსით** ("App.tsx შეიცავს resetBlockUIState-ს"), არა commit hash-ით. AI Studio-ს report-ის diff-stat რიცხვები არაერთხელ არ ემთხვეოდა რეალურს — ვენდობით მხოლოდ დამოუკიდებელ `git diff`-ს.
 
+- **ქვეშმიწერით გაყოფა (`Kveshdivision`) — დაცული ინვარიანტები:** (ა) გაყოფის ლოგიკა (`utils/columnDivision.ts`) იცვლება მხოლოდ სპეციფიკაციის შეცვლით და ორაკულის (`columnDivision.oracle.test.ts`, SHA-256 Current Checkpoint-შია) გავლით; ორაკული არასდროს ეძლევა AI Studio-ს და არასდროს იცვლება ტესტის გასავლელად; (ბ) `getDivisionLayoutForProblem` არასდროს ისვრის — რეჟიმის გადართვისას ერთი რენდერით "ძველი" `problem` დასაშვებია და უნდა ჩანდეს როგორც `იტვირთება...`, არა crash; (გ) `Header.tsx`-ში ყოველ `GameMode`-ს ცხადი ტოტი აქვს (ხუთივე რეჟიმი; ჯაჭვის default ახლა `''`-ია, `main`-ზე გადამოწმებულია). Commit 3-მდე default იყო "ქვეშმიწერით გამრავლება ✍️", რის გამოც ახალი რეჟიმი ჩუმად არასწორ ტექსტს აჩვენებდა; ახალი `GameMode`-ის დამატებისას ცხადი ტოტი და მისი ტესტი (`components/Header.test.tsx`) აუცილებლად დაემატოს; (დ) გაყოფაზე ერთი ამოცანა ერთხელ იწერება `recordAnswer`-ით (`hasFailedThisDivision`); (ე) გაყოფის ბანერს App-იდან `currentMessage` არ გადაეცემა (`currentMessage=""`), რომ წინა ამოცანის შექება არ გამოჩნდეს; (ვ) გაყოფის ბარათი `md:`-ზე `md:max-w-2xl`-ია და უჯრები ერთი და იგივე className-ით ყველა უჯრაზე (4-ნიშნა ცხრილი 360px-ზე 294px, ≥768px-ზე 530px; ტესტი T იცავს `md:max-w-2xl`-ს)
+- **ახალი `GameMode`-ის დამატების ჩეკლისტი** (გაყოფის გამოცდილებიდან): `types.ts`, `services/problemGenerator.ts`, `utils/gameModeLabels.ts`, `utils/wishBlockSize.ts`, `MainMenu.tsx`, `Header.tsx` (ცალკე ტოტი!), `App.tsx`-ის ყველა `GameMode.Kveshmicera` ადგილი (7 ადგილი: state-reset, ფოკუსი, `shouldRecord`, არასწორი პასუხის early-return, submit, render, generic ფორმა), Dashboard-ის breakdown ლეიბლი; DB-ს `game_mode` CHECK constraint არ აქვს და migration საჭირო არ არის
+
 ## დაგეგმილი მომდევნო Wave-ები (პრიორიტეტის მიხედვით)
 
 ### Wave "grade-range" (კლასის მიხედვით რიცხვითი დიაპაზონი) — შემდეგი პრიორიტეტი, ყველაზე სენსიტიური (problemGenerator.ts-ის ცენტრალურ ლოგიკას ეხება)
+
+### PLANNED (არ დაწყებულა) — გაყოფასთან და Kveshmicera-სთან დაკავშირებული
+- Kveshmicera-ს "ძველი შექება შეცდომის ბანერში" ბაგის შესწორება ცალკე commit-ად (იხ. Known issues) — დამოუკიდებელი, მცირე scope
+- Kveshmicera-ს ფიქსირებული 3 რიგი × 4 უჯრა განზოგადება, როცა 3-ნიშნა გამრავლება დაემატება (Lexo-ს გადაწყვეტილება: ახლა არ ვეხებით)
+- გაყოფა: 5-ნიშნა გასაყოფი; ნაშთიანი გაყოფა — ორივე გადადებულია
+- გაყოფა და Wave "grade-range": გაყოფას საკუთარი გენერატორი აქვს (`divisionProblemGenerator.ts`, ფიქსირებული დიაპაზონი); grade-range Wave-მა უნდა გადაწყვიტოს, ჩაერთვება თუ არა
 
 ### Wave "word problems" — grade-range-ის შემდეგ
 
@@ -340,9 +446,13 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 - `SUPER_WINNER_GIFS`-ის დუბლირებული caption — გადაწყვეტილი, აღარ აქტუალური
 - ~~`game_sessions`-ის stuck `'active'`-row~~ ✅ გამოკვლეულია: მიზეზი — beforeunload-ის არასაიმედოობა; გადაწყვეტა — Dashboard ითვლის ყველა row-ს (b28cb05)
-- `package-lock.json` სინქრონში არ არის `package.json`-თან (`npm ci` ვარდება; CI იყენებს `npm install`-ს და ამიტომ deploy არ ზიანდება) — დაბალი პრიორიტეტი
 - Vercel/APK (webintoapp) გადაწყვეტილება — ჯერ არ მიღებულა; ამჟამად ყველა GitHub Pages ლინკს იყენებს. იხ. localStorage-per-origin წესი ზემოთ
-- `metadata.json`-ის description-ის განახლება (თომას სახელი) — ჯერ არ გასწორებულა
+- **Kveshmicera-ს "ძველი შექება შეცდომის ბანერში" ბაგი (ცნობილი, გასასწორებელი, გაყოფაში გასწორებულია):** `App.tsx` სწორი პასუხისას `currentMessage`-ში ინახავს შექებას, `handleNext` მას არ ასუფთავებს, `ColumnMultiplication.tsx` ბანერში `currentMessage || "ზოგიერთი ციფრი არასწორია!..."`-ს აჩვენებს. კოდის წაკითხვით დადასტურებულია იგივე გზა; Kveshmicera-ზე რეგრესიული ტესტით **არ არის გამეორებული** (გაყოფაზე — გამეორებულია ტესტით S). გაყოფის Commit 3-ში Kveshmicera განზრახ არ შეხებია
+- **Schema drift: `supabase/schema.sql` ≠ production (გადამოწმებულია `549f654`-ზე).** repo-ს ფაილი მხოლოდ 4 `CREATE TABLE`-ს შეიცავს (`profiles`, `children`, `game_sessions`, `wishes`); `child_reward_images` ცხრილი და Storage bucket/policies ფაილში არ არის. `wishes`-ის განსაზღვრებაში ჯერ კიდევ ძველი `status DEFAULT 'pending'` და `CHECK (status IN ('pending','fulfilled'))` წერია და არ არის `wish_parent_note`, `image_parent_note`, `proposed_image_path`; production-ში ეს Wave Y-ის ხელით გაშვებული migration-ებით უკვე შეცვლილია (7-state `wishes_status_check`, ახალი სვეტები, `child_reward_images`, storage policies). `children` და `profiles` ფაილში `pin_hash`/`gender`-ს შეიცავს; `game_sessions.game_mode`-ს CHECK არც ფაილში და არც production-ში არ აქვს (production-ში SQL-ით დადასტურებულია). **შედეგი:** ახალი გარემოს `schema.sql`-ით აწყობა არასწორ/არასრულ DB-ს მოგვცემს. **წესი:** DB-ის ფაქტობრივი სტრუქტურისთვის source of truth არის production Supabase (`pg_policies`, `information_schema`); `schema.sql`-ის სინქრონიზაცია ცალკე, ხელით დამტკიცებულ ამოცანად დგას (production migration-ების წესის მიხედვით), ამ დოკუმენტის განახლებისას კოდი/schema არ შეცვლილა
+- **`package-lock.json` სინქრონში არ არის `package.json`-თან** (დაბალი პრიორიტეტი): `npm ci --dry-run` ვარდება (გადამოწმებულია `549f654`-ზე); CI (`deploy.yml`) იყენებს `npm install`-ს, ამიტომ deploy არ ზიანდება; `npm install` ფაილს ცვლის, ამიტომ commit-მდე `git restore package-lock.json`. რეპოში `bun.lock`-იც არსებობს — მისი დანიშნულება დოკუმენტში არ დადასტურებულა
+- `metadata.json`-ის description ისევ "...თომასთვის"-ს ახსენებს (გადამოწმებულია `549f654`-ზე) — დაბალი პრიორიტეტი
+- გაყოფა: 320px-იან ძალიან პატარა ეკრანზე 4-ნიშნა ცხრილი შიდა ჰორიზონტალურ სქროლს იძლევა (28px უჯრებზე ზღვარი 360px-ზე 26px-ია, 320px-ზე არ ჯდება) — მისაღებად ითვლება
+- გაყოფა: Dashboard-ში ლეიბლის ცოცხალი შემოწმება და ტელეფონზე/APK-ში გამოცდა — ✅ VERIFIED (Lexo-ს განცხადებით 2026-10-12)
 - Backup-სტრატეგია — ინფორმირებული, კონკრეტული გეგმა ჯერ არ არის; launch-მდე რეკომენდებული
 - კომერციალიზაცია (Georgia-first) — მომავალი ეტაპი, ჯერ არ აქტუალური 10-ბავშვიანი launch-ისთვის
 - **PROJECT_STATE.md-ის AI Studio sync** — ყოველი Wave X/Y-შემდგომი commit-ის შემდეგ საჭიროა ხელით შემოწმება, ხომ არ დაბრუნდა ძველ ვერსიაზე
@@ -350,13 +460,13 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 ## Production Launch-ის მდგომარეობა (~10 ახლობელი ბავშვი)
 
-**რეალურად ბლოკავს:** არაფერი ცნობილი.
+**რეალურად ბლოკავს:** არაფერი ცნობილი. **Release verification ✅ VERIFIED** (Lexo-ს განცხადებით 2026-10-12): გაყოფა `main`-შია, deploy, 360px და ტელეფონი/APK Lexo-მ შეამოწმა — იხ. Current Checkpoint.
 
 **launch-მდე ერთჯერადი მოქმედებები:**
 - სატესტო ანგარიშების წაშლა (Supabase Dashboard → Authentication → Users). წაშლის შემდეგ შეამოწმე, რომ მათი `children`, `game_sessions`, `wishes` ჩანაწერებიც წაიშალა და `child-reward-images` bucket-ში (მათ შორის `pending`-ქვესაქაღალდეებში) სატესტო სურათები არ დარჩა
 - სრული ნამდვილი ნაკადის ერთხელ გავლა ახალი ანგარიშით: რეგისტრაცია PIN-ით → ბავშვის დამატება PIN-ით → ბავშვის PIN-ით შესვლა და თამაში → wish-ის დაწერა → მშობლის PIN-ით შესვლა, Inbox, დადასტურება/უარყოფა → სურათის ატვირთვა/დადასტურება → `published`-ის ხელით დასმა
 - **ყველა ტესტ-browser-ში service worker-ის hard-refresh/unregister** (security fix-ის commit-ის შემდეგ) — ძველი, დაზიანებული cache-ლოგიკის მქონე service worker-ები ხელით უნდა ჩანაცვლდეს
-- - sw.js-ის CACHE_NAME ახლა v7 და ახალი deploy-ის შემდეგ stale-while-revalidate ძველ bundle-ს ერთხელ კიდევ აჩვენებს. ყოველი კრიტიკული deploy-ის შემდეგ ტესტი ინკოგნიტოში ან Unregister + Clear site data-ის შემდეგ.
+- sw.js-ის CACHE_NAME ახლა v7 და ახალი deploy-ის შემდეგ stale-while-revalidate ძველ bundle-ს ერთხელ კიდევ აჩვენებს. ყოველი კრიტიკული deploy-ის შემდეგ ტესტი ინკოგნიტოში ან Unregister + Clear site data-ის შემდეგ.
 
 **აღარ ბლოკავს (ამ conversation-ის ფარგლებში დასრულებული):**
 - ~~Wave X (PIN gate)~~ ✅ დასრულებულია
@@ -372,12 +482,14 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 - `metadata.json`-ის description-ის განახლება
 - Saved query/view Lexo-ს image-approval სამუშაო რიგისთვის (Wave Y manual ნაბიჯების გასამარტივებლად)
 
-**Webintoapp.com (native app wrapper) გამოყენების გეგმა:** ჯერ არ გაკეთებულა. ტექნიკურად პასიური ცვლილება (APK უბრალოდ ფანჯარაა მითითებულ URL-ზე და ავტომატურად იღებს ახალ deploy-ს), მაგრამ Android WebView-ში beforeunload/visibilitychange ნაკლებად საიმედოა → მეტი "active" row (Dashboard ახლა მათაც ითვლის).  ღირს ხელით ტესტირება ერთი ბავშვით სრულ flow-ზე (PIN gate-ისა და Wave Y-ის wish-ციკლის ჩათვლით), სანამ ყველას დაურიგდება.
+**Webintoapp.com (native app wrapper):** APK შექმნილია და GitHub Pages URL-ს იყენებს. გაყოფის რეჟიმი APK-ში/ტელეფონზე შემოწმებულია — ✅ VERIFIED (Lexo-ს განცხადებით 2026-10-12, Claude-ს დამოუკიდებლად არ გადაუმოწმებია). ტექნიკურად wrapper პასიურია (APK უბრალოდ ფანჯარაა მითითებულ URL-ზე და ავტომატურად იღებს ახალ deploy-ს), მაგრამ Android WebView-ში beforeunload/visibilitychange ნაკლებად საიმედოა → მეტი "active" row (Dashboard ახლა მათაც ითვლის). სრული flow-ის (PIN gate-ისა და Wave Y-ის wish-ციკლის ჩათვლით) ტესტი ერთი ბავშვით დისტრიბუციამდე კვლავ გონივრულია.
 
 ## Workflow (როგორ ვმუშაობთ)
 
+> **განახლება 2026-10-12:** როლების მიმდინარე განაწილება და 12-ნაბიჯიანი პროცესი — დოკუმენტის დასაწყისში ("როლები და სამუშაო პროცესი"). ქვემოთ ჩამოთვლილი ძველი სია ისტორიულია იმ ნაწილში, სადაც Claude წერდა prompt-ებს; დანარჩენი წესები (fresh-clone ვერიფიკაცია, AI Studio-ს რეპორტის უნდობლობა, ხელით migration-ები) ძალაშია.
+
 1. AI Studio (Gemini) წერს კოდს პატარა, ინკრემენტულ commit-ებად, ZIP export/import-ით
-2. Claude ამოწმებს დამოუკიდებლად, fresh-clone-ით (hash, `git diff --stat` scope-შემოწმება, tsc, vitest, build) — **არასდროს** ენდობა AI Studio-ს თვითმოხსენებას, თუნდაც report დეტალური/დარწმუნებული ჩანდეს
+2. Claude ამოწმებს დამოუკიდებლად (ახალ როლში — ChatGPT-ის გეგმასა და რეალურ commit-ს), fresh-clone-ით (hash, `git diff --stat` scope-შემოწმება, tsc, vitest, build) — **არასდროს** ენდობა AI Studio-ს თვითმოხსენებას, თუნდაც report დეტალური/დარწმუნებული ჩანდეს
 3. ChatGPT აკეთებს დამოუკიდებელ cross-review-ს არქიტექტურული გადაწყვეტილებების დონეზე (არა ყოველი მექანიკური/text-only commit-ისთვის)
 4. ორივეს შენიშვნები ერთიანდება საბოლოო implementation prompt-ში
 5. Lexo იღებს საბოლოო გადაწყვეტილებას; DB/Storage/RLS migrations — ყოველთვის ხელით, SQL editor-იდან; client-კოდის ცვლილებები — AI Studio-დან, ლოკალურად
@@ -388,8 +500,12 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 ## შემდეგი ნაბიჯი
 
-Pre-Launch Bug-Fix Wave (4 commit: c8b6802, 111a659, 9f68acd, b28cb05) სრულად დასრულებულია: ოთხივე ბაგი ცოცხლად დადასტურებული, თითოეული commit fresh-clone-ით დამოუკიდებლად ვერიფიცირებული (321/321 ტესტი, 41 ფაილი, tsc 0 შეცდომა, build სუფთა).
+გაყოფა (`Kveshdivision`) დასრულებულია და `main`-შია (`549f654`; 49 ფაილი / 410 ტესტი, tsc 0, build სუფთა, ორაკული უცვლელი). ღია პუნქტები:
 
-რეკომენდებული თანმიმდევრობა: (1) Vercel/APK გადაწყვეტილება (ერთი canonical URL, Supabase Auth Site URL, Vercel-ზე env vars `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`); (2) ბოლო launch-მდე გაწმენდა: ამ ბაგების ტესტებისას შექმნილი სატესტო ანგარიშების წაშლა + სრული ნამდვილი ნაკადის ერთხელ გავლა ახალი ანგარიშით; (3) Backup-სტრატეგია; (4) Wave "grade-range" architecture review.
+1. ~~**Lexo (Release verification)**~~ ✅ შესრულებულია (Lexo-ს განცხადებით 2026-10-12): Pages deploy, 360×740, რეალური ტელეფონი/APK, Dashboard ლეიბლი — ყველაფერი რიგზეა.
+2. **Kveshmicera-ს შექების ბაგი** — ცალკე მცირე commit (ChatGPT გეგმავს, Claude ამოწმებს, AI Studio ახორციელებს). საჭიროა regression ტესტი, რომელიც parent commit-ზე ვარდება.
+3. `feature/long-division` ბრანჩის წაშლა GitHub-ზე (სურვილისამებრ; merge დადასტურებულია).
+4. Pre-Launch დარჩენილი პუნქტები: Vercel/APK გადაწყვეტილება (ერთი canonical URL), სატესტო ანგარიშების გაწმენდა, სრული ნამდვილი ნაკადის გავლა ახალი ანგარიშით, Backup-სტრატეგია.
+5. Wave "grade-range" architecture review (ChatGPT გეგმავს, Claude ამოწმებს) — ჩართვა თუ არა გაყოფის გენერატორისა.
 
-[ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს Claude-ის და ChatGPT-ის Project-ებში, **და** AI Studio-ს project-ში. ნამდვილად ატვირთეთ ეს ფაილი repo-შიც (`git add PROJECT_STATE.md && git commit && git push`).]
+[ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს ChatGPT-ისა და Claude-ის Project-ებში, **და** AI Studio-ს project-ში (ZIP revert risk: განახლების შემდეგ AI Studio-ს ასლი ძველზე არ უნდა დარჩეს). repo-ში განახლება: `git add PROJECT_STATE.md && git commit && git push` — მხოლოდ Lexo-ს ნებართვით.]
