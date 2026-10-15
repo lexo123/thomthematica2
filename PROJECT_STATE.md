@@ -1,29 +1,29 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: 2026-10-12. მეხუთე თამაში "ქვეშმიწერით გაყოფა" (`Kveshdivision`) დასრულებულია და `main`-შია (PR #1, merge commit `549f654`, 2026-10-10). მიმდინარე checkpoint და როლების ახალი განაწილება — ქვემოთ, პირველ ორ სექციაში. ძველი ისტორია უცვლელია; შეცვლილი ფაქტები მონიშნულია. წინა განახლება: Pre-Launch Bug-Fix Wave (c8b6802, 111a659, 9f68acd, b28cb05)._
+_ბოლო განახლება: 2026-10-15. Kveshmicera-ს შეცდომის ბანერში წინა კითხვის შექების გამოჩენის ბაგი გასწორებულია (`096fb463`, 2026-10-15): 49 ფაილი / 411 ტესტი, typecheck და build წარმატებული, GitHub Pages deploy დასრულებული. წინამორბედი ეტაპი: მეხუთე თამაში "ქვეშმიწერით გაყოფა" (`Kveshdivision`) დასრულდა და `main`-ში გაერთიანდა (`549f654`, 2026-10-10). ძველი ფაზების ისტორიული შედეგები უცვლელია; ახალი კოდის checkpoint და ღია რისკები ქვემოთ ცალკეა მითითებული._
 
-## Current Checkpoint (გადამოწმებულია 2026-10-12, fresh clone-ით)
+## Current Checkpoint (განახლებულია 2026-10-15; დამოუკიდებელი GitHub review + Claude fresh clone)
 
 | პუნქტი | მდგომარეობა |
 |---|---|
 | Repo | https://github.com/lexo123/thomthematica2 |
-| `main` HEAD | `549f654` — Merge pull request #1 from lexo123/feature/long-division (2026-10-10 14:14 +04:00) ✅ VERIFIED |
+| `main`-ის კოდის checkpoint (ამ დოკუმენტის docs commit-მდე) | `096fb463c6a9e48250199589a31946927f1f1519` — Kveshmicera Banner Regression Fix, parent `6e9e691ac9c29aa0aa5d34043544e5e3615e6e22` (2026-10-15) ✅ VERIFIED |
 | `feature/long-division` | HEAD `09aaa9f`, მთლიანად `main`-შია გაერთიანებული (`git merge-base --is-ancestor` დადასტურდა). ბრანჩი GitHub-ზე ჯერ არ წაშლილა |
-| tsc `--noEmit` | 0 შეცდომა ✅ VERIFIED (`main`, `549f654`) |
-| vitest | 49 ფაილი / **410 ტესტი**, ყველა გადის ✅ VERIFIED |
-| `vite build` | სუფთად სრულდება ✅ VERIFIED |
-| გაყოფის ორაკული | `utils/columnDivision.oracle.test.ts`, SHA-256 `ecf26a7aa60beb7ae49d7c9ec68a7df6ffb20d5c1e5ea92f9738a5e153bcdd08`, `main`-ზე უცვლელია ✅ VERIFIED |
+| tsc `--noEmit` | 0 შეცდომა ✅ VERIFIED — ChatGPT: GitHub Actions run `38727161113`-ის job logs; Claude: დამოუკიდებელი fresh clone (Claude-ს Actions API-ზე 403 ჰქონდა) |
+| vitest | **49 ფაილი / 411 ტესტი**, ყველა გადის ✅ VERIFIED — ChatGPT: GitHub Actions job logs; Claude: დამოუკიდებელი fresh clone (Claude-ს Actions API-ზე 403 ჰქონდა) |
+| `vite build` | წარმატებით სრულდება ✅ VERIFIED — ChatGPT: GitHub Actions job logs; Claude: დამოუკიდებელი fresh clone (Claude-ს Actions API-ზე 403 ჰქონდა) |
+| გაყოფის ორაკული | `utils/columnDivision.oracle.test.ts`, SHA-256 `ecf26a7aa60beb7ae49d7c9ec68a7df6ffb20d5c1e5ea92f9738a5e153bcdd08` ✅ VERIFIED; Git blob SHA `abc6d4cc2bfd092d5e8803db9659273aafabb488` ერთნაირია `6e9e691`-სა და `096fb463`-ზე |
 | დაცული ფაილები ამ merge-ში | `supabase/schema.sql`, `public/sw.js`, `hooks/useGameSession.ts`, `services/supabaseSyncService.ts` — `6af22e6`-დან `549f654`-მდე ხელუხლებელი ✅ VERIFIED |
 | `public/sw.js` | `CACHE_NAME = 'thomthematica-v7'` ✅ VERIFIED (გაყოფის ცვლილებას არ შეხებია) |
 | GameMode enum | 5 მნიშვნელობა: `thomthematica`, `thomravlebis_tabula`, `gethometria`, `kveshmicera`, `kveshdivision` ✅ VERIFIED |
-| **Development status** | **COMPLETE** — გაყოფის კოდი `main`-შია, ლოკალური/fresh-clone შემოწმებები (tsc, 410 ტესტი, build) გადის ✅ VERIFIED |
+| **Development status** | **Kveshdivision + Kveshmicera banner fix დასრულებულია და code review-ით დამტკიცებულია**; 411/411 ტესტი, tsc და build ✅ VERIFIED. ახალი Wave ჯერ არ არის დამტკიცებული |
 | **Release verification** | ✅ **VERIFIED** (Lexo-ს ხელით შემოწმება, 2026-10-12) — სამივე პუნქტი (Pages deploy, 360×740, რეალური ტელეფონი/APK + Dashboard ლეიბლი) Lexo-მ შეამოწმა და შედეგი კარგია. კონკრეტული რიცხვები/ეკრანები ამ სესიაში არ მოუწოდებია; Claude-ს დამოუკიდებლად არ გადაუმოწმებია |
 | Deploy მექანიზმი (`.github/workflows/deploy.yml`) | `push` `main`-ზე (და `workflow_dispatch`) → `npm install` → `npm run typecheck` → `npm test` → `npm run build` (Supabase env: `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` secrets/vars-იდან) → GitHub Pages. ანუ deploy ტესტებზეა დამოკიდებული; ჩავარდნილი typecheck/test deploy-ს აჩერებს ✅ VERIFIED (workflow ფაილი წაკითხულია) |
-| GitHub Pages deploy `549f654`-ისთვის | ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12: deploy და გამოქვეყნებული ვერსია შემოწმებულია, ყველაფერი რიგზეა (Claude-ს Actions-ის run ვერ უნახავს, GitHub API 403) |
+| GitHub Pages deploy `096fb463`-ისთვის | ✅ VERIFIED **ChatGPT-ის მიერ** — GitHub Actions [run `38727161113`](https://github.com/lexo123/thomthematica2/actions/runs/38727161113): `Typecheck & Test`, `Build`, `Deploy to GitHub Pages` ყველა `success` (2026-10-15). **Claude-ს Actions API-ზე 403 ჰქონდა და run უშუალოდ არ უნახავს**; მან ტესტები/typecheck/build დამოუკიდებლად fresh clone-ში დაადასტურა. **ახალი fix-ის ცალკე მობილური/UI smoke test არ არის დადასტურებული** |
 | APK (webintoapp.com wrapper) | APK გაკეთებულია და GitHub Pages URL-ს ეხსნება. ტექნიკურად wrapper პასიურია: ახალ deploy-ს ავტომატურად იღებს, ცალკე rebuild არ სჭირდება. ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12: გაყოფის რეჟიმი რეალურ ტელეფონზე/APK-ში შემოწმებულია, ყველაფერი რიგზეა (Claude-ს დამოუკიდებლად არ გადაუმოწმებია). Android WebView-ში `beforeunload`/`visibilitychange` ნაკლებად საიმედოა (იხ. Pre-Launch ბაგი 3) |
 | ხელით შემოწმება 360×740-ზე (გაყოფა) | ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12: 360×740-ზე ყველაფერი რიგზეა (ზუსტი `scrollWidth`/`clientWidth` არ მოუწოდებია). ჩემი Chromium-ის გაზომვა: 360–767px → 294/294, ≥768px → 530/530; Lexo-ს დესკტოპზე: 530/530 (viewport 1299) |
 | გაყოფა რეალურ ტელეფონზე / APK-ში; Dashboard-ის ლეიბლი ცოცხლად | ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12 (Dashboard-ის ლეიბლი ასევე ტესტით დაფარულია: `deriveGameModeBreakdown`) |
-| უშუალოდ შემდეგი ნაბიჯი | (1) Lexo-ს მიერ 360px + ტელეფონის შემოწმება გამოქვეყნებულ ვერსიაზე; (2) Kveshmicera-ს "ძველი შექება შეცდომის ბანერში" ბაგის ცალკე შესწორება (იხ. Known issues); (3) შემდეგ Pre-Launch პუნქტები (Vercel/APK გადაწყვეტილება, სატესტო ანგარიშების გაწმენდა, Backup) და Wave "grade-range" architecture review |
+| უშუალოდ შემდეგი ნაბიჯი | (1) Lexo ადასტურებს `096fb463` code checkpoint-ს; (2) ChatGPT-ის ამ `PROJECT_STATE.md`-ს Claude დამოუკიდებლად ამოწმებს, Lexo ამტკიცებს და ცალკე docs commit-ით push-ავს; (3) **AI Studio-ს სამუშაო ასლი სინქრონიზდება GitHub-ის ახალ `main`-თან და მოწმდება**; (4) Pre-Launch ერთჯერადი შემოწმებები/backup; შემდეგ `grade-range` მხოლოდ planning/review |
 
 ---
 
@@ -33,16 +33,35 @@ _ბოლო განახლება: 2026-10-12. მეხუთე თა
 
 | როლი | პასუხისმგებლობა |
 |---|---|
-| **ChatGPT — Lead Architect** | არქიტექტურული გეგმა, ტექნიკური ალტერნატივების შეფასება, scope-ის განსაზღვრა, არსებული არქიტექტურისა და დაცული ინვარიანტების შენარჩუნება, Claude-ის შენიშვნების განხილვა, **ერთი საბოლოო implementation prompt AI Studio-სთვის**, განხორციელებული commit-ის არქიტექტურული შეფასება |
-| **Claude — Independent Architecture & Code Reviewer** | ChatGPT-ის გეგმების კრიტიკული შეფასება, გამორჩენილი სცენარები, უსაფრთხოებისა/მონაცემთა მთლიანობის/regression-რისკები, **რეალური Git commit/diff-ის დამოუკიდებელი შემოწმება** (fresh clone), ტესტებისა და mutation checks-ის ადეკვატურობა. ChatGPT-ს ავტომატურად არ ეთანხმება; უთანხმოებას პირდაპირ მიუთითებს. ძირითადი implementation prompt-ის ავტორი აღარ არის, თუ Lexo კონკრეტულად არ დაავალებს |
+| **ChatGPT — Lead Architect** | არქიტექტურული გეგმა, ტექნიკური ალტერნატივების შეფასება, scope-ის განსაზღვრა, დაცული ინვარიანტების შენარჩუნება, Claude-ის შენიშვნების განხილვა, **ერთი საბოლოო implementation prompt AI Studio-სთვის**, განხორციელებული commit-ის არქიტექტურული შეფასება; **`PROJECT_STATE.md`-ის განახლების მუდმივი ავტორი, თუ Lexo სხვა წესს არ დაადგენს** |
+| **Claude — Independent Architecture & Code Reviewer** | ChatGPT-ის გეგმების კრიტიკული შეფასება, გამორჩენილი სცენარები, უსაფრთხოებისა/მონაცემთა მთლიანობის/regression-რისკები, **რეალური Git commit/diff-ის დამოუკიდებელი შემოწმება** (fresh clone), ტესტებისა და mutation checks-ის ადეკვატურობა; **ChatGPT-ის მიერ მომზადებული `PROJECT_STATE.md`-ის დამოუკიდებელი review**. ChatGPT-ს ავტომატურად არ ეთანხმება; ძირითადი implementation prompt-ის ან დოკუმენტის ავტორი არ არის, თუ Lexo კონკრეტულად არ შეცვლის როლებს |
 | **Google AI Studio (Gemini) — Implementer** | მხოლოდ დამტკიცებული scope-ის განხორციელება, კოდი და ტესტები, tsc/test suite/build, ფაილებისა და შედეგების რეპორტი, STOP-პირობების დაცვა. თავად არ წყვეტს შემდეგ ფაზაზე გადასვლას, არქიტექტურის შეცვლას ან დამატებით ფუნქციას |
-| **Lexo — Project Owner / Final Decision Maker** | პროდუქტის მიზნები და პრიორიტეტები, არქიტექტურული ცვლილებების დამტკიცება/შეჩერება, საბოლოო გადაწყვეტილება უთანხმოებისას (APPROVED / CHANGES REQUESTED / STOP), Git workflow, production ცვლილებები, merge |
+| **Lexo — Project Owner / Final Decision Maker** | პროდუქტის მიზნები და პრიორიტეტები, არქიტექტურული ცვლილებების დამტკიცება/შეჩერება, საბოლოო გადაწყვეტილება უთანხმოებისას (APPROVED / CHANGES REQUESTED / STOP), Git workflow, production ცვლილებები, merge; `PROJECT_STATE.md`-ის საბოლოო დამტკიცება და ცალკე documentation commit |
 
 **ChatGPT-ის რეკომენდაცია არ აუქმებს Lexo-ს საბოლოო გადაწყვეტილების უფლებას. თუ ChatGPT-სა და Claude-ს დასკვნა განსხვავდება, უთანხმოება კოდის წერამდე უნდა გადაწყდეს.**
 
 **პროცესი:** (1) Lexo სვამს მოთხოვნას → (2) ChatGPT ამზადებს არქიტექტურულ გეგმას → (3) Claude დამოუკიდებლად ამოწმებს → (4) უთანხმოებები განიხილება კოდამდე → (5) ChatGPT ამზადებს ერთ საბოლოო prompt-ს → (6) Lexo ამტკიცებს AI Studio-ში გაგზავნას → (7) AI Studio ახორციელებს მხოლოდ შეთანხმებულ scope-ს → (8) tests, typecheck, build, საჭიროებისას mutation checks → (9) Claude ამოწმებს რეალურ diff-სა და კოდს → (10) ChatGPT აფასებს განხორციელებას → (11) Lexo წყვეტს → (12) ახალი ფაზა მხოლოდ დასრულებული checkpoint-ის შემდეგ. მცირე ცვლილებებისთვის პროცესი Lexo-ს თანხმობით შეიძლება გამარტივდეს, მაგრამ **რეალური diff-ის შემოწმება და დაცული ლოგიკის შენარჩუნება სავალდებულოა**.
 
-**AI Studio-ს რეპორტი არასდროს ითვლება დამოუკიდებელ მტკიცებულებად. Git repository და კონკრეტული commit არის source of truth.** (გაყოფის სამუშაოზე ეს წესი კიდევ ოთხჯერ გამართლდა — იხ. "გაკვეთილები" ქვემოთ.)
+**AI Studio-ს რეპორტი არასდროს ითვლება დამოუკიდებელ მტკიცებულებად. Git repository და კონკრეტული commit არის source of truth.** (გაყოფის სამუშაოზე ეს წესი კიდევ ოთხჯერ გამართლდა; Kveshmicera banner fix-ის დროსაც რიცხვები და hash არ ემთხვეოდა — იხ. ქვემოთ.) **დოკუმენტაციის workflow:** ChatGPT წერს `PROJECT_STATE.md` → Claude ამოწმებს → Lexo ამტკიცებს → GitHub-ში შედის ცალკე docs commit. თავად ChatGPT-ის/Claude-ის review არ ნიშნავს Lexo-ს საბოლოო გადაწყვეტილებას.
+
+---
+
+## Kveshmicera Banner Regression Fix ✅ — Commit `096fb463` (2026-10-15)
+
+**პრობლემა (დახურული):** `App.tsx` სწორი პასუხისას `currentMessage`-ში ინახავდა შექებას; `handleNext` მას არ ასუფთავებდა; Kveshmicera-ს მეორე კითხვის არასწორ პასუხზე ადრეული `return`-ის გამო ძველი შექება რჩებოდა და `ColumnMultiplication.tsx`-ის შეცდომის ბანერში ჩანდა. გაყოფას (`Kveshdivision`) მსგავსი შეცდომა მანამდე `currentMessage=""`-ით ჰქონდა გასწორებული.
+
+**დამტკიცებული fix:** `App.tsx`-ში მხოლოდ `ColumnMultiplication`-ის prop `currentMessage={currentMessage}` → `currentMessage=""`. `ResultOverlay` და შექების რეალური არჩევის ლოგიკა უცვლელია. `tests/KveshmiceraRetryFlow.test.tsx`-ში დაემატა ტესტი **J**, რომელიც Q1: `24 × 12 = 288` სწორ პასუხს/შექებას, შემდეგ Q2: `31 × 14 = 434` არასწორ პასუხს და შეცდომის ბანერის ზუსტ ტექსტს ამოწმებს. იგივე ლოკატორებია, რაც გაყოფის Test S-ში; გამოიყენება არსებული `fillKveshDigits` helper.
+
+**დადასტურებული commit/diff:** [`096fb463c6a9e48250199589a31946927f1f1519`](https://github.com/lexo123/thomthematica2/commit/096fb463c6a9e48250199589a31946927f1f1519), parent `6e9e691`; **ზუსტად 2 ფაილი** (`App.tsx`: 1 ხაზის ჩანაცვლება; `tests/KveshmiceraRetryFlow.test.tsx`: +53 ხაზი, 1 ტესტი). `PROJECT_STATE.md`, `package-lock.json`, ორაკული და ყველა სხვა ფაილი commit-ში ხელუხლებელია. დამატებითი schema, auth, sync, rolling-window ან Service Worker ცვლილება არ ყოფილა.
+
+**Red/Green/Mutation:** Claude-მა fresh clone-ში independent red phase შეამოწმა (parent-ის `App.tsx` + ახალი Test J → ჩავარდა, ბანერმა ძველი შექება აჩვენა); fix-ის აღდგენით Test J გავიდა, Kveshmicera-ის ტესტები **9/9**. AI Studio-მაც red/green/mutation report წარმოადგინა, მაგრამ ის **არ არის** დამოუკიდებელი მტკიცებულება. GitHub Actions [run `38727161113`](https://github.com/lexo123/thomthematica2/actions/runs/38727161113)-ის job logs **ChatGPT-მა უშუალოდ წაიკითხა GitHub connector-ით**: **49 ფაილი / 411 ტესტი**, `tsc --noEmit`, `vite build` და Pages deploy წარმატებულია. **Claude-ს GitHub Actions API-ზე 403 ჰქონდა**, ამიტომ run-ის სტატუსი/ლოგები უშუალოდ ვერ გადაამოწმა; მან fresh clone-ში დამოუკიდებლად დაადასტურა იგივე ტესტების რაოდენობა, tsc და build. ChatGPT და Claude code review: **APPROVED**. **Lexo-ს საბოლოო checkpoint-დამტკიცება ცალკე გადაწყვეტილებაა.**
+
+### AI Studio-ს ანგარიშის შეუსაბამობები — მომდევნო implementation-მდე შესამოწმებელი
+
+- AI Studio-მ დაწერა ორაკულის SHA-256 `906d1de5f8e9fbca1871c14840efe16b138a75169475aeffc78c6b0ce161d3f5`, რეალურ GitHub commit-ში კი უცვლელია დამტკიცებული `ecf26a7aa60beb7ae49d7c9ec68a7df6ffb20d5c1e5ea92f9738a5e153bcdd08` (Git blob იგივეა parent-შიც). **ორაკულის მიგრაცია/ცვლილება არ არის ნებადართული.**
+- AI Studio-მ მიუთითა **48 ფაილი / 401 ტესტი**, მაშინ როდესაც GitHub Actions-მა და Claude-ის fresh clone-მა დაადასტურა **49 ფაილი / 411 ტესტი**.
+- AI Studio-ს რეპორტში `package-lock.json`-ზე ცალკე ანგარიში არ იყო, მაგრამ Git diff-ში ფაილი არ შეცვლილა. მისი არსებული lockfile-sync პრობლემა კვლავ გადადებულია.
+- **ზუსტი მიზეზი ჯერ დაუდგენელია:** შესაძლოა AI Studio-ს სამუშაო ასლი განსხვავდებოდეს რეპოზიტორიისგან, ან ანგარიში იყოს არაზუსტი. მარტო ეს რიცხვები არ ამტკიცებს კონკრეტული ფაილის დაზიანებას. მიუხედავად ამისა, **ახალი implementation prompt არ გაიგზავნოს, სანამ სამუშაო ასლი GitHub-ის დამტკიცებულ `main`-თან არ გადაიმოწმება** (მათ შორის მიმდინარე `PROJECT_STATE.md`, test-file inventory და დაცული ორაკულის checksum). ZIP overwrite-ის შემდეგ Git diff/status, `sha256sum` და სრული suite დამოუკიდებლად შემოწმდეს. ორაკულის შიგთავსი არ მიეცეს AI Studio-ს შესაცვლელად და არ დაბრუნდეს ძველი ასლით.
 
 ---
 
@@ -433,7 +452,6 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 ### Wave "grade-range" (კლასის მიხედვით რიცხვითი დიაპაზონი) — შემდეგი პრიორიტეტი, ყველაზე სენსიტიური (problemGenerator.ts-ის ცენტრალურ ლოგიკას ეხება)
 
 ### PLANNED (არ დაწყებულა) — გაყოფასთან და Kveshmicera-სთან დაკავშირებული
-- Kveshmicera-ს "ძველი შექება შეცდომის ბანერში" ბაგის შესწორება ცალკე commit-ად (იხ. Known issues) — დამოუკიდებელი, მცირე scope
 - Kveshmicera-ს ფიქსირებული 3 რიგი × 4 უჯრა განზოგადება, როცა 3-ნიშნა გამრავლება დაემატება (Lexo-ს გადაწყვეტილება: ახლა არ ვეხებით)
 - გაყოფა: 5-ნიშნა გასაყოფი; ნაშთიანი გაყოფა — ორივე გადადებულია
 - გაყოფა და Wave "grade-range": გაყოფას საკუთარი გენერატორი აქვს (`divisionProblemGenerator.ts`, ფიქსირებული დიაპაზონი); grade-range Wave-მა უნდა გადაწყვიტოს, ჩაერთვება თუ არა
@@ -447,7 +465,7 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 - `SUPER_WINNER_GIFS`-ის დუბლირებული caption — გადაწყვეტილი, აღარ აქტუალური
 - ~~`game_sessions`-ის stuck `'active'`-row~~ ✅ გამოკვლეულია: მიზეზი — beforeunload-ის არასაიმედოობა; გადაწყვეტა — Dashboard ითვლის ყველა row-ს (b28cb05)
 - Vercel/APK (webintoapp) გადაწყვეტილება — ჯერ არ მიღებულა; ამჟამად ყველა GitHub Pages ლინკს იყენებს. იხ. localStorage-per-origin წესი ზემოთ
-- **Kveshmicera-ს "ძველი შექება შეცდომის ბანერში" ბაგი (ცნობილი, გასასწორებელი, გაყოფაში გასწორებულია):** `App.tsx` სწორი პასუხისას `currentMessage`-ში ინახავს შექებას, `handleNext` მას არ ასუფთავებს, `ColumnMultiplication.tsx` ბანერში `currentMessage || "ზოგიერთი ციფრი არასწორია!..."`-ს აჩვენებს. კოდის წაკითხვით დადასტურებულია იგივე გზა; Kveshmicera-ზე რეგრესიული ტესტით **არ არის გამეორებული** (გაყოფაზე — გამეორებულია ტესტით S). გაყოფის Commit 3-ში Kveshmicera განზრახ არ შეხებია
+- ~~**Kveshmicera-ს ძველი შექება შეცდომის ბანერში**~~ ✅ **დახურული** — fix `096fb463`, regression Test J red/green/mutation დადასტურებულია (იხ. სექცია "Kveshmicera Banner Regression Fix"). ეს აღარ არის ღია პრობლემა
 - **Schema drift: `supabase/schema.sql` ≠ production (გადამოწმებულია `549f654`-ზე).** repo-ს ფაილი მხოლოდ 4 `CREATE TABLE`-ს შეიცავს (`profiles`, `children`, `game_sessions`, `wishes`); `child_reward_images` ცხრილი და Storage bucket/policies ფაილში არ არის. `wishes`-ის განსაზღვრებაში ჯერ კიდევ ძველი `status DEFAULT 'pending'` და `CHECK (status IN ('pending','fulfilled'))` წერია და არ არის `wish_parent_note`, `image_parent_note`, `proposed_image_path`; production-ში ეს Wave Y-ის ხელით გაშვებული migration-ებით უკვე შეცვლილია (7-state `wishes_status_check`, ახალი სვეტები, `child_reward_images`, storage policies). `children` და `profiles` ფაილში `pin_hash`/`gender`-ს შეიცავს; `game_sessions.game_mode`-ს CHECK არც ფაილში და არც production-ში არ აქვს (production-ში SQL-ით დადასტურებულია). **შედეგი:** ახალი გარემოს `schema.sql`-ით აწყობა არასწორ/არასრულ DB-ს მოგვცემს. **წესი:** DB-ის ფაქტობრივი სტრუქტურისთვის source of truth არის production Supabase (`pg_policies`, `information_schema`); `schema.sql`-ის სინქრონიზაცია ცალკე, ხელით დამტკიცებულ ამოცანად დგას (production migration-ების წესის მიხედვით), ამ დოკუმენტის განახლებისას კოდი/schema არ შეცვლილა
 - **`package-lock.json` სინქრონში არ არის `package.json`-თან** (დაბალი პრიორიტეტი): `npm ci --dry-run` ვარდება (გადამოწმებულია `549f654`-ზე); CI (`deploy.yml`) იყენებს `npm install`-ს, ამიტომ deploy არ ზიანდება; `npm install` ფაილს ცვლის, ამიტომ commit-მდე `git restore package-lock.json`. რეპოში `bun.lock`-იც არსებობს — მისი დანიშნულება დოკუმენტში არ დადასტურებულა
 - `metadata.json`-ის description ისევ "...თომასთვის"-ს ახსენებს (გადამოწმებულია `549f654`-ზე) — დაბალი პრიორიტეტი
@@ -455,7 +473,7 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 - გაყოფა: Dashboard-ში ლეიბლის ცოცხალი შემოწმება და ტელეფონზე/APK-ში გამოცდა — ✅ VERIFIED (Lexo-ს განცხადებით 2026-10-12)
 - Backup-სტრატეგია — ინფორმირებული, კონკრეტული გეგმა ჯერ არ არის; launch-მდე რეკომენდებული
 - კომერციალიზაცია (Georgia-first) — მომავალი ეტაპი, ჯერ არ აქტუალური 10-ბავშვიანი launch-ისთვის
-- **PROJECT_STATE.md-ის AI Studio sync** — ყოველი Wave X/Y-შემდგომი commit-ის შემდეგ საჭიროა ხელით შემოწმება, ხომ არ დაბრუნდა ძველ ვერსიაზე
+- **AI Studio-ს სამუშაო ასლის / `PROJECT_STATE.md`-ის სინქრონიზაცია** — **მომდევნო implementation-მდე აუცილებელი preflight**: GitHub `main`-ის მიმდინარე approved snapshot, ახალი docs commit, ტესტების რაოდენობა და ორაკულის ჰეში შეადარე სამუშაო/ZIP ასლს; წინა fix-ის რეპორტში 48/401 და არასწორი hash გამოვლინდა (ზუსტი მიზეზი დაუდგენელია). ყოველი docs commit-ის შემდეგ ახალი `PROJECT_STATE.md` ხელით განახლდეს AI Studio-ს project-შიც; stale ZIP-ით GitHub-ის ახალი ფაილები არ გადაიწეროს
 - **`image_approved → published`-ის manual ოპერაცია** (Wave Y) — ყოველი დამტკიცებული სურათისთვის Lexo-მ თავად უნდა შეამოწმოს Supabase Table Editor/SQL Editor, push notification არ არსებობს. Saved query/view `wish_approved`/`image_rejected`/`image_approved` status-ებისთვის რეკომენდებულია, ჯერ არ შექმნილა
 
 ## Production Launch-ის მდგომარეობა (~10 ახლობელი ბავშვი)
@@ -493,19 +511,20 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 3. ChatGPT აკეთებს დამოუკიდებელ cross-review-ს არქიტექტურული გადაწყვეტილებების დონეზე (არა ყოველი მექანიკური/text-only commit-ისთვის)
 4. ორივეს შენიშვნები ერთიანდება საბოლოო implementation prompt-ში
 5. Lexo იღებს საბოლოო გადაწყვეტილებას; DB/Storage/RLS migrations — ყოველთვის ხელით, SQL editor-იდან; client-კოდის ცვლილებები — AI Studio-დან, ლოკალურად
-6. ყოველი Wave-ის/მნიშვნელოვანი commit-ის დასრულებისას ეს დოკუმენტი განახლდება
-7. ამ ფაილის ყოველი ხელით/git-ით განახლების შემდეგ, განახლებული ვერსია ხელით აიტვირთება AI Studio-ს project-შიც
+6. ყოველი Wave-ის/მნიშვნელოვანი commit-ის დასრულებისას **ChatGPT ამზადებს ამ დოკუმენტის განახლებას**, Claude დამოუკიდებლად ამოწმებს, Lexo ამტკიცებს და ცალკე docs commit-ით push-ავს
+7. ამ ფაილის ყოველი ხელით/git-ით განახლების შემდეგ, განახლებული ვერსია ხელით აიტვირთება AI Studio-ს project-შიც; სანამ შემდეგი prompt გაიგზავნება, სამუშაო ასლის შესაბამისობა ახალ `main`-თან მოწმდება
 
 **Lexo-ს სამუშაო კონტექსტი:** არ იცნობს SQL-ს ან Supabase-ის dashboard-ს — ყოველი ტექნიკური ნაბიჯი დეტალურად, ეტაპ-ეტაპად აღსაწერია.
 
 ## შემდეგი ნაბიჯი
 
-გაყოფა (`Kveshdivision`) დასრულებულია და `main`-შია (`549f654`; 49 ფაილი / 410 ტესტი, tsc 0, build სუფთა, ორაკული უცვლელი). ღია პუნქტები:
+**კოდის ბოლო დამტკიცებული review checkpoint:** `096fb463` (Kveshmicera Banner Regression Fix), 49 ფაილი / **411/411 ტესტი**, tsc 0, build წარმატებული, GitHub Pages deploy წარმატებული. ChatGPT და Claude: APPROVED. შემდეგი ნაბიჯები ამ დოკუმენტის მომზადების მომენტისთვის:
 
-1. ~~**Lexo (Release verification)**~~ ✅ შესრულებულია (Lexo-ს განცხადებით 2026-10-12): Pages deploy, 360×740, რეალური ტელეფონი/APK, Dashboard ლეიბლი — ყველაფერი რიგზეა.
-2. **Kveshmicera-ს შექების ბაგი** — ცალკე მცირე commit (ChatGPT გეგმავს, Claude ამოწმებს, AI Studio ახორციელებს). საჭიროა regression ტესტი, რომელიც parent commit-ზე ვარდება.
-3. `feature/long-division` ბრანჩის წაშლა GitHub-ზე (სურვილისამებრ; merge დადასტურებულია).
-4. Pre-Launch დარჩენილი პუნქტები: Vercel/APK გადაწყვეტილება (ერთი canonical URL), სატესტო ანგარიშების გაწმენდა, სრული ნამდვილი ნაკადის გავლა ახალი ანგარიშით, Backup-სტრატეგია.
-5. Wave "grade-range" architecture review (ChatGPT გეგმავს, Claude ამოწმებს) — ჩართვა თუ არა გაყოფის გენერატორისა.
+1. **Lexo — საბოლოო checkpoint-ის დადასტურება:** code review მიღებულია; თუ Lexo ეთანხმება, `096fb463` გახდება ოფიციალური პროექტის checkpoint. ახალი gameplay feature არ არის დაწყებული.
+2. **`PROJECT_STATE.md` — ცალკე docs commit:** ChatGPT-ის ეს განახლება Claude-მა დამოუკიდებლად უნდა გადაამოწმოს; Lexo ამტკიცებს, repo-ს `PROJECT_STATE.md`-ს ანაცვლებს და commit/push-ს აკეთებს **მხოლოდ ამ ფაილზე**. შემდეგ შეამოწმოს GitHub-ზე, რომ historical sections არ დაკარგულა.
+3. **AI Studio-ს გარემოს სინქრონიზაცია — gate:** GitHub-ის **docs commit-ის შემდეგ** არსებული `main` ავიღოთ canonical source-ად. AI Studio-ს workspace/export შევადაროთ შესაბამის ფაილებსა და ტესტების რაოდენობას; დადასტურებულ ორაკულს SHA-256 უნდა ჰქონდეს `ecf26a7aa60beb7ae49d7c9ec68a7df6ffb20d5c1e5ea92f9738a5e153bcdd08`. AI Studio-ში ხელით აიტვირთოს ახალი `PROJECT_STATE.md` და საჭირო ახალი ფაილები. **დაცული ორაკული AI Studio-ს შესაცვლელად არ მიეცეს.** თუ ხარვეზი აღმოჩნდება, ახალი implementation STOP მის მოგვარებამდე.
+4. **Pre-Launch ერთჯერადი შემოწმებები:** წინა release verification (`549f654`) ჩატარებულია Lexo-ს მიერ; ამ ახალ `096fb463` fix-ზე სურვილისამებრ ხელით გავიაროთ Q1 სწორი → Q2 არასწორი მობილურზე. ძირითადი გახსნილი checklist: backup/restore-გეგმა, სატესტო ანგარიშების უსაფრთხო წაშლა, ახალი ანგარიშით სრული PIN → gameplay → wish → parent approval → publish flow, service-worker/cache cross-account smoke test, canonical URL (GitHub Pages vs Vercel) გადაწყვეტილება. GitHub Pages-ის დატოვება მიმდინარე მცირე pilot-ისთვის მისაღები ვარიანტია; ჰოსტინგის ცვლილება ჯერ არ არის დამტკიცებული.
+5. **`feature/long-division` ბრანჩის წაშლა** სურვილისამებრ (უკვე merge-ებულია `549f654`-ში).
+6. **Wave `grade-range` — მხოლოდ planning/architecture review**, AI Studio-ში implementation prompt არ გაიგზავნოს ამ checkpoint-ის, docs commit-ის და workspace-sync-ის დასრულებამდე; შემდეგ განისაზღვროს, შეეხება თუ არა ცალკე `divisionProblemGenerator.ts`-საც. `word problems` უფრო გვიან.
 
-[ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს ChatGPT-ისა და Claude-ის Project-ებში, **და** AI Studio-ს project-ში (ZIP revert risk: განახლების შემდეგ AI Studio-ს ასლი ძველზე არ უნდა დარჩეს). repo-ში განახლება: `git add PROJECT_STATE.md && git commit && git push` — მხოლოდ Lexo-ს ნებართვით.]
+[ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს ChatGPT-ისა და Claude-ის Project-ებში, **და** AI Studio-ს project-ში. GitHub-ის ახალი docs commit და AI Studio workspace ცალ-ცალკე უნდა გადაიმოწმოს (ZIP revert risk). ამ დოკუმენტს მუდმივად **ChatGPT ამზადებს, Claude ამოწმებს, Lexo ამტკიცებს**, თუ Lexo როლებს არ შეცვლის. Repo-ში განახლება მხოლოდ Lexo-ს დამტკიცების შემდეგ: `git add PROJECT_STATE.md && git commit -m "docs: update project state after Kveshmicera banner fix" && git push`.]
