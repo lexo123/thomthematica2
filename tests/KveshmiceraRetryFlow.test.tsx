@@ -434,4 +434,57 @@ describe('Phase 3 - Kveshmicera Retry & Question-level Recording Flow', () => {
     expect(screen.getByText('4')).toBeDefined();
     expect(document.getElementById('cell-res-0')).not.toBeNull();
   });
+
+  it('J. Kveshmicera validation banner on Q2 does not leak stale praise from Q1', () => {
+    const q1: MathProblem = {
+      category: 'math',
+      num1: 24,
+      num2: 12,
+      operation: Operation.Multiply,
+      answer: 288,
+    };
+    const q2: MathProblem = {
+      category: 'math',
+      num1: 31,
+      num2: 14,
+      operation: Operation.Multiply,
+      answer: 434,
+    };
+    setupDeterministicProblems([q1, q2]);
+
+    render(<App />);
+
+    // Select Kveshmicera mode
+    fireEvent.click(screen.getByText('ქვეშმიწერით გამრავლება ✍️'));
+
+    // Step 4: Fill Q1 correctly using existing fillKveshDigits helper and submit
+    fillKveshDigits(24, 12, false);
+    submitKvesh();
+
+    // Step 5: Capture the nonempty praise message from ResultOverlay
+    const overlayHeading = screen.getByRole('heading', { level: 2 });
+    const praise = overlayHeading.textContent?.trim() || '';
+    expect(praise.length).toBeGreaterThan(0);
+
+    // Step 6: Click Next
+    const nextBtn = screen.getByRole('button', { name: /შემდეგი/ });
+    fireEvent.click(nextBtn);
+
+    // Step 7: Fill Q2 incorrectly using existing fillKveshDigits helper and submit
+    fillKveshDigits(31, 14, true);
+    submitKvesh();
+
+    // Step 8: Locate the inline validation banner using document.querySelector('.text-rose-700')
+    const banner = document.querySelector('.text-rose-700');
+
+    // Step 9: Assert that the banner is NOT null
+    expect(banner).not.toBeNull();
+
+    // Step 10: Assert that its trimmed text equals EXACTLY: ზოგიერთი ციფრი არასწორია! შეასწორე წითელი უჯრები.
+    expect(banner?.textContent?.trim()).toBe('ზოგიერთი ციფრი არასწორია! შეასწორე წითელი უჯრები.');
+
+    // Step 11: Assert that the banner does NOT contain the previously captured praise text
+    expect(banner?.textContent).not.toContain(praise);
+  });
 });
+

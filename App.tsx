@@ -496,7 +496,7 @@ const App: React.FC = () => {
               problem={problem}
               colMultState={colMultState}
               showKveshValidation={showKveshValidation}
-              currentMessage={currentMessage}
+              currentMessage=""
               onCellChange={handleCellChange}
               onKeyDown={handleKeyDown}
               getExpectedDigits={getExpectedDigits}
