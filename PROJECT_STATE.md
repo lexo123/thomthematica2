@@ -1,8 +1,8 @@
 # thomthematica2 — Project State
 
-_ბოლო განახლება: 2026-10-15. Kveshmicera-ს შეცდომის ბანერში წინა კითხვის შექების გამოჩენის ბაგი გასწორებულია (`096fb463`, 2026-10-15): 49 ფაილი / 411 ტესტი, typecheck და build წარმატებული, GitHub Pages deploy დასრულებული. წინამორბედი ეტაპი: მეხუთე თამაში "ქვეშმიწერით გაყოფა" (`Kveshdivision`) დასრულდა და `main`-ში გაერთიანდა (`549f654`, 2026-10-10). ძველი ფაზების ისტორიული შედეგები უცვლელია; ახალი კოდის checkpoint და ღია რისკები ქვემოთ ცალკეა მითითებული._
+_ბოლო დოკუმენტური განახლება: **2026-10-21**. კოდის ბოლო დამოუკიდებლად დადასტურებული checkpoint კვლავ `096fb463` (2026-10-15; 49 ტესტ-ფაილი / 411 ტესტი, typecheck/build/Pages deploy წარმატებული). GitHub `main`-ის მიმდინარე HEAD ამ დოკუმენტის მომზადებისას: **`c988a56c8af5a281679acec2aa166fb597aba5cc`** (2026-10-15, docs-only). 2026-10-21-ზე AI Studio ZIP (92)-ის სამუშაო ასლი შიგთავსობრივად გასწორებულია `main`-თან; შემდეგი პროდუქტის პრიორიტეტია **I–VI კლასების მხარდაჭერის მხოლოდ არქიტექტურული დაგეგმვა**. კოდი, DB schema და gameplay ამ დოკუმენტის გამო არ შეცვლილა (DB კავშირის პაროლი 2026-10-19-ს ცალკე განახლდა). ისტორიული გადაწყვეტილებები ქვემოთ შენარჩუნებულია; ახალი აქტუალური მდგომარეობა მომდევნო სექციაშია._
 
-## Current Checkpoint (განახლებულია 2026-10-15; დამოუკიდებელი GitHub review + Claude fresh clone)
+## Last verified code checkpoint — 2026-10-15 (ისტორიული CI; აქტუალური planning სტატუსი იხ. 2026-10-21 Transition Checkpoint-ში)
 
 | პუნქტი | მდგომარეობა |
 |---|---|
@@ -16,14 +16,80 @@ _ბოლო განახლება: 2026-10-15. Kveshmicera-ს შეც
 | დაცული ფაილები ამ merge-ში | `supabase/schema.sql`, `public/sw.js`, `hooks/useGameSession.ts`, `services/supabaseSyncService.ts` — `6af22e6`-დან `549f654`-მდე ხელუხლებელი ✅ VERIFIED |
 | `public/sw.js` | `CACHE_NAME = 'thomthematica-v7'` ✅ VERIFIED (გაყოფის ცვლილებას არ შეხებია) |
 | GameMode enum | 5 მნიშვნელობა: `thomthematica`, `thomravlebis_tabula`, `gethometria`, `kveshmicera`, `kveshdivision` ✅ VERIFIED |
-| **Development status** | **Kveshdivision + Kveshmicera banner fix დასრულებულია და code review-ით დამტკიცებულია**; 411/411 ტესტი, tsc და build ✅ VERIFIED. ახალი Wave ჯერ არ არის დამტკიცებული |
+| **Development status** | **Kveshdivision + Kveshmicera banner fix დასრულებულია და code review-ით დამტკიცებულია**; 411/411 ტესტი, tsc და build ✅ VERIFIED (2026-10-15 ისტორიული CI). 2026-10-21 გადაწყვეტილება: **I–VI grade planning**, კოდის ახალი Wave ჯერ არ არის დამტკიცებული (იხ. Transition Checkpoint) |
 | **Release verification** | ✅ **VERIFIED** (Lexo-ს ხელით შემოწმება, 2026-10-12) — სამივე პუნქტი (Pages deploy, 360×740, რეალური ტელეფონი/APK + Dashboard ლეიბლი) Lexo-მ შეამოწმა და შედეგი კარგია. კონკრეტული რიცხვები/ეკრანები ამ სესიაში არ მოუწოდებია; Claude-ს დამოუკიდებლად არ გადაუმოწმებია |
 | Deploy მექანიზმი (`.github/workflows/deploy.yml`) | `push` `main`-ზე (და `workflow_dispatch`) → `npm install` → `npm run typecheck` → `npm test` → `npm run build` (Supabase env: `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` secrets/vars-იდან) → GitHub Pages. ანუ deploy ტესტებზეა დამოკიდებული; ჩავარდნილი typecheck/test deploy-ს აჩერებს ✅ VERIFIED (workflow ფაილი წაკითხულია) |
 | GitHub Pages deploy `096fb463`-ისთვის | ✅ VERIFIED **ChatGPT-ის მიერ** — GitHub Actions [run `38727161113`](https://github.com/lexo123/thomthematica2/actions/runs/38727161113): `Typecheck & Test`, `Build`, `Deploy to GitHub Pages` ყველა `success` (2026-10-15). **Claude-ს Actions API-ზე 403 ჰქონდა და run უშუალოდ არ უნახავს**; მან ტესტები/typecheck/build დამოუკიდებლად fresh clone-ში დაადასტურა. **ახალი fix-ის ცალკე მობილური/UI smoke test არ არის დადასტურებული** |
 | APK (webintoapp.com wrapper) | APK გაკეთებულია და GitHub Pages URL-ს ეხსნება. ტექნიკურად wrapper პასიურია: ახალ deploy-ს ავტომატურად იღებს, ცალკე rebuild არ სჭირდება. ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12: გაყოფის რეჟიმი რეალურ ტელეფონზე/APK-ში შემოწმებულია, ყველაფერი რიგზეა (Claude-ს დამოუკიდებლად არ გადაუმოწმებია). Android WebView-ში `beforeunload`/`visibilitychange` ნაკლებად საიმედოა (იხ. Pre-Launch ბაგი 3) |
 | ხელით შემოწმება 360×740-ზე (გაყოფა) | ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12: 360×740-ზე ყველაფერი რიგზეა (ზუსტი `scrollWidth`/`clientWidth` არ მოუწოდებია). ჩემი Chromium-ის გაზომვა: 360–767px → 294/294, ≥768px → 530/530; Lexo-ს დესკტოპზე: 530/530 (viewport 1299) |
 | გაყოფა რეალურ ტელეფონზე / APK-ში; Dashboard-ის ლეიბლი ცოცხლად | ✅ VERIFIED — Lexo-ს განცხადებით 2026-10-12 (Dashboard-ის ლეიბლი ასევე ტესტით დაფარულია: `deriveGameModeBreakdown`) |
-| უშუალოდ შემდეგი ნაბიჯი | (1) Lexo ადასტურებს `096fb463` code checkpoint-ს; (2) ChatGPT-ის ამ `PROJECT_STATE.md`-ს Claude დამოუკიდებლად ამოწმებს, Lexo ამტკიცებს და ცალკე docs commit-ით push-ავს; (3) **AI Studio-ს სამუშაო ასლი სინქრონიზდება GitHub-ის ახალ `main`-თან და მოწმდება**; (4) Pre-Launch ერთჯერადი შემოწმებები/backup; შემდეგ `grade-range` მხოლოდ planning/review |
+| უშუალოდ შემდეგი ნაბიჯი (2026-10-21-ზე) | **AI Studio ZIP (92)-ის ორი რეალური შეუსაბამობა გამოსწორებულია** (იხ. Transition Checkpoint). შემდეგ: ChatGPT-ის განახლებული `PROJECT_STATE.md` → Claude review → Lexo approval → ცალკე docs commit და იმავე ფაილის ხელით ჩანაცვლება AI Studio-ში → ახალი chat: **I–VI grade architecture planning only** |
+
+---
+
+## Transition Checkpoint — 2026-10-21 (Planning Handoff; **არა ახალი code commit**)
+
+### Source of truth / დამტკიცების საზღვრები
+
+- **GitHub `main` დოკუმენტის შედგენის მომენტში:** `c988a56c8af5a281679acec2aa166fb597aba5cc`, `PROJECT_STATE.md`-ის 2026-10-15 docs-only commit. **ბოლო დამოუკიდებლად დადასტურებული production კოდის ცვლილება:** `096fb463c6a9e48250199589a31946927f1f1519`. მიმდინარე სტატუსი ისტორიულ CI-ზე დაყრდნობითაა: 49 test files / 411 tests, TS 0, build + GitHub Pages deploy success (GitHub Actions run `38727161113`). **2026-10-21-ს ახალი ტესტები/CI არ გაშვებულა; ZIP-ის static compare არ არის test run.**
+- **პროდუქტის ახალი გადაწყვეტილება (Lexo, 2026-10-21):** საწყისი grade-based განვითარების **დიაპაზონი I–VI კლასი**, თითო ბავშვისთვის მშობლის მიერ მითითებული კლასი და შესაბამისი სასწავლო შინაარსის განსხვავება. ეს **არ არის დამტკიცებული ტექნიკური დიზაინი/სკოლის პროგრამა** და **არ არის implementation ავტორიზაცია**. ახალი ჩათის პირველი სამუშაოა ChatGPT + Claude planning/review, შემდეგ Lexo-ს გადაწყვეტილება.
+- **სხვა პროდუქტის / backend ცვლილება:** ამ დოკუმენტის განახლებისას **არ შესრულებულა**. Supabase migration, RLS, session logic, generator და თამაშის UI უცვლელია. `supabase/schema.sql`-ის ისტორიული production drift ძალაში რჩება; ფაილის პირდაპირ გაშვება production-ზე აკრძალულია.
+- **დოკუმენტის სტატუსი:** ChatGPT-ის მიერ მომზადებული ახალი draft → Claude independent review → Lexo final approval → მხოლოდ `PROJECT_STATE.md`-ის docs commit GitHub-ზე → იმავე დოკუმენტის ხელით განახლება *არსებულ* AI Studio project-ში და სხვა project-context ადგილებში. ახალი Git commit hash დოკუმენტში წინასწარ **არ გამოიგონოს**.
+
+### AI Studio ↔ GitHub workspace sync — 2026-10-21 ✅ შიგთავსობრივად დადასტურებული, **EOL გამონაკლისებით**
+
+**პრობლემის წყარო:** AI Studio-ს `თომთემატიკა (91).zip`-ში იყო 125 ფაილი — მოძველებული `utils/columnDivision.oracle.test.ts` (6,696 bytes, SHA-256 `906d1de5f8e9fbca1871c14840efe16b138a75169475aeffc78c6b0ce161d3f5`) და აკლდა `.github/workflows/keep-supabase-alive.yml`. ZIP-ის პირდაპირ GitHub-ზე გადატანა საშიში იყო. 2026-10-21-ზე Lexo-მ ეს ორი პრობლემა არსებული AI Studio project-ში გაასწორა და ატვირთა `თომთემატიკა (92).zip`.
+
+**დამოუკიდებელი შედარება:** ZIP (92) — 126 ფაილი; ZIP (91) → (92) ცვლილება **ზუსტად** ორი პუნქტია: `utils/columnDivision.oracle.test.ts` შეიცვალა, `.github/workflows/keep-supabase-alive.yml` დაემატა. დანარჩენი 124 ფაილი **უცვლელია** ZIP (91)-თან. წინა ZIP (91) ↔ GitHub `main` შედარებამ დაადგინა: 118 byte-exact, 6 მხოლოდ ფაილის დაბოლოების newline სხვაობით, 1 substantive-old-oracle, 1 missing workflow. ახალი ZIP-ის ორაკული და workflow GitHub-ის შესაბამის ფაილებს შიგთავსით ემთხვევა: ორივე ფაილს ZIP-ში აკლია ბოლო `\n`.
+
+| ფაილი / შემოწმება | GitHub `main` | AI Studio ZIP (92) | დასკვნა |
+|---|---|---|---|
+| `utils/columnDivision.oracle.test.ts` | 12,860 bytes; SHA-256 `ecf26a7aa60beb7ae49d7c9ec68a7df6ffb20d5c1e5ea92f9738a5e153bcdd08` | 12,859 bytes; SHA-256 `da69cb45074936404b98d5c44ddecebd203ca9d7311370d8950477bcba92c796` | მხოლოდ final newline; სწორი ორაკულის შიგთავსი, *არ გადააწერო GitHub-ის ვერსიას* |
+| `.github/workflows/keep-supabase-alive.yml` | არსებობს | ახლა არსებობს; ბოლო newline განსხვავდება | დაკარგული workflow აღდგა AI Studio-ს ასლში |
+| `PROJECT_STATE.md` (2026-10-15) | blob `bae060d66108603cf84f93289e9c9f1cfca4de07` | ზუსტად იგივე ბაიტები (ამ ახალი draft-ის დამატებამდე) | დოკუმენტაციის ახალი commit-ის შემდეგ თავიდან დასინქრონებელია |
+| სხვა ფაილები | GitHub-ის ბოლო `main` | ZIP (91)-თან უცვლელი | წინა შედარების თანახმად substantive drift არ არის; რამდენიმე ბოლო-newline სხვაობა რჩება |
+
+**საზღვარი:** ეს არის exported snapshot/სტატიკური შიგთავსის შედარება, **არა AI Studio-ში ან GitHub-ზე ხელახლა შესრულებული 411 ტესტის მტკიცებულება**. ZIP-ში newline განსხვავება ნიშნავს, რომ byte-for-byte Git hash ყველა ფაილზე იდენტური არ არის; ის არ ნიშნავს ლოგიკურ კოდის განსხვავებას. მომავალი code Wave-ის preflight-ზე ცვლილებების *რეალური* Git diff მაინც სავალდებულოა.
+
+**რეკომენდებული უსაფრთხო workflow (ერთი მიმართულება; საბოლოო პროცედურას Lexo ამტკიცებს):** Lexo-ს არსებული AI Studio integration GitHub-იდან `pull`-ს არ უჭერს მხარს; **არსებული AI Studio project შეინარჩუნოს**. AI Studio-ს მთელი ZIP **არ merge-დეს `main`-ში** და არასდროს დაიშვას პირდაპირი, unreviewed Push `main`-ზე. მხოლოდ შეთანხმებული შეცვლილი ფაილები გადაიტანოს Ubuntu-ზე **clean local feature branch**-ში (ან AI Studio-ს push-ს გამოიყენოს *მხოლოდ* იმ feature branch-ზე, თუ უსაფრთხოდ არის მხარდაჭერილი), → `git diff`/allowlist/protected hashes → ტესტები/typecheck/build → Claude + ChatGPT review → Lexo-ის მიერ PR merge. `.github/workflows/*`, `supabase/schema.sql`, ორაკული, `public/sw.js`, `hooks/useGameSession.ts` და სხვა protected files უნებართვოდ არ შეიცვალოს. **მომავალი `PROJECT_STATE.md` docs commit-ის შემდეგ ერთი განზრახ დოკუმენტური სხვაობა დროებით გაჩნდება, სანამ AI Studio-ში ახალი ფაილი არ შეიცვლება.**
+
+### Backup / Pre-Launch მონაცემთა დაცვა — 2026-10-19…21
+
+- **Supabase Free Plan:** ავტომატური managed DB backup ამ გეგმაში არ არის. Production PostgreSQL 17.6; Ubuntu-ზე `pg_dump` 17.11 და `pg_restore` 17 გამოიყენეს. მონაცემთა ბაზის **ლოკალური custom-format** Backup შექმნილია `2026-10-19`-ს (ფაილი `supabase-20261019-122631.dump`, დაახლოებით **399 KB**); `pg_restore --list` შეიცავს ექვსი საკვანძო table-data სექციას — `auth.users`, `public.profiles`, `public.children`, `public.game_sessions`, `public.wishes`, `public.child_reward_images`. `pg_restore --file=/dev/null` წაკითხვა დასრულდა `BACKUP READ OK`-ით. **აღდგენის გამოცდა ცალკე გარემოში არ ჩატარებულა; ეს არ უდრის სრულ disaster-recovery დადასტურებას.** PostgreSQL globals/roles-ის, Auth-ის სრულყოფილი აღდგენისა და სხვა გარემოს-დამოკიდებულებების შესაბამისობა კვლავ გადასამოწმებელია.
+- **Private Storage bucket `child-reward-images`:** SQL-ით bucket `public=false`, 74 file-object, 5 top-level ბავშვის საქაღალდე, `storage.objects` metadata-ს ჯამური მოცულობა დაახლოებით **341 MB**. Supabase CLI 2.121.0-ით linked project-იდან Ubuntu-ზე რეკურსიულად ჩამოტვირთულია **74 ფაილი**, `storage-20261019-140417`, `du` ≈ **342M**. საქაღალდის სტრუქტურისა და თითოეული ობიექტის checksum-ის სრული შედარება/აღდგენა **არ დადასტურებულა**; count ემთხვევა.
+- **კონფიდენციალურობა:** DB dump და სურათები შეიცავს მშობლებისა და ბავშვების მონაცემებს — **არ აიტვირთოს GitHub-ზე, AI Studio-ში, Claude-ში ან ChatGPT-ში**, არ ჩაიკომიტოს; არ გამოქვეყნდეს არც Database Password, არც Supabase access token, არც დაშიფვრის პაროლი. Ubuntu-ზე არსებული ორიგინალები უნდა დარჩეს დაცულ, კერძო ლოკალურ საქაღალდეში. DB password 2026-10-19-ს შეცვლილია; მისი მნიშვნელობა დოკუმენტში არ წერია.
+- **GPG AES-256:** ერთი `.tar.gpg` არქივი შეიქმნა, მაგრამ Lexo-მ ვერ დაადასტურა მისი პაროლის გახსენება; **იგი არ ითვლება აღდგენად/შესამოწმებლად დამტკიცებულ სარეზერვო ასლად**. ორიგინალი `.dump` და Storage ფაილები მანამდე არ წაშალოთ. დაკარგული გასაღებით დაშიფრული ასლი სრულფასოვანი offsite protection არ არის.
+- **Lexo-ს გადაწყვეტილება 2026-10-21:** GPG-ის ახლიდან გამართვა, ახალი დაშიფრული ფაილი, offsite შენახვა, backup-ის ავტომატიზაცია და სრული restore drill **ახლა გადადებულია** (ცნობილი/გაცნობიერებული რისკი). სამომავლო სასურველი გზა: ავტომატური encrypted DB daily + Storage weekly/after significant uploads, შესაძლო **GitHub Actions → Google Drive** (Cloudflare R2 არ არის აუცილებელი). ჯერ არ არის არქიტექტურულად დამტკიცებული, არ არსებობს production ავტომატიზაცია; cloud secrets/Service Account OAuth least-privilege, retention, failure alerting და აღდგენის ტესტი ცალკე planning/review-ს მოითხოვს. **არ შეცვალოთ მიმდინარე `.github/workflows/*` ამ ამოცანის გარეშე.**
+- **ფუნქციური შემოწმება:** Lexo-ს განცხადებით, ახალი მშობლის/ბავშვის end-to-end ნაკადი უკვე შემოწმებულია და კარგად მუშაობს; ეს არის owner-ის ხელით დადასტურება, არა ამ სესიაში დამოუკიდებელი fresh-user/სხვადასხვა ანგარიშის security audit. Storage/private access, cross-account/service-worker სცენარების ღრმა ტესტები კვლავ საჭიროებისამებრ განიხილება. სატესტო მონაცემების წაშლა/cleanup არ დადასტურებულა.
+
+### შემდეგი Wave — I–VI კლასების მიხედვით ამოცანები და თამაშები: **PLANNING / REVIEW ONLY**
+
+**პროდუქტის მიზანი:** მშობელმა ბავშვის პროფილში მიუთითოს **I, II, III, IV, V ან VI კლასი**; აპლიკაციამ აქტიური ბავშვის მიხედვით მისცეს შესაფერისი ამოცანები და, საჭიროებისამებრ, განსხვავებული თამაშების/თემების არჩევანი. დღევანდელი ერთიანი სირთულის ამოცანები პირველკლასელისთვის ზედმეტად რთულია, მეექვსეკლასელისთვის — ზედმეტად მარტივი. აპლიკაცია პირველ პილოტში დაახლოებით 10 ბავშვისთვისაა განკუთვნილი; მთავარი მიზანია სასწავლო შინაარსის შესაბამისობა, **არა მხოლოდ დიდი/პატარა რიცხვები**.
+
+**რეალური current implementation (GitHub `main`, 2026-10-21-ზე წაკითხული):**
+
+- `types.ts`: `Child`-ს აქვს `id`, `parent_id`, `name`, `avatar_id`, `gender`, `created_at`; **`grade` ველი ჯერ არ არსებობს**. `hooks/useChildren.ts` კონკრეტულად სელექტავს/ინსერტავს არსებულ child fields-ს; `components/ChildSelector.tsx` იღებს სახელს, სქესს, ავატარს, PIN-ს; `contexts/ChildContext.tsx` გამოყოფს `activeChild`-ს/`activeChildId`-ს. კლასის დამატება საჭიროებს **production-ში კონტროლირებულ `children` migration-ს**, type/projections/registration-ს და კლასის parent-only UI რედაქტირების გადაწყვეტას. **არ დაამატოთ ახალი application table საჭიროების დასაბუთების გარეშე.**
+- `services/problemGenerator.ts`: `generateProblem(mode, questionIndex=0)` **კლასის პარამეტრს არ იღებს**. `Thomthematica` არჩევს ±, ×, ÷ მოქმედებებს (მათ შორის 3-წევრიან ±-ებს), `ThomravlebisTabula` იყენებს 0–10 × 0–10, `Gethometria` არჩევს ფიგურებს, გვერდებს/კუთხეებს, პერიმეტრს/ფართობს, `Kveshmicera` ფიქსირებული ორნიშნა×ორნიშნაა, `Kveshdivision` — ცალკე `utils/divisionProblemGenerator.ts`, 3/4-ნიშნა dividend და 2–9 divisor, exact quotient. `App.tsx` უშუალოდ იძახებს `generateProblem(gameMode, ...)`-ს და მართავს UI/state. `MainMenu.tsx` დღეს ხუთივე რეჟიმს აჩვენებს.
+- **UI-ს შეზღუდვები:** `components/MathQuiz.tsx` და `types.ts` დღევანდელ მარტივ რიცხვით/გეომეტრიულ `MathProblem`-ზეა გათვლილი; VI კლასის შესაძლო წილადები/ათწილადები/სხვადასხვა პასუხის ფორმატი შეიძლება ცალკე data model + input/validation/UI-ს საჭიროებდეს. `ColumnMultiplication.tsx` არის ფიქსირებული 2-ნიშნა×2-ნიშნა, განზოგადება ადრე შეგნებულად გადაიდო. `Kveshdivision` layout/validator/ორაკული დაცულია. **ახალი შინაარსი არ უნდა ჩაისვას არსებულ გენერატორში/validator-ში წინასწარი სპეციფიკაციისა და ტესტების გარეშე.**
+- **Performance expectation (გეგმის დონეზე, ჯერ არ გაზომილა):** ბავშვის grade-ის ერთი დამატებითი ველი და client-side გენერაციის grade-config მცირე runtime/database overhead-ს ქმნის; მაგრამ ექვსი კლასის × ხუთი რეჟიმის შესაბამისობის ტესტები და ახალი გეომეტრია/წილადები სირთულეს ზრდის. დიდი assets/ფოტოები ან network-first content არ დავამატოთ ავტომატურად.
+
+**სავალდებულო planning-review კითხვები (არაფერი აქედან წინასწარ არ არის გადაწყვეტილი):**
+
+1. **პედაგოგიური მატრიცა I–VI:** საქართველოს მოქმედ სასწავლო სტანდარტთან შესატყვისი, კლასის × თამაშის × თემის × ოპერაციის × რიცხვების დიაპაზონის explicit spec. რა თემებია თითოეულ კლასში უკვე ნასწავლი? როდის ჩნდება გამრავლება, გაყოფა, პერიმეტრი, ფართობი, ქვეშმიწერა, წილადები, ათწილადები? პედაგოგის დამოუკიდებელი review სასურველია. **არ გამოიგონოთ curricular facts**; გადაამოწმეთ ოფიციალური წყაროები ახალ planning ჩათში.
+2. **Mode availability vs difficulty:** დაბალი კლასებისთვის ზოგი რეჟიმი დაიმალოს/დაიბლოკოს, თუ მარტივ ვარიანტში უნდა დარჩეს? უფროსისთვის ახალი ტიპის ამოცანები/პასუხის ფორმატები როგორ გამოჩნდეს? სრულ I–VI დაფარვას ნუ გაუტოლებთ იმას, რომ ყველა თამაშის ერთი და იგივე UI ყველა კლასისთვის მუშაობს.
+3. **Data migration:** `children.grade` შესაძლო ტიპი/დიაპაზონი, nullability/backfill არსებული ბავშვებისთვის, მშობლის მიერ კლასის არჩევა/რედაქტირება, სწავლის წლიდან წლამდე grade update, input validation, RLS და PIN gate-ის საზღვრები. ამჟამად მშობელი და ბავშვი ერთ Supabase Auth session-ს იზიარებენ; client-side PIN არ არის DB-level authorization. Parent-only class edit უნდა შეფასდეს იმავე threat model-ით.
+4. **Session/rolling-window:** კლასის შეცვლა თამაშის დაწყებამდე/შუაში, რომელი მომენტიდან ვრცელდება, დაწყებული სესიის კუთვნილება, grade-aware progress-ის მოთხოვნა თუ არმოთხოვნა, `gameProgress:${childId}:${gameMode}` გასაღების გაგრძელება, კლასის შეცვლისას wish qualification/history-ის მიმართ პოლიტიკა. **არსებული 40/20 rolling logic, ერთი session ID, `flushedSessionIdRef`, FIFO sync queue, recordAnswer არ დაირღვეს; grade-ის გამო ძველი პროგრესი ჩუმად არ წაიშალოს.**
+5. **Generators/validators:** grade-aware, deterministic/testable configuration; ადეკვატური problem pool და retry/fallback; არ უნდა წარმოიქმნას გამრავლება/გაყოფა ჯერ არნასწავლ კლასში ან გაუთვალისწინებელი negative/fraction format. ცალკე გადაწყდეს `divisionProblemGenerator.ts`-ის ჩართულობა, `Kveshmicera` grid expansion და `ColumnDivision` Oracle/test scope. Oracle-ის `SHA-256 ecf26a7...` დაცულია: არასდროს შეცვალოთ მხოლოდ მწვანე ტესტებისთვის.
+6. **UX / test matrix / rollout:** მშობლის პროფილის ცვლილების flow, ბავშვის მენიუ და unavailable რეჟიმები, კითხვების ტაიმერი/სურვილების წესები, class-switch regression, mixed-family/multi-child isolation, performance on 360px/mobile/APK, actual counts of tests and CI baseline, manual Supabase migration on production მხოლოდ Lexo approval-ით.
+
+**რეკომენდებული *დასაგეგმი*, არა დამტკიცებული implementation Phases:**
+
+- **Wave G0 — Architecture & curriculum planning (ახლანდელი ნაბიჯი):** ChatGPT მოამზადებს scope/matrix-ს → Claude independent review → უთანხმოებების გადაწყვეტა → Lexo APPROVED / REQUEST CHANGES. **არავითარი კოდი/SQL/UI ამ ეტაპზე.**
+- **Wave G1 — Child grade model/parent-controlled UI:** დამტკიცებული production migration გეგმა, არსებული მონაცემების უსაფრთხო backfill, child types/query projections, რეგისტრაცია და grade update; ცალკე tests/review/checkpoint.
+- **Wave G2 — არსებული გენერატორებისა და თამაშების სირთულის ადაპტაცია:** მხოლოდ G0-ში დამტკიცებული თემებით; თავიდან არსებული არითმეტიკა, ტაბულა, გეომეტრია, შემდეგ ქვეშმიწერა, თითოეულზე პატარა implementation/verification steps. Protected logic არ იცვლება წინასწარი architecture decision-ის გარეშე.
+- **Wave G3 — ახალი ამოცანების/პასუხების ტიპები:** საჭიროების მიხედვით წილადები, ათწილადები, სხვა თემები და მოგვიანებით word problems; ცალკე მონაცემის/UX-ის დიზაინი და ტესტები. Wave G3-ის შინაარსი ჯერ არ არის შეთანხმებული.
+
+**STOP Gate:** G0-ის საბოლოო არქიტექტურის ChatGPT + Claude review + Lexo approval-მდე AI Studio-ს **არ გაეგზავნოს grade implementation prompt**, SQL Editor-ში **არ შესრულდეს migration**, protected files **არ შეიცვალოს**. ყოველი მომდევნო Wave მხოლოდ წინა Wave-ის რეალური Git commit/diff + tests + approval + checkpoint-ის შემდეგ.
 
 ---
 
@@ -56,12 +122,12 @@ _ბოლო განახლება: 2026-10-15. Kveshmicera-ს შეც
 
 **Red/Green/Mutation:** Claude-მა fresh clone-ში independent red phase შეამოწმა (parent-ის `App.tsx` + ახალი Test J → ჩავარდა, ბანერმა ძველი შექება აჩვენა); fix-ის აღდგენით Test J გავიდა, Kveshmicera-ის ტესტები **9/9**. AI Studio-მაც red/green/mutation report წარმოადგინა, მაგრამ ის **არ არის** დამოუკიდებელი მტკიცებულება. GitHub Actions [run `38727161113`](https://github.com/lexo123/thomthematica2/actions/runs/38727161113)-ის job logs **ChatGPT-მა უშუალოდ წაიკითხა GitHub connector-ით**: **49 ფაილი / 411 ტესტი**, `tsc --noEmit`, `vite build` და Pages deploy წარმატებულია. **Claude-ს GitHub Actions API-ზე 403 ჰქონდა**, ამიტომ run-ის სტატუსი/ლოგები უშუალოდ ვერ გადაამოწმა; მან fresh clone-ში დამოუკიდებლად დაადასტურა იგივე ტესტების რაოდენობა, tsc და build. ChatGPT და Claude code review: **APPROVED**. **Lexo-ს საბოლოო checkpoint-დამტკიცება ცალკე გადაწყვეტილებაა.**
 
-### AI Studio-ს ანგარიშის შეუსაბამობები — მომდევნო implementation-მდე შესამოწმებელი
+### AI Studio-ს 2026-10-15 ანგარიშის ისტორიული შეუსაბამობები — 2026-10-21 ZIP (92)-ში ძირითადი პრობლემა მოგვარებულია
 
 - AI Studio-მ დაწერა ორაკულის SHA-256 `906d1de5f8e9fbca1871c14840efe16b138a75169475aeffc78c6b0ce161d3f5`, რეალურ GitHub commit-ში კი უცვლელია დამტკიცებული `ecf26a7aa60beb7ae49d7c9ec68a7df6ffb20d5c1e5ea92f9738a5e153bcdd08` (Git blob იგივეა parent-შიც). **ორაკულის მიგრაცია/ცვლილება არ არის ნებადართული.**
 - AI Studio-მ მიუთითა **48 ფაილი / 401 ტესტი**, მაშინ როდესაც GitHub Actions-მა და Claude-ის fresh clone-მა დაადასტურა **49 ფაილი / 411 ტესტი**.
 - AI Studio-ს რეპორტში `package-lock.json`-ზე ცალკე ანგარიში არ იყო, მაგრამ Git diff-ში ფაილი არ შეცვლილა. მისი არსებული lockfile-sync პრობლემა კვლავ გადადებულია.
-- **ზუსტი მიზეზი ჯერ დაუდგენელია:** შესაძლოა AI Studio-ს სამუშაო ასლი განსხვავდებოდეს რეპოზიტორიისგან, ან ანგარიში იყოს არაზუსტი. მარტო ეს რიცხვები არ ამტკიცებს კონკრეტული ფაილის დაზიანებას. მიუხედავად ამისა, **ახალი implementation prompt არ გაიგზავნოს, სანამ სამუშაო ასლი GitHub-ის დამტკიცებულ `main`-თან არ გადაიმოწმება** (მათ შორის მიმდინარე `PROJECT_STATE.md`, test-file inventory და დაცული ორაკულის checksum). ZIP overwrite-ის შემდეგ Git diff/status, `sha256sum` და სრული suite დამოუკიდებლად შემოწმდეს. ორაკულის შიგთავსი არ მიეცეს AI Studio-ს შესაცვლელად და არ დაბრუნდეს ძველი ასლით.
+- **ამ ისტორიული ანგარიშის პირველადი მიზეზი ZIP (91)-ის შედარებამ დააზუსტა:** AI Studio-ს სამუშაო ასლში ნამდვილად იყო ძველი ორაკული და აკლდა scheduled workflow; ანგარიშის ყველა რიცხვის ზუსტი წარმომავლობა ცალკე არ დამტკიცებულა. მარტო ეს რიცხვები არ ამტკიცებს კონკრეტული ფაილის დაზიანებას. მიუხედავად ამისა, **ახალი implementation prompt არ გაიგზავნოს, სანამ ახალი grade-wave-ის არქიტექტურა და docs sync არ დამტკიცდება** (მათ შორის მიმდინარე `PROJECT_STATE.md`, test-file inventory და დაცული ორაკულის checksum). ZIP overwrite-ის შემდეგ Git diff/status, `sha256sum` და სრული suite დამოუკიდებლად შემოწმდეს. ორაკულის შიგთავსი არ მიეცეს AI Studio-ს შესაცვლელად და არ დაბრუნდეს ძველი ასლით.
 
 ---
 
@@ -449,7 +515,9 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 ## დაგეგმილი მომდევნო Wave-ები (პრიორიტეტის მიხედვით)
 
-### Wave "grade-range" (კლასის მიხედვით რიცხვითი დიაპაზონი) — შემდეგი პრიორიტეტი, ყველაზე სენსიტიური (problemGenerator.ts-ის ცენტრალურ ლოგიკას ეხება)
+### Wave I–VI grade support — ახალი პრიორიტეტი (2026-10-21), მხოლოდ **planning/review**
+
+ძველი ჩანაფიქრი — მხოლოდ რიცხვითი დიაპაზონის `grade-range` — გაფართოვდა: საჭიროა მშობლის მიერ ბავშვის კლასის მითითება, ექვსი კლასის პედაგოგიური მატრიცა, განსხვავებული საკითხები/თამაშების ხელმისაწვდომობა და შესაბამისი generator/UI/test-არქიტექტურა. პირველი ეტაპი არის **Wave G0 (planning only)**, იხ. Transition Checkpoint. ეს სექცია არ ნიშნავს implementation approval-ს; `problemGenerator.ts` ცენტრალური რისკია.
 
 ### PLANNED (არ დაწყებულა) — გაყოფასთან და Kveshmicera-სთან დაკავშირებული
 - Kveshmicera-ს ფიქსირებული 3 რიგი × 4 უჯრა განზოგადება, როცა 3-ნიშნა გამრავლება დაემატება (Lexo-ს გადაწყვეტილება: ახლა არ ვეხებით)
@@ -471,9 +539,9 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 - `metadata.json`-ის description ისევ "...თომასთვის"-ს ახსენებს (გადამოწმებულია `549f654`-ზე) — დაბალი პრიორიტეტი
 - გაყოფა: 320px-იან ძალიან პატარა ეკრანზე 4-ნიშნა ცხრილი შიდა ჰორიზონტალურ სქროლს იძლევა (28px უჯრებზე ზღვარი 360px-ზე 26px-ია, 320px-ზე არ ჯდება) — მისაღებად ითვლება
 - გაყოფა: Dashboard-ში ლეიბლის ცოცხალი შემოწმება და ტელეფონზე/APK-ში გამოცდა — ✅ VERIFIED (Lexo-ს განცხადებით 2026-10-12)
-- Backup-სტრატეგია — ინფორმირებული, კონკრეტული გეგმა ჯერ არ არის; launch-მდე რეკომენდებული
+- **Backup:** 2026-10-19 DB `.dump` 399 KB (`pg_restore --list`/`--file=/dev/null` OK), Private Storage 74 ფაილი / ≈342M ლოკალურად — ✅ შექმნილი, **მაგრამ restore test, დაშიფვრის საიმედო პაროლი და offsite ასლი არ არსებობს**; სრულად ავტომატური/Google Drive Backup 2026-10-21-ის Lexo-ს გადაწყვეტილებით გადადებულია (დეტალები Transition Checkpoint-ში)
 - კომერციალიზაცია (Georgia-first) — მომავალი ეტაპი, ჯერ არ აქტუალური 10-ბავშვიანი launch-ისთვის
-- **AI Studio-ს სამუშაო ასლის / `PROJECT_STATE.md`-ის სინქრონიზაცია** — **მომდევნო implementation-მდე აუცილებელი preflight**: GitHub `main`-ის მიმდინარე approved snapshot, ახალი docs commit, ტესტების რაოდენობა და ორაკულის ჰეში შეადარე სამუშაო/ZIP ასლს; წინა fix-ის რეპორტში 48/401 და არასწორი hash გამოვლინდა (ზუსტი მიზეზი დაუდგენელია). ყოველი docs commit-ის შემდეგ ახალი `PROJECT_STATE.md` ხელით განახლდეს AI Studio-ს project-შიც; stale ZIP-ით GitHub-ის ახალი ფაილები არ გადაიწეროს
+- **AI Studio code workspace sync:** 2026-10-21 ZIP (92)-ზე წინა ორი რეალური სხვაობა (ძველი oracle, დაკარგული keepalive workflow) **გამოსწორებულია**; 126 ფაილი, მხოლოდ ფაილის ბოლოში newline შეუსაბამობები (Transition Checkpoint). **ამ ახალი `PROJECT_STATE.md`-ის GitHub docs commit-ის შემდეგ უნდა გაკეთდეს მისი ხელით სინქრონიზაცია AI Studio-ში**. ყოველი მომდევნო Wave-ის commit-ის წინ იგივე preflight/დაცული SHA და Git diff სავალდებულოა
 - **`image_approved → published`-ის manual ოპერაცია** (Wave Y) — ყოველი დამტკიცებული სურათისთვის Lexo-მ თავად უნდა შეამოწმოს Supabase Table Editor/SQL Editor, push notification არ არსებობს. Saved query/view `wish_approved`/`image_rejected`/`image_approved` status-ებისთვის რეკომენდებულია, ჯერ არ შექმნილა
 
 ## Production Launch-ის მდგომარეობა (~10 ახლობელი ბავშვი)
@@ -496,7 +564,7 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 - ~~UI-ტექსტის გადარქმევა~~ ✅ დასრულებულია
 
 **არ ბლოკავს, მაგრამ რეკომენდებულია launch-მდე ან პარალელურად:**
-- Backup-სტრატეგია
+- Backup-სტრატეგია (ლოკალური DB + Storage ასლი არსებობს; **restore/offsite/ახალი encryption და cloud automation გადადებულია, დარჩენილი რისკით**)
 - `metadata.json`-ის description-ის განახლება
 - Saved query/view Lexo-ს image-approval სამუშაო რიგისთვის (Wave Y manual ნაბიჯების გასამარტივებლად)
 
@@ -516,15 +584,14 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 **Lexo-ს სამუშაო კონტექსტი:** არ იცნობს SQL-ს ან Supabase-ის dashboard-ს — ყოველი ტექნიკური ნაბიჯი დეტალურად, ეტაპ-ეტაპად აღსაწერია.
 
-## შემდეგი ნაბიჯი
+## შემდეგი ნაბიჯი — 2026-10-21 handoff
 
-**კოდის ბოლო დამტკიცებული review checkpoint:** `096fb463` (Kveshmicera Banner Regression Fix), 49 ფაილი / **411/411 ტესტი**, tsc 0, build წარმატებული, GitHub Pages deploy წარმატებული. ChatGPT და Claude: APPROVED. შემდეგი ნაბიჯები ამ დოკუმენტის მომზადების მომენტისთვის:
+**ძველი კოდის checkpoint:** `096fb463` (2026-10-15); docs `main` HEAD `c988a56` (ამ draft-ის GitHub-ში შეტანამდე); 49 test-files / 411 tests + TS/build/deploy წარმატება ისტორიული დადასტურებაა და 2026-10-21-ს არ განმეორებულა.
 
-1. **Lexo — საბოლოო checkpoint-ის დადასტურება:** code review მიღებულია; თუ Lexo ეთანხმება, `096fb463` გახდება ოფიციალური პროექტის checkpoint. ახალი gameplay feature არ არის დაწყებული.
-2. **`PROJECT_STATE.md` — ცალკე docs commit:** ChatGPT-ის ეს განახლება Claude-მა დამოუკიდებლად უნდა გადაამოწმოს; Lexo ამტკიცებს, repo-ს `PROJECT_STATE.md`-ს ანაცვლებს და commit/push-ს აკეთებს **მხოლოდ ამ ფაილზე**. შემდეგ შეამოწმოს GitHub-ზე, რომ historical sections არ დაკარგულა.
-3. **AI Studio-ს გარემოს სინქრონიზაცია — gate:** GitHub-ის **docs commit-ის შემდეგ** არსებული `main` ავიღოთ canonical source-ად. AI Studio-ს workspace/export შევადაროთ შესაბამის ფაილებსა და ტესტების რაოდენობას; დადასტურებულ ორაკულს SHA-256 უნდა ჰქონდეს `ecf26a7aa60beb7ae49d7c9ec68a7df6ffb20d5c1e5ea92f9738a5e153bcdd08`. AI Studio-ში ხელით აიტვირთოს ახალი `PROJECT_STATE.md` და საჭირო ახალი ფაილები. **დაცული ორაკული AI Studio-ს შესაცვლელად არ მიეცეს.** თუ ხარვეზი აღმოჩნდება, ახალი implementation STOP მის მოგვარებამდე.
-4. **Pre-Launch ერთჯერადი შემოწმებები:** წინა release verification (`549f654`) ჩატარებულია Lexo-ს მიერ; ამ ახალ `096fb463` fix-ზე სურვილისამებრ ხელით გავიაროთ Q1 სწორი → Q2 არასწორი მობილურზე. ძირითადი გახსნილი checklist: backup/restore-გეგმა, სატესტო ანგარიშების უსაფრთხო წაშლა, ახალი ანგარიშით სრული PIN → gameplay → wish → parent approval → publish flow, service-worker/cache cross-account smoke test, canonical URL (GitHub Pages vs Vercel) გადაწყვეტილება. GitHub Pages-ის დატოვება მიმდინარე მცირე pilot-ისთვის მისაღები ვარიანტია; ჰოსტინგის ცვლილება ჯერ არ არის დამტკიცებული.
-5. **`feature/long-division` ბრანჩის წაშლა** სურვილისამებრ (უკვე merge-ებულია `549f654`-ში).
-6. **Wave `grade-range` — მხოლოდ planning/architecture review**, AI Studio-ში implementation prompt არ გაიგზავნოს ამ checkpoint-ის, docs commit-ის და workspace-sync-ის დასრულებამდე; შემდეგ განისაზღვროს, შეეხება თუ არა ცალკე `divisionProblemGenerator.ts`-საც. `word problems` უფრო გვიან.
+1. **ამ დოკუმენტის დამოუკიდებელი review:** ChatGPT-ის `PROJECT_STATE.md` 2026-10-21 draft წარედგინოს Claude-ს დასკვნისთვის. Lexo გადაწყვეტს APPROVED / CHANGES REQUESTED. Claude-ს შეუძლია მიუთითოს შეცდომები; საბოლოო დოკუმენტის ავტორობას ChatGPT ინარჩუნებს, თუ Lexo როლებს არ ცვლის.
+2. **Docs-only GitHub commit:** Lexo განაახლებს მხოლოდ `PROJECT_STATE.md`-ს, ამოწმებს `git diff -- PROJECT_STATE.md` და `git status --short`, `git add PROJECT_STATE.md` (არა `git add -A`), docs commit → `main`. **არავითარი DB/TS/HTML/Workflow ცვლილება ამ commit-ით.** GitHub-ზე ახალი commit SHA და CI-ს შედეგი ცალკე დაფიქსირდება/გადამოწმდება; არ ჩაიწეროს წინასწარ გამოგონილი commit SHA.
+3. **AI Studio project docs sync:** განახლებული `PROJECT_STATE.md` **ზუსტად** ჩაანაცვლოს ძველ AI Studio პროექტში; თავიდან არ შექმნას ახალი project და მთლიანი ZIP არ გადაწეროს GitHub-ში. `PROJECT_STATE.md`-ის საბაზო ბაიტები ZIP (92)-ში `c988a56`-ის დოკუმენტს ემთხვევა **ამ ახალი docs commit-მდე**. Claude-სა და ChatGPT-ის ახალ ჩათებში იგივე საბოლოო დოკუმენტი გამოიყენოს.
+4. **ახალი planning chat — Wave G0:** I–VI კლასის სასწავლო მატრიცა, თამაშების ხელმისაწვდომობა/სირთულე, მონაცემთა migration გეგმა, არსებული ბავშვების grade-backfill, parent-controlled edit, active-game grade changes, rolling-window/session invariants, Kveshmicera/Kveshdivision/UI/grade constraints, test matrix. ChatGPT draft → Claude independent architecture review → Lexo approval. **ჯერ არ არსებობს დამტკიცებული ტექნიკური scope; AI Studio-ში code generation არ დაიწყოს.**
+5. **გადადებული, ცალკე დასაგეგმი:** Backup-ის სანდო encryption + offsite/Google Drive ავტომატიზაცია + ცალკე გარემოში restore drill; production schema drift; წვრილი metadata/lockfile საკითხები; test-data cleanup/security smoke; word problems; optional ძველი merged feature branch cleanup. არცერთი არ დაინერგოს მომხმარებლის ახალ თანხმობამდე.
 
-[ახალი chat-სესიისთვის: ეს ფაილი აიტვირთოს ChatGPT-ისა და Claude-ის Project-ებში, **და** AI Studio-ს project-ში. GitHub-ის ახალი docs commit და AI Studio workspace ცალ-ცალკე უნდა გადაიმოწმოს (ZIP revert risk). ამ დოკუმენტს მუდმივად **ChatGPT ამზადებს, Claude ამოწმებს, Lexo ამტკიცებს**, თუ Lexo როლებს არ შეცვლის. Repo-ში განახლება მხოლოდ Lexo-ს დამტკიცების შემდეგ: `git add PROJECT_STATE.md && git commit -m "docs: update project state after Kveshmicera banner fix" && git push`.]
+**ახალი ჩათისთვის პირველი მოთხოვნის ნიმუში:** „იმუშავე `PROJECT_STATE.md` 2026-10-21 checkpoint-ით; GitHub code checkpoint `096fb463`, GitHub docs baseline `c988a56` (+ ახალი docs-only commit, თუ უკვე შეიქმნა), AI Studio ZIP (92) შიგთავსობრივად დასინქრონებულია. გვინდა **I–VI კლასის Wave G0 მხოლოდ არქიტექტურული დაგეგმვა**: Grade model, ეროვნული სასწავლო სტანდარტის მიხედვით თემების მატრიცა, ხუთი game mode, parent UI, legacy migration, safe grade changes, invariants/regression tests/performance. ჯერ არც SQL და არც implementation prompt. ChatGPT Lead Architect; Claude independent reviewer; Lexo approves.“
