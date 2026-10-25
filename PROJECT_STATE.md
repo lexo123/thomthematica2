@@ -1,5 +1,25 @@
 # thomthematica2 — Project State
 
+> **CURRENT ARCHITECTURE CHECKPOINT — 2026-10-24: Wave G0 APPROVED (planning only).** GitHub `main` last checked: `9debd49928d15e8c0bed823eced8d6ac55bbf8d8` (docs only); verified code checkpoint `096fb463c6a9e48250199589a31946927f1f1519`. Claude re-review: CONFIRMED WITH MINOR CHANGES, ChatGPT review completed; Lexo approved the three final choices and clarified some games are intentionally excluded from some grades. G1a **planning/review next**; do NOT run SQL, edit code, touch RLS/SW or send AI Studio prompt until G1a scope is independently reviewed and approved. This preface supersedes older G0 planning status in historical sections below; historical content is otherwise preserved verbatim.
+
+# PROJECT_STATE.md — Wave G0 approved checkpoint addendum
+
+**2026-10-24 — Architecture-only checkpoint; code unchanged.** Reviewed by ChatGPT and Claude (Claude: CONFIRMED WITH MINOR CHANGES); Lexo approved. Grounded GitHub HEAD `9debd49928d15e8c0bed823eced8d6ac55bbf8d8`; base code `096fb463c6a9e48250199589a31946927f1f1519`, intermediate docs-only. Historical 411 tests / TS 0 / build successful (not rerun in G0). Full agreed architecture in `G0_ARCHITECTURE_APPROVED_v4.md`.
+
+**Decisions DEC-01–11:** grade I..VI nullable during rollout; NULL → 5 legacy games, II–VI → 5 legacy games until adapted; grade I after activation shows only approved *curriculum-eligible* games. Grade required only when all 6 classes finished. New child and existing children may initially have NULL grade; no automatic backfill. Parent can select I–VI even while their grade-specific content is pending. Class changes and content-version changes end prior session with immutable `(grade_at_start,content_version)` snapshot, then start fresh session context; partial 40/20 wish-progress resets/discarded, prior received wishes/history remain. `content_version` static in `(grade,gameMode)` config, increment only on content change. New Dashboard current grade/current mode-wise version default; history separately, mixed grade/content stats forbidden; pre-Wave `(NULL,NULL)` rows excluded without deletion; new `(NULL,'legacy-v1')` rows visible in grade-unassigned history. Old pilot stats need no backfill; no automatic deletes.
+
+**DEC-11 (new):** Some games are intentionally out of curriculum in some grades, not merely unfinished. Grade I specifically excludes BOTH `Kveshmicera` (column multiplication) and `Kveshdivision` (column division). Treat modes as `legacy`, `grade-ready`, `unavailable(reason='not-ready'|'curriculum-excluded')`. Menu and App entry guard must agree. Grade-I completion **does not require all 5 games**. No further grade-mode eligibility assumed without Lexo's curriculum decision.
+
+**Simplification approved:** no `progress_revision`, `grade_changed_at`, DB trigger or realtime cross-device syncing. Local rolling window payload v2 retains grade/content version; mismatch resets, 48h TTL unchanged, 40/20 and 39/19 thresholds unchanged. Old v1 safe compatibility only for NULL-grade legacy. Known and approved rare second-device I→II→I within 48h, without refetch, may revive stale partial wish-progress and allow an extra wish. Lexo accepts loss of unfinished wish-progress on changes; earned wishes/history remain.
+
+**Implementation waves (each separate approval):** G1a grade schema/projection/update and ChildContext, parent UI disabled; G1b-1 session snapshots all paths; G1b-2 rolling-window v2; G2a policy/generator/guards and regression tests; G2b grade+mode+version Dashboard filtering, NULL-history, pagination checks; G2c activate parent grade picker after `public/sw.js` cache-version and stale-client/APK smoke gate; G3-I eligible grade-I content only; then G3-II…VI. Database migrations additive nullable, manual Lexo operation before dependent code, require actual `information_schema` and `pg_policies` preflight (incl. UPDATE WITH CHECK and existing non-NULL grades). Protected session/FIFO/RLS/SW/oracle invariants unchanged absent separately approved narrow scope. No code/SQL/AI Studio implementation prompt until G1a plan review + Lexo approval.
+
+---
+
+## Historical project state (unchanged previous checkpoint)
+
+# thomthematica2 — Project State
+
 _ბოლო დოკუმენტური განახლება: **2026-10-21**. კოდის ბოლო დამოუკიდებლად დადასტურებული checkpoint კვლავ `096fb463` (2026-10-15; 49 ტესტ-ფაილი / 411 ტესტი, typecheck/build/Pages deploy წარმატებული). GitHub `main`-ის მიმდინარე HEAD ამ დოკუმენტის მომზადებისას: **`c988a56c8af5a281679acec2aa166fb597aba5cc`** (2026-10-15, docs-only). 2026-10-21-ზე AI Studio ZIP (92)-ის სამუშაო ასლი შიგთავსობრივად გასწორებულია `main`-თან; შემდეგი პროდუქტის პრიორიტეტია **I–VI კლასების მხარდაჭერის მხოლოდ არქიტექტურული დაგეგმვა**. კოდი, DB schema და gameplay ამ დოკუმენტის გამო არ შეცვლილა (DB კავშირის პაროლი 2026-10-19-ს ცალკე განახლდა). ისტორიული გადაწყვეტილებები ქვემოთ შენარჩუნებულია; ახალი აქტუალური მდგომარეობა მომდევნო სექციაშია._
 
 ## Last verified code checkpoint — 2026-10-15 (ისტორიული CI; აქტუალური planning სტატუსი იხ. 2026-10-21 Transition Checkpoint-ში)
