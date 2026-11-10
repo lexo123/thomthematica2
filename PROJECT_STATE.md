@@ -1,8 +1,74 @@
 # thomthematica2 — Project State
 
-> **CURRENT ARCHITECTURE CHECKPOINT — 2026-10-24: Wave G0 APPROVED (planning only).** GitHub `main` last checked: `9debd49928d15e8c0bed823eced8d6ac55bbf8d8` (docs only); verified code checkpoint `096fb463c6a9e48250199589a31946927f1f1519`. Claude re-review: CONFIRMED WITH MINOR CHANGES, ChatGPT review completed; Lexo approved the three final choices and clarified some games are intentionally excluded from some grades. G1a **planning/review next**; do NOT run SQL, edit code, touch RLS/SW or send AI Studio prompt until G1a scope is independently reviewed and approved. This preface supersedes older G0 planning status in historical sections below; historical content is otherwise preserved verbatim.
+> **CURRENT CHECKPOINT — 2026-10-25: Wave G1a production DB migration COMPLETED; Preflight B 7/7 REPORTED PASS; G1a TypeScript implementation NOT STARTED.** This is a database/documentation checkpoint, **not** an application-code checkpoint or authorization to implement. Production observations below are attributed to Lexo's Supabase screenshots and terminal output shared with ChatGPT; neither ChatGPT nor Claude independently connected to production. The latest repository `main` HEAD checked for this documentation was `115e8d6499fbbe94303a5b5f5adca299b68e56f5` (G0 docs commit). The verified earlier application-code checkpoint remains `096fb463c6a9e48250199589a31946927f1f1519` (historical 411 tests / TypeScript 0 errors / build passed, **not** rerun for this G1a DB migration).
 
-# PROJECT_STATE.md — Wave G0 approved checkpoint addendum
+## Wave G1a — 2026-10-25 Production DB checkpoint
+
+**Architecture and decision provenance.** Lexo approved G1a Architecture Plan v2 after ChatGPT–Claude review of the original plan; Claude has not independently reviewed the final v2 text. The approved G0 decisions DEC-01–11 in `G0_ARCHITECTURE_APPROVED_v4.md` remain binding. The full approved G1a v2 plan, held in Lexo's ChatGPT project/review conversation, is authoritative for implementation; this checkpoint is a status record, not a replacement specification. If any reconstructed signature, result contract, validation or race-safety detail below differs from the approved v2, STOP and reconcile with the original plan before writing an AI Studio prompt.
+
+**DB migration — completed (Lexo-reported).** On 2026-10-25 Lexo ran the approved SQL in Supabase SQL Editor and reported `Success. No rows returned`; the exact SQL Editor input was not independently captured. This is the **exact SQL instruction supplied to Lexo** (including transaction and lock-wait timeout), not a byte-for-byte forensic record of execution:
+
+```sql
+BEGIN;
+
+SET LOCAL lock_timeout = '5s';
+
+ALTER TABLE public.children
+  ADD COLUMN grade SMALLINT;
+
+ALTER TABLE public.children
+  ADD CONSTRAINT children_grade_valid
+  CHECK (grade BETWEEN 1 AND 6);
+
+COMMIT;
+```
+
+- `grade` is nullable, without DEFAULT or backfill. NULL represents the unassigned/legacy grade state; a grade is an integer from 1 through 6 when populated.
+- `lock_timeout = '5s'` limits waiting to acquire a lock; it does not cap total execution time. No new table, index, trigger, RLS policy, or grade UI was authorized.
+- Lexo has not separately supplied a copy of the editor's executed statement text; do not overstate the strength of that evidence.
+
+**Preflight A — six read-only steps before execution (results supplied by Lexo).**
+1. `information_schema.columns`: `public.children` had seven existing columns and **no `grade`**.
+2. RLS enabled; SELECT/INSERT/UPDATE/DELETE policies enforce `parent_id = auth.uid()`; UPDATE had both `USING` and `WITH CHECK`.
+3. All four previous constraints were validated: `children_gender_valid`, `children_name_not_empty`, `children_parent_id_fkey`, `children_pkey`.
+4. `pg_trigger`: no non-internal trigger on `public.children`.
+5. Role-level effective column SELECT/UPDATE privileges checked for `anon`, `authenticated`, and `service_role`.
+6. Table-level SELECT/UPDATE privileges checked for the same three roles; permissions on future columns expected to inherit those grants. A final pre-execution read-only query again found `grade` and `children_grade_valid` absent and RLS enabled.
+
+**Backup — before migration (Lexo terminal reports).** A new private PostgreSQL custom-format `pg_dump` backup was created on 2026-10-25 using `pg_dump` 17.11; directory/file permissions were restricted. Lexo supplied terminal output showing `pg_restore --list`, successful archive read (`BACKUP READ OK`), presence of the four MVP application tables and other schemas, and an equality check of the four table row counts against the pre-migration SQL query. ChatGPT reviewed these outputs; neither reviewer independently obtained backup bytes. **No test restore was performed.** Do not commit the backup, its local path, its basename, row counts or any exported sensitive data to this public repository.
+
+**Preflight B — seven read-only checks after migration, before dependent code (Lexo-reported, 7/7 PASS).**
+1. Column: `children.grade` exists with `data_type=smallint`, `is_nullable=YES`, `column_default=NULL`.
+2. Data: counts for `profiles`, `children`, `game_sessions`, and `wishes` matched pre-migration values; `COUNT(*) WHERE grade IS NOT NULL` returned zero.
+3. Constraints: five constraints, all valid; new `children_grade_valid` is a validated CHECK for `grade` 1–6; prior four remain.
+4. RLS: enabled; four existing policy definitions remained the same, including UPDATE `USING` and `WITH CHECK` ownership guards.
+5. Triggers: no non-internal `children` triggers appeared.
+6. Privileges: `has_column_privilege` SELECT and UPDATE for new `grade` returned true for `anon`, `authenticated`, `service_role`; privileges alone do not bypass RLS ownership checks.
+7. Authenticated REST read: using a real parent's browser session, GET selecting `id,grade` returned HTTP 200 and `grade: null`; this verifies the read path, **not** INSERT/PATCH schema-cache behavior or another parent's access denial.
+
+**Not yet verified / future gates.**
+- `children.grade` update through authenticated PostgREST PATCH; the read-only check did not test the write path. Plan write-path/cache verification before G2c activation, with earlier controlled regression testing as appropriate for the G1a data-access implementation.
+- Cross-account RLS negative-access test with two real parent identities; existing policy definitions were inspected but cross-account behavior was not experimentally exercised here. Re-evaluate before exposing any grade controls.
+- Production backup restoration in an isolated environment; no restore-test was run for G1a.
+- After the G1a TypeScript deployment: controlled smoke-test of loading the child list with the `grade` projection and adding a child through the existing INSERT `.select(...)` flow. Do **not** create test child records in production without Lexo's explicit approval and cleanup plan.
+
+**G1a TypeScript implementation — NOT STARTED.** The previously reviewed nine-file allowlist is:
+- Main scope: `types.ts`; `hooks/useChildren.ts`; `contexts/ChildContext.tsx`; `hooks/useChildren.test.ts`; new `contexts/ChildContext.grade.test.tsx`.
+- Only `grade: null` fixture updates: `components/ChildSelector.test.tsx`; `components/ParentWishInbox.test.tsx`; `tests/KveshdivisionFlow.test.tsx`; `utils/personalizeMessage.test.ts`.
+
+**Implementation details recalled from ChatGPT–Claude review; cross-check each item against approved v2 before the implementation prompt.** `Child.grade` required but nullable; strict input/fetch validation with invalid values fail-closed; `addChild` retains four arguments and unchanged INSERT payload (returned projection includes grade); grade update is restricted to 1–6 pending an explicit NULL-update policy; distinguish successful DB write from follow-up refresh failure; reject stale account-switch fetches before request/state counters change (e.g. current-user guard and applied/stale/failed internal result). The review proposed a result shape `{ok:true, grade, refreshed} | {ok:false, error}`; its exact final signature must be verified against the approved v2, not inferred from this status file. No grade picker, game/session/generator/dashboard/wish change, new DB structure, RLS/SW/oracle change, or unauthorized file changes belong to G1a.
+
+- **Protected out of scope:** session ID lifecycle/completion/FIFO sync, 40/20 rolling window and 39/19 thresholds, PIN threat model, RLS, `supabase/schema.sql`, `services/supabaseSyncService.ts`, `public/sw.js`, and golden division oracle. `updateChildGrade` may be defined and exposed through `ChildContext`, but must have **no non-test caller until G2c**. Any file outside the nine-file allowlist is a **STOP**.
+
+**Schema / deployment compatibility.** Production now has `children.grade`, but repository `supabase/schema.sql` has not been updated as part of G1a because it is protected/out of the approved file allowlist. Record this deliberate schema/documentation drift; any future, separately approved schema sync must update the AI Studio working source too, or a later ZIP import could reintroduce an outdated copy. Do not silently edit `schema.sql` now. PostgreSQL DDL is transactional; follow G0's conservative rollback policy: revert grade-dependent frontend first if needed, and leave additive nullable DB columns in place unless a separate architecture decision approves removal.
+
+**Next gate.** ChatGPT reconciles the exact approved G1a Architecture Plan v2 with current GitHub HEAD, prepares the narrowly scoped implementation prompt; Claude independently reviews it; Lexo separately approves before AI Studio changes code. This documentation checkpoint and the completed production SQL migration **do not authorize** TypeScript implementation, a new migration, or continuation into later waves. No code tests, new CI success claim, or application deploy is attributed to this documentation-only checkpoint.
+
+---
+
+> **HISTORICAL ARCHITECTURE CHECKPOINT — 2026-10-24: Wave G0 APPROVED (planning only).** GitHub `main` last checked: `9debd49928d15e8c0bed823eced8d6ac55bbf8d8` (docs only); verified code checkpoint `096fb463c6a9e48250199589a31946927f1f1519`. Claude re-review: CONFIRMED WITH MINOR CHANGES, ChatGPT review completed; Lexo approved the three final choices and clarified some games are intentionally excluded from some grades. G1a **planning/review next**; do NOT run SQL, edit code, touch RLS/SW or send AI Studio prompt until G1a scope is independently reviewed and approved. This G0 planning status was superseded by the 2026-10-25 G1a DB checkpoint above; historical content below remains preserved.
+
+# PROJECT_STATE.md — Wave G0 approved checkpoint addendum (HISTORICAL; superseded 2026-10-25)
 
 **2026-10-24 — Architecture-only checkpoint; code unchanged.** Reviewed by ChatGPT and Claude (Claude: CONFIRMED WITH MINOR CHANGES); Lexo approved. Grounded GitHub HEAD `9debd49928d15e8c0bed823eced8d6ac55bbf8d8`; base code `096fb463c6a9e48250199589a31946927f1f1519`, intermediate docs-only. Historical 411 tests / TS 0 / build successful (not rerun in G0). Full agreed architecture in `G0_ARCHITECTURE_APPROVED_v4.md`.
 
