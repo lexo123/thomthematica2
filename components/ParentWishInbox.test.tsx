@@ -19,6 +19,7 @@ describe('ParentWishInbox Component (Wave Y Stage 3b)', () => {
       avatar_id: 'avatar_1',
       gender: 'boy',
       created_at: '2026-09-01T10:00:00Z',
+      grade: null,
     },
     {
       id: 'child-2',
@@ -27,6 +28,7 @@ describe('ParentWishInbox Component (Wave Y Stage 3b)', () => {
       avatar_id: 'avatar_3',
       gender: 'girl',
       created_at: '2026-09-01T10:00:00Z',
+      grade: null,
     },
   ];
 

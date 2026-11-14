@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useChildren } from './useChildren';
-import { Child } from '../types';
+import { Child, ChildGrade } from '../types';
 
 let currentAuthUser: { id: string; email?: string } | null = null;
 let mockSupabaseClient: any = null;
@@ -58,6 +58,7 @@ const mockChildA: Child = {
   avatar_id: 'avatar_1',
   gender: 'boy',
   created_at: '2026-01-01T00:00:00Z',
+  grade: null,
 };
 
 const mockChildB: Child = {
@@ -67,6 +68,7 @@ const mockChildB: Child = {
   avatar_id: 'avatar_2',
   gender: 'girl',
   created_at: '2026-01-02T00:00:00Z',
+  grade: null,
 };
 
 describe('useChildren - Multi-Account Login Switch & In-Flight Race Condition Protection', () => {
@@ -313,7 +315,7 @@ describe('useChildren - Multi-Account Login Switch & In-Flight Race Condition Pr
     });
 
     // FIX 3: select must use explicit columns and NOT select '*' or pin_hash
-    expect(capturedSelectCols).toBe('id, parent_id, name, avatar_id, gender, created_at');
+    expect(capturedSelectCols).toBe('id, parent_id, name, avatar_id, gender, created_at, grade');
     expect(capturedSelectCols).not.toContain('pin_hash');
 
     // FIX 1: addChild passes pin_hash in insert payload and selects explicit columns
@@ -324,7 +326,381 @@ describe('useChildren - Multi-Account Login Switch & In-Flight Race Condition Pr
 
     expect(addRes.error).toBeNull();
     expect(capturedInsertPayload.pin_hash).toBe('test-hashed-pin');
-    expect(capturedInsertSelectCols).toBe('id, parent_id, name, avatar_id, gender, created_at');
+    expect(capturedInsertSelectCols).toBe('id, parent_id, name, avatar_id, gender, created_at, grade');
     expect(capturedInsertSelectCols).not.toContain('pin_hash');
+  });
+});
+
+describe('G1a-1 - ChildGrade domain, projection, strict SELECT & INSERT validation', () => {
+  const EXACT_INSERT_VERIFICATION_ERROR =
+    'ბავშვის დამატება შესაძლოა შესრულდა, მაგრამ მისი გადამოწმება ვერ მოხერხდა. გთხოვთ, გადაამოწმოთ ბავშვების სია, სანამ ხელახლა სცდით.';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryCalls = [];
+    currentAuthUser = { id: 'user-a' };
+  });
+
+  const setupMockChains = (options: {
+    selectQueue?: Array<{ data: unknown; error: unknown }>;
+    insertSingleResult?: { data: unknown; error: unknown };
+  }) => {
+    const selectProjections: string[] = [];
+    const insertSelectProjections: string[] = [];
+    const insertPayloads: Array<Record<string, unknown>> = [];
+    const queue = [...(options.selectQueue ?? [{ data: [mockChildA], error: null }])];
+
+    mockSupabaseClient = {
+      from: vi.fn((table: string) => {
+        if (table === 'profiles') {
+          return {
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'user-a' }, error: null }),
+              })),
+            })),
+          };
+        }
+        return {
+          select: vi.fn((cols: string) => {
+            selectProjections.push(cols);
+            return {
+              eq: vi.fn((field: string, val: string) => ({
+                order: vi.fn(() => {
+                  expect(field).toBe('parent_id');
+                  expect(val).toBe(currentAuthUser?.id);
+                  const next = queue.shift() ?? { data: [], error: null };
+                  return Promise.resolve(next);
+                }),
+              })),
+            };
+          }),
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            insertPayloads.push(payload);
+            return {
+              select: vi.fn((cols: string) => {
+                insertSelectProjections.push(cols);
+                return {
+                  single: vi.fn().mockResolvedValue(
+                    options.insertSingleResult ?? {
+                      data: {
+                        id: 'child-inserted',
+                        parent_id: 'user-a',
+                        name: String(payload.name ?? 'თომა'),
+                        avatar_id: String(payload.avatar_id ?? 'avatar_1'),
+                        gender: 'boy',
+                        created_at: '2026-01-03T00:00:00Z',
+                        grade: null,
+                      },
+                      error: null,
+                    }
+                  ),
+                };
+              }),
+            };
+          }),
+        };
+      }),
+    };
+
+    return { selectProjections, insertSelectProjections, insertPayloads };
+  };
+
+  it('uses exact CHILD_COLUMNS for both SELECT and INSERT-return without * or pin_hash, and preserves 4-argument addChild payload without grade', async () => {
+    const { selectProjections, insertSelectProjections, insertPayloads } = setupMockChains({});
+
+    const { result } = renderHook(() => useChildren());
+    await waitFor(() => {
+      expect(result.current.hasFetchedOnce).toBe(true);
+    });
+
+    expect(selectProjections).toEqual(['id, parent_id, name, avatar_id, gender, created_at, grade']);
+    expect(selectProjections[0]).not.toContain('*');
+    expect(selectProjections[0]).not.toContain('pin_hash');
+
+    let addResult!: { child: Child | null; error: Error | null };
+    await act(async () => {
+      addResult = await result.current.addChild('  ლუკა  ', 'avatar_2', 'boy', 'hashed-pin-9999');
+    });
+
+    expect(addResult.error).toBeNull();
+    expect(addResult.child).toEqual({
+      id: 'child-inserted',
+      parent_id: 'user-a',
+      name: 'ლუკა',
+      avatar_id: 'avatar_2',
+      gender: 'boy',
+      created_at: '2026-01-03T00:00:00Z',
+      grade: null,
+    });
+
+    expect(insertSelectProjections).toEqual(['id, parent_id, name, avatar_id, gender, created_at, grade']);
+    expect(insertSelectProjections[0]).not.toContain('*');
+    expect(insertSelectProjections[0]).not.toContain('pin_hash');
+
+    expect(insertPayloads).toHaveLength(1);
+    expect(Object.keys(insertPayloads[0]).sort()).toEqual(
+      ['avatar_id', 'gender', 'name', 'parent_id', 'pin_hash'].sort()
+    );
+    expect(Object.prototype.hasOwnProperty.call(insertPayloads[0], 'grade')).toBe(false);
+    expect(insertPayloads[0]).toEqual({
+      parent_id: 'user-a',
+      name: 'ლუკა',
+      avatar_id: 'avatar_2',
+      gender: 'boy',
+      pin_hash: 'hashed-pin-9999',
+    });
+  });
+
+  it('accepts valid multi-row array with grade: null and each numeric ChildGrade 1..6', async () => {
+    const validGrades: Array<ChildGrade | null> = [null, 1, 2, 3, 4, 5, 6];
+    const validRows: Child[] = validGrades.map((grade, idx) => ({
+      id: `child-grade-${idx}`,
+      parent_id: 'user-a',
+      name: `ბავშვი ${idx}`,
+      avatar_id: 'avatar_1',
+      gender: idx % 2 === 0 ? 'boy' : 'girl',
+      created_at: '2026-01-01T00:00:00Z',
+      grade,
+    }));
+
+    setupMockChains({
+      selectQueue: [{ data: validRows, error: null }],
+    });
+
+    const { result } = renderHook(() => useChildren());
+    await waitFor(() => {
+      expect(result.current.hasFetchedOnce).toBe(true);
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.children).toEqual(validRows);
+  });
+
+  it('rejects malformed grade values (missing, undefined, string "1", 0, 7, fractional, NaN, Infinity, non-own property, wrong type) without coercion', async () => {
+    const inheritedGradeRow = Object.assign(Object.create({ grade: 1 }), {
+      id: 'child-inherited',
+      parent_id: 'user-a',
+      name: 'თომა',
+      avatar_id: 'avatar_1',
+      gender: 'boy',
+      created_at: '2026-01-01T00:00:00Z',
+    });
+
+    const { grade: _omitted, ...missingGradeRow } = mockChildA;
+
+    const invalidGradeRows: unknown[] = [
+      missingGradeRow,
+      { ...mockChildA, grade: undefined },
+      { ...mockChildA, grade: '1' },
+      { ...mockChildA, grade: 0 },
+      { ...mockChildA, grade: 7 },
+      { ...mockChildA, grade: -1 },
+      { ...mockChildA, grade: 2.5 },
+      { ...mockChildA, grade: Number.NaN },
+      { ...mockChildA, grade: Number.POSITIVE_INFINITY },
+      { ...mockChildA, grade: Number.NEGATIVE_INFINITY },
+      { ...mockChildA, grade: true },
+      { ...mockChildA, grade: {} },
+      inheritedGradeRow,
+    ];
+
+    setupMockChains({
+      selectQueue: invalidGradeRows.map((badRow) => ({ data: [badRow], error: null })),
+    });
+
+    const { result } = renderHook(() => useChildren());
+
+    for (let i = 0; i < invalidGradeRows.length; i++) {
+      if (i > 0) {
+        await act(async () => {
+          await result.current.fetchChildren();
+        });
+      }
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+      expect(result.current.error).toBeTruthy();
+      expect(result.current.children).toEqual([]);
+    }
+  });
+
+  it('rejects row shape failures: null row, array row, wrong parent_id, malformed gender, non-string fields, missing/empty id, and duplicate id', async () => {
+    const invalidRowPayloads: unknown[][] = [
+      [null],
+      [['array-instead-of-object']],
+      [{ ...mockChildA, parent_id: 'other-user' }],
+      [{ ...mockChildA, parent_id: null }],
+      [{ ...mockChildA, gender: 'other' }],
+      [{ ...mockChildA, gender: '' }],
+      [{ ...mockChildA, name: 123 }],
+      [{ ...mockChildA, avatar_id: null }],
+      [{ ...mockChildA, created_at: undefined }],
+      [{ ...mockChildA, id: '' }],
+      [{ ...mockChildA, id: 42 }],
+      [
+        mockChildA,
+        { ...mockChildA, name: 'დუბლიკატი ID' },
+      ],
+    ];
+
+    setupMockChains({
+      selectQueue: invalidRowPayloads.map((rows) => ({ data: rows, error: null })),
+    });
+
+    const { result } = renderHook(() => useChildren());
+
+    for (let i = 0; i < invalidRowPayloads.length; i++) {
+      if (i > 0) {
+        await act(async () => {
+          await result.current.fetchChildren();
+        });
+      }
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+      expect(result.current.error).toBeTruthy();
+      expect(result.current.children).toEqual([]);
+    }
+  });
+
+  it('does not publish partial array on mixed valid/invalid response and preserves previously validated child array', async () => {
+    const secondValidChild: Child = {
+      id: 'child-a-2',
+      parent_id: 'user-a',
+      name: 'ელენე',
+      avatar_id: 'avatar_3',
+      gender: 'girl',
+      created_at: '2026-01-02T00:00:00Z',
+      grade: 3,
+    };
+    const invalidChild = {
+      ...mockChildA,
+      id: 'child-a-bad',
+      grade: 9,
+    };
+
+    setupMockChains({
+      selectQueue: [
+        { data: [mockChildA], error: null },
+        { data: [secondValidChild, invalidChild], error: null },
+      ],
+    });
+
+    const { result } = renderHook(() => useChildren());
+    await waitFor(() => {
+      expect(result.current.children).toEqual([mockChildA]);
+      expect(result.current.error).toBeNull();
+    });
+
+    await act(async () => {
+      await result.current.fetchChildren();
+    });
+
+    expect(result.current.error).toBeTruthy();
+    // Must keep prior [mockChildA], neither publishing [secondValidChild] nor clobbering to []
+    expect(result.current.children).toEqual([mockChildA]);
+  });
+
+  it('rejects data: null with error: null (and non-array data) while accepting a real empty array []', async () => {
+    setupMockChains({
+      selectQueue: [
+        { data: [mockChildA], error: null },
+        { data: null, error: null },
+        { data: { id: 'not-an-array' }, error: null },
+        { data: [], error: null },
+      ],
+    });
+
+    const { result } = renderHook(() => useChildren());
+    await waitFor(() => {
+      expect(result.current.children).toEqual([mockChildA]);
+      expect(result.current.error).toBeNull();
+    });
+
+    // 1. data: null, error: null -> error, does not clobber [mockChildA]
+    await act(async () => {
+      await result.current.fetchChildren();
+    });
+    expect(result.current.error).toBeTruthy();
+    expect(result.current.children).toEqual([mockChildA]);
+
+    // 2. data: object instead of array, error: null -> error, does not clobber [mockChildA]
+    await act(async () => {
+      await result.current.fetchChildren();
+    });
+    expect(result.current.error).toBeTruthy();
+    expect(result.current.children).toEqual([mockChildA]);
+
+    // 3. data: [], error: null -> authoritative empty list
+    await act(async () => {
+      await result.current.fetchChildren();
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.children).toEqual([]);
+  });
+
+  it('fails INSERT verification with exact Georgian error message when returned row has non-null grade, missing/invalid grade, wrong parent_id, or null data, without appending or retrying', async () => {
+    const invalidInsertReturns: unknown[] = [
+      null,
+      { ...mockChildA, id: 'new-1', grade: 1 }, // non-null grade is invalid for new-child INSERT
+      { ...mockChildA, id: 'new-2', grade: 6 },
+      { ...mockChildA, id: 'new-3', grade: undefined },
+      { ...mockChildA, id: 'new-4', grade: '1' },
+      { ...mockChildA, id: 'new-5', parent_id: 'other-parent', grade: null },
+      { ...mockChildA, id: '', grade: null },
+    ];
+
+    for (const badReturnData of invalidInsertReturns) {
+      const { insertPayloads } = setupMockChains({
+        selectQueue: [{ data: [mockChildA], error: null }],
+        insertSingleResult: { data: badReturnData, error: null },
+      });
+
+      const { result, unmount } = renderHook(() => useChildren());
+      await waitFor(() => {
+        expect(result.current.children).toEqual([mockChildA]);
+      });
+
+      let addRes!: { child: Child | null; error: Error | null };
+      await act(async () => {
+        addRes = await result.current.addChild('ახალი', 'avatar_1', 'boy', 'pin-hash-1');
+      });
+
+      expect(addRes.child).toBeNull();
+      expect(addRes.error).not.toBeNull();
+      expect(addRes.error?.message).toBe(EXACT_INSERT_VERIFICATION_ERROR);
+      expect(result.current.children).toEqual([mockChildA]);
+      expect(insertPayloads).toHaveLength(1);
+      unmount();
+    }
+  });
+
+  it('keeps explicit Supabase INSERT error separate from response-validation failure', async () => {
+    const { insertPayloads } = setupMockChains({
+      selectQueue: [{ data: [mockChildA], error: null }],
+      insertSingleResult: {
+        data: null,
+        error: { message: 'duplicate key value violates unique constraint' },
+      },
+    });
+
+    const { result } = renderHook(() => useChildren());
+    await waitFor(() => {
+      expect(result.current.children).toEqual([mockChildA]);
+    });
+
+    let addRes!: { child: Child | null; error: Error | null };
+    await act(async () => {
+      addRes = await result.current.addChild('ახალი', 'avatar_1', 'boy', 'pin-hash-1');
+    });
+
+    expect(addRes.child).toBeNull();
+    expect(addRes.error).not.toBeNull();
+    expect(addRes.error?.message).toBe('duplicate key value violates unique constraint');
+    expect(addRes.error?.message).not.toBe(EXACT_INSERT_VERIFICATION_ERROR);
+    expect(result.current.children).toEqual([mockChildA]);
+    expect(insertPayloads).toHaveLength(1);
   });
 });

@@ -2,7 +2,92 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabase } from '../lib/supabase';
 import { ensureProfileExists } from '../lib/ensureProfile';
-import { Child } from '../types';
+import { Child, ChildGrade } from '../types';
+
+const CHILD_COLUMNS = 'id, parent_id, name, avatar_id, gender, created_at, grade';
+
+const INSERT_VERIFICATION_ERROR_MESSAGE =
+  'ბავშვის დამატება შესაძლოა შესრულდა, მაგრამ მისი გადამოწმება ვერ მოხერხდა. გთხოვთ, გადაამოწმოთ ბავშვების სია, სანამ ხელახლა სცდით.';
+
+const isPlainRecord = (val: unknown): val is Record<string, unknown> => {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+};
+
+const isValidChildGrade = (value: unknown): value is ChildGrade | null => {
+  if (value === null) {
+    return true;
+  }
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    (value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6)
+  );
+};
+
+const validateChildRow = (raw: unknown, expectedParentId: string): Child | null => {
+  if (!isPlainRecord(raw)) {
+    return null;
+  }
+  if (typeof raw.id !== 'string' || raw.id.length === 0) {
+    return null;
+  }
+  if (typeof raw.parent_id !== 'string' || raw.parent_id !== expectedParentId) {
+    return null;
+  }
+  if (typeof raw.name !== 'string') {
+    return null;
+  }
+  if (typeof raw.avatar_id !== 'string') {
+    return null;
+  }
+  if (raw.gender !== 'boy' && raw.gender !== 'girl') {
+    return null;
+  }
+  if (typeof raw.created_at !== 'string') {
+    return null;
+  }
+  if (!Object.prototype.hasOwnProperty.call(raw, 'grade')) {
+    return null;
+  }
+  const rawGrade = raw.grade;
+  if (!isValidChildGrade(rawGrade)) {
+    return null;
+  }
+
+  return {
+    id: raw.id,
+    parent_id: raw.parent_id,
+    name: raw.name,
+    avatar_id: raw.avatar_id,
+    gender: raw.gender,
+    created_at: raw.created_at,
+    grade: rawGrade,
+  };
+};
+
+const validateChildrenList = (data: unknown, expectedParentId: string): Child[] => {
+  if (!Array.isArray(data)) {
+    throw new Error('ბავშვების სიის მონაცემები არასწორი ფორმატისაა');
+  }
+
+  const validatedList: Child[] = [];
+  const seenIds = new Set<string>();
+
+  for (const rawRow of data) {
+    const validated = validateChildRow(rawRow, expectedParentId);
+    if (!validated) {
+      throw new Error('ბავშვის მონაცემები არასწორი ფორმატისაა');
+    }
+    if (seenIds.has(validated.id)) {
+      throw new Error('ბავშვების სიაში აღმოჩნდა დუბლირებული ID');
+    }
+    seenIds.add(validated.id);
+    validatedList.push(validated);
+  }
+
+  return validatedList;
+};
 
 export const CHILD_AVATARS: { id: string; emoji: string; label: string }[] = [
   { id: 'avatar_1', emoji: '🦁', label: 'ლომი' },
@@ -65,7 +150,7 @@ export const useChildren = () => {
     try {
       const { data, error: fetchErr } = await supabase
         .from('children')
-        .select('id, parent_id, name, avatar_id, gender, created_at')
+        .select(CHILD_COLUMNS)
         .eq('parent_id', userId)
         .order('created_at', { ascending: true });
 
@@ -77,7 +162,8 @@ export const useChildren = () => {
         throw fetchErr;
       }
 
-      setChildren((data as Child[]) || []);
+      const validatedChildren = validateChildrenList(data, userId);
+      setChildren(validatedChildren);
     } catch (err: any) {
       if (thisRequestId !== requestIdRef.current) {
         return;
@@ -121,6 +207,8 @@ export const useChildren = () => {
       return { child: null, error: new Error('Supabase არ არის კონფიგურირებული') };
     }
 
+    const capturedParentId = user.id;
+
     try {
       // Self-healing: Ensure parent profile exists safely without overwriting existing data
       await ensureProfileExists(user);
@@ -128,22 +216,29 @@ export const useChildren = () => {
       const { data, error: insertErr } = await supabase
         .from('children')
         .insert({
-          parent_id: user.id,
+          parent_id: capturedParentId,
           name: trimmedName,
           avatar_id: avatarId,
           gender: gender,
           pin_hash: pin,
         })
-        .select('id, parent_id, name, avatar_id, gender, created_at')
+        .select(CHILD_COLUMNS)
         .single();
 
       if (insertErr) {
         throw insertErr;
       }
 
-      const newChild = data as Child;
-      setChildren(prev => [...prev, newChild]);
-      return { child: newChild, error: null };
+      const validatedChild = validateChildRow(data, capturedParentId);
+      if (!validatedChild || validatedChild.grade !== null) {
+        return {
+          child: null,
+          error: new Error(INSERT_VERIFICATION_ERROR_MESSAGE),
+        };
+      }
+
+      setChildren(prev => [...prev, validatedChild]);
+      return { child: validatedChild, error: null };
     } catch (err: any) {
       return { child: null, error: new Error(err.message || 'ბავშვის დამატება ვერ მოხერხდა') };
     }

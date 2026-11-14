@@ -53,6 +53,7 @@ describe('Commit 3 - Kveshdivision Flow & App-level Integration Tests', () => {
       avatar_id: 'avatar_1',
       gender: 'boy',
       created_at: '',
+      grade: null,
     };
 
     vi.spyOn(SessionModeContext, 'useSessionMode').mockReturnValue({
@@ -823,4 +824,3 @@ describe('Commit 3 - Kveshdivision Flow & App-level Integration Tests', () => {
     expect(mainKveshmicera?.className).not.toContain('md:max-w-2xl');
   });
 });
-
