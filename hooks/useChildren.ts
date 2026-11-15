@@ -9,8 +9,24 @@ const CHILD_COLUMNS = 'id, parent_id, name, avatar_id, gender, created_at, grade
 const INSERT_VERIFICATION_ERROR_MESSAGE =
   'ბავშვის დამატება შესაძლოა შესრულდა, მაგრამ მისი გადამოწმება ვერ მოხერხდა. გთხოვთ, გადაამოწმოთ ბავშვების სია, სანამ ხელახლა სცდით.';
 
+const PRE_INSERT_ACCOUNT_CHANGED_ERROR_MESSAGE =
+  'აქტიური ანგარიში შეიცვალა. ბავშვის დამატება შეწყდა.';
+
+const IN_FLIGHT_INSERT_ACCOUNT_CHANGED_ERROR_MESSAGE =
+  'აქტიური ანგარიში შეიცვალა ბავშვის დამატებისას; ჩანაწერი შესაძლოა შენახულია წინა ანგარიშზე.';
+
 const isPlainRecord = (val: unknown): val is Record<string, unknown> => {
   return typeof val === 'object' && val !== null && !Array.isArray(val);
+};
+
+const extractErrorMessage = (err: unknown, fallback: string): string => {
+  if (err instanceof Error && err.message.length > 0) {
+    return err.message;
+  }
+  if (isPlainRecord(err) && typeof err.message === 'string' && err.message.length > 0) {
+    return err.message;
+  }
+  return fallback;
 };
 
 const isValidChildGrade = (value: unknown): value is ChildGrade | null => {
@@ -114,47 +130,110 @@ export const getAvatarEmoji = (avatarId?: string): string => {
   return found ? found.emoji : '🦁';
 };
 
+interface OwnerChildrenState {
+  ownerId: string | null;
+  children: Child[];
+  loading: boolean;
+  error: string | null;
+  hasFetchedOnce: boolean;
+  appliedFetchSeq: number;
+}
+
 export const useChildren = () => {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const [children, setChildren] = useState<Child[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasFetchedOnce, setHasFetchedOnce] = useState<boolean>(false);
-  const [fetchedForUserId, setFetchedForUserId] = useState<string | null>(null);
-  const requestIdRef = useRef(0);
 
-  const fetchChildren = useCallback(async () => {
-    if (!userId) {
+  // Idempotent render assignment so async callbacks always compare against the latest rendered parent ID
+  const currentUserIdRef = useRef<string | null>(userId);
+  currentUserIdRef.current = userId;
+
+  const [ownerState, setOwnerState] = useState<OwnerChildrenState>({
+    ownerId: null,
+    children: [],
+    loading: false,
+    error: null,
+    hasFetchedOnce: false,
+    appliedFetchSeq: 0,
+  });
+
+  const requestIdRef = useRef<number>(0);
+  const activeSelectRef = useRef<{ requestId: number; ownerId: string } | null>(null);
+
+  const fetchChildren = useCallback(async (): Promise<void> => {
+    const capturedUserId = userId;
+
+    // Stale-callback guard: if invoked after parent identity changed, do nothing on current owner state
+    if (capturedUserId !== currentUserIdRef.current) {
+      return;
+    }
+
+    if (!capturedUserId) {
       requestIdRef.current += 1;
-      setChildren([]);
-      setLoading(false);
-      setHasFetchedOnce(true);
-      setFetchedForUserId(null);
+      activeSelectRef.current = null;
+      setOwnerState({
+        ownerId: null,
+        children: [],
+        loading: false,
+        error: null,
+        hasFetchedOnce: false,
+        appliedFetchSeq: 0,
+      });
       return;
     }
 
     const supabase = getSupabase();
     if (!supabase) {
+      if (capturedUserId !== currentUserIdRef.current) {
+        return;
+      }
       requestIdRef.current += 1;
-      setLoading(false);
-      setHasFetchedOnce(true);
-      setFetchedForUserId(userId);
+      activeSelectRef.current = null;
+      setOwnerState(prev => {
+        const isSameOwner = prev.ownerId === capturedUserId;
+        return {
+          ownerId: capturedUserId,
+          children: isSameOwner ? prev.children : [],
+          loading: false,
+          error: 'Supabase არ არის კონფიგურირებული',
+          hasFetchedOnce: isSameOwner ? prev.hasFetchedOnce : false,
+          appliedFetchSeq: isSameOwner ? prev.appliedFetchSeq : 0,
+        };
+      });
       return;
     }
 
     const thisRequestId = ++requestIdRef.current;
-    setLoading(true);
-    setError(null);
+    activeSelectRef.current = { requestId: thisRequestId, ownerId: capturedUserId };
+
+    const isStillCurrent = (): boolean =>
+      capturedUserId === currentUserIdRef.current &&
+      thisRequestId === requestIdRef.current;
+
+    setOwnerState(prev =>
+      prev.ownerId === capturedUserId
+        ? {
+            ...prev,
+            loading: true,
+            error: null,
+          }
+        : {
+            ownerId: capturedUserId,
+            children: [],
+            loading: true,
+            error: null,
+            hasFetchedOnce: false,
+            appliedFetchSeq: 0,
+          }
+    );
 
     try {
       const { data, error: fetchErr } = await supabase
         .from('children')
         .select(CHILD_COLUMNS)
-        .eq('parent_id', userId)
+        .eq('parent_id', capturedUserId)
         .order('created_at', { ascending: true });
 
-      if (thisRequestId !== requestIdRef.current) {
+      if (!isStillCurrent()) {
         return;
       }
 
@@ -162,25 +241,55 @@ export const useChildren = () => {
         throw fetchErr;
       }
 
-      const validatedChildren = validateChildrenList(data, userId);
-      setChildren(validatedChildren);
-    } catch (err: any) {
-      if (thisRequestId !== requestIdRef.current) {
+      const validatedChildren = validateChildrenList(data, capturedUserId);
+
+      if (!isStillCurrent()) {
         return;
       }
-      setError(err.message || 'ბავშვების სიის ჩატვირთვა ვერ მოხერხდა');
+
+      setOwnerState(prev => {
+        const prevSeq = prev.ownerId === capturedUserId ? prev.appliedFetchSeq : 0;
+        return {
+          ownerId: capturedUserId,
+          children: validatedChildren,
+          loading: false,
+          error: null,
+          hasFetchedOnce: true,
+          appliedFetchSeq: prevSeq + 1,
+        };
+      });
+    } catch (err: unknown) {
+      if (!isStillCurrent()) {
+        return;
+      }
+      const errMsg = extractErrorMessage(err, 'ბავშვების სიის ჩატვირთვა ვერ მოხერხდა');
+      setOwnerState(prev => {
+        const isSameOwner = prev.ownerId === capturedUserId;
+        return {
+          ownerId: capturedUserId,
+          children: isSameOwner ? prev.children : [],
+          loading: false,
+          error: errMsg,
+          hasFetchedOnce: isSameOwner ? prev.hasFetchedOnce : false,
+          appliedFetchSeq: isSameOwner ? prev.appliedFetchSeq : 0,
+        };
+      });
     } finally {
-      if (thisRequestId !== requestIdRef.current) {
-        return;
+      if (activeSelectRef.current?.requestId === thisRequestId) {
+        activeSelectRef.current = null;
       }
-      setLoading(false);
-      setHasFetchedOnce(true);
-      setFetchedForUserId(userId);
+      if (isStillCurrent()) {
+        setOwnerState(prev =>
+          prev.ownerId === capturedUserId && prev.loading
+            ? { ...prev, loading: false }
+            : prev
+        );
+      }
     }
   }, [userId]);
 
   useEffect(() => {
-    fetchChildren();
+    void fetchChildren();
   }, [fetchChildren]);
 
   const addChild = async (
@@ -189,8 +298,15 @@ export const useChildren = () => {
     gender: 'boy' | 'girl',
     pin: string
   ): Promise<{ child: Child | null; error: Error | null }> => {
-    if (!user) {
+    if (!user || !currentUserIdRef.current) {
       return { child: null, error: new Error('ავტორიზაცია აუცილებელია') };
+    }
+
+    const capturedUser = user;
+    const capturedParentId = user.id;
+
+    if (capturedParentId !== currentUserIdRef.current) {
+      return { child: null, error: new Error(PRE_INSERT_ACCOUNT_CHANGED_ERROR_MESSAGE) };
     }
 
     const trimmedName = name.trim();
@@ -207,11 +323,14 @@ export const useChildren = () => {
       return { child: null, error: new Error('Supabase არ არის კონფიგურირებული') };
     }
 
-    const capturedParentId = user.id;
-
     try {
       // Self-healing: Ensure parent profile exists safely without overwriting existing data
-      await ensureProfileExists(user);
+      await ensureProfileExists(capturedUser);
+
+      // Pre-INSERT switch guard: if account changed while profile check was pending, do not send INSERT
+      if (capturedParentId !== currentUserIdRef.current) {
+        return { child: null, error: new Error(PRE_INSERT_ACCOUNT_CHANGED_ERROR_MESSAGE) };
+      }
 
       const { data, error: insertErr } = await supabase
         .from('children')
@@ -229,6 +348,7 @@ export const useChildren = () => {
         throw insertErr;
       }
 
+      // G1a-1 partial-success verification precedence: check returned row validity first
       const validatedChild = validateChildRow(data, capturedParentId);
       if (!validatedChild || validatedChild.grade !== null) {
         return {
@@ -237,20 +357,65 @@ export const useChildren = () => {
         };
       }
 
-      setChildren(prev => [...prev, validatedChild]);
+      // In-flight INSERT switch guard: do not append A's child into B's state or return as B success
+      if (capturedParentId !== currentUserIdRef.current) {
+        return {
+          child: null,
+          error: new Error(IN_FLIGHT_INSERT_ACCOUNT_CHANGED_ERROR_MESSAGE),
+        };
+      }
+
+      const hadInFlightSameOwnerSelect =
+        activeSelectRef.current !== null &&
+        activeSelectRef.current.ownerId === capturedParentId;
+
+      setOwnerState(prev => {
+        if (prev.ownerId !== capturedParentId) {
+          return {
+            ownerId: capturedParentId,
+            children: [validatedChild],
+            loading: false,
+            error: null,
+            hasFetchedOnce: false,
+            appliedFetchSeq: 0,
+          };
+        }
+        const alreadyExists = prev.children.some(c => c.id === validatedChild.id);
+        return {
+          ...prev,
+          children: alreadyExists ? prev.children : [...prev.children, validatedChild],
+        };
+      });
+
+      if (hadInFlightSameOwnerSelect) {
+        // Supersede any pre-INSERT in-flight SELECT with a guarded current-owner post-INSERT fetch
+        // so the older snapshot cannot overwrite validatedChild and loading always settles (B3 liveness).
+        void fetchChildren();
+      }
+
       return { child: validatedChild, error: null };
-    } catch (err: any) {
-      return { child: null, error: new Error(err.message || 'ბავშვის დამატება ვერ მოხერხდა') };
+    } catch (err: unknown) {
+      return {
+        child: null,
+        error: new Error(extractErrorMessage(err, 'ბავშვის დამატება ვერ მოხერხდა')),
+      };
     }
   };
 
-  const isReadyForCurrentUser = hasFetchedOnce && fetchedForUserId === userId;
+  // Derive public output synchronously against current userId for first-render owner isolation
+  const isCurrentOwnerState = userId !== null && ownerState.ownerId === userId;
+  const exposedChildren = isCurrentOwnerState ? ownerState.children : [];
+  const exposedLoading = isCurrentOwnerState ? ownerState.loading : false;
+  const exposedError = isCurrentOwnerState ? ownerState.error : null;
+  const exposedHasFetchedOnce = isCurrentOwnerState ? ownerState.hasFetchedOnce : false;
+  const exposedAppliedFetchSeq = isCurrentOwnerState ? ownerState.appliedFetchSeq : 0;
 
   return {
-    children,
-    loading,
-    error,
-    hasFetchedOnce: isReadyForCurrentUser,
+    children: exposedChildren,
+    loading: exposedLoading,
+    error: exposedError,
+    hasFetchedOnce: exposedHasFetchedOnce,
+    appliedFetchSeq: exposedAppliedFetchSeq,
     fetchChildren,
     addChild,
   };
