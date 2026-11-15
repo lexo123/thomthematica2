@@ -3,17 +3,18 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, waitFor, fireEvent, cleanup } from '@testing-library/react';
 import { ChildProvider, useChild } from './ChildContext';
+import { UpdateChildGradeResult } from '../hooks/useChildren';
 import { Child, ChildGrade, ChildRewardImagesState } from '../types';
 
 /**
- * Layer documentation per G1a-2 §7B:
+ * Layer documentation per G1a-2 §7B & G1a-3 §6/§7:
  * - REAL in ALL tests in this file:
  *   - `ChildProvider` and `useChild` (`./ChildContext`)
  *   - `useChildren` (`../hooks/useChildren`)
  *   - `useChildRewardImagesFetcher` (`../hooks/useChildRewardImagesFetcher`)
  * - MOCKED boundary dependencies only:
  *   - `useAuth` (`./AuthContext`) with mutable parent identity
- *   - `getSupabase` (`../lib/supabase`) with controlled deferred SELECT responses
+ *   - `getSupabase` (`../lib/supabase`) with controlled deferred SELECT and UPDATE responses
  *   - `fetchChildRewardImages` (`../services/rewardImagesService`) with controlled deferred / immediate promises and shared EMPTY_STATE singleton
  */
 
@@ -26,6 +27,16 @@ type DeferredSelectCall = {
   reject: (reason: unknown) => void;
 };
 let selectCalls: DeferredSelectCall[] = [];
+
+type DeferredUpdateCall = {
+  table: string;
+  payload: Record<string, unknown>;
+  filters: Array<{ field: string; val: unknown }>;
+  selectCols: string;
+  resolve: (value: { data: unknown; error: unknown }) => void;
+  reject: (reason: unknown) => void;
+};
+let updateCalls: DeferredUpdateCall[] = [];
 
 type DeferredRewardCall = {
   childId: string;
@@ -69,7 +80,7 @@ vi.mock('../services/rewardImagesService', () => ({
 }));
 
 const createDeferredSupabaseMock = () => ({
-  from: vi.fn((_table: string) => ({
+  from: vi.fn((table: string) => ({
     select: vi.fn((_cols: string) => ({
       eq: vi.fn((_field: string, val: string) => ({
         order: vi.fn(() => {
@@ -79,6 +90,28 @@ const createDeferredSupabaseMock = () => ({
         }),
       })),
     })),
+    update: vi.fn((payload: Record<string, unknown>) => {
+      const filters: Array<{ field: string; val: unknown }> = [];
+      const filterBuilder = {
+        eq: vi.fn((field: string, val: unknown) => {
+          filters.push({ field, val });
+          return filterBuilder;
+        }),
+        select: vi.fn((selectCols: string) => {
+          return new Promise<{ data: unknown; error: unknown }>((resolve, reject) => {
+            updateCalls.push({
+              table,
+              payload,
+              filters: [...filters],
+              selectCols,
+              resolve,
+              reject,
+            });
+          });
+        }),
+      };
+      return filterBuilder;
+    }),
   })),
 });
 
@@ -223,6 +256,7 @@ describe('G1a-2 ChildProvider Integration Tests (real ChildProvider + real useCh
     vi.clearAllMocks();
     localStorage.clear();
     selectCalls = [];
+    updateCalls = [];
     rewardCalls = [];
     rewardImmediateResolver = null;
     currentAuthUser = { id: 'user-a' };
@@ -631,5 +665,183 @@ describe('G1a-2 ChildProvider Integration Tests (real ChildProvider + real useCh
     fireEvent.click(screen.getByTestId('btn-select-candidate'));
     expect(screen.getByTestId('active-child-id').textContent).toBe('child-grade-0');
     expect(screen.getByTestId('active-child-grade').textContent).toBe('null');
+  });
+
+  it('6. G1a-3 MANDATORY real-Provider updateChildGrade wiring: exposes required function, invokes real UPDATE (.eq(id).eq(parent_id).select("id")), preserves all 3 result categories, updates childrenList/activeChild.grade only on applied refresh, and retains selection on failed write/refresh', async () => {
+    let capturedContextUpdateFn:
+      | ((childId: string, grade: ChildGrade) => Promise<UpdateChildGradeResult>)
+      | undefined;
+
+    const GradeUpdateConsumer: React.FC = () => {
+      const ctx = useChild();
+      capturedContextUpdateFn = ctx.updateChildGrade;
+      return <ContextConsumerProbe />;
+    };
+
+    localStorage.setItem(STORAGE_KEY, 'child-a-1');
+
+    render(
+      <ChildProvider>
+        <GradeUpdateConsumer />
+      </ChildProvider>
+    );
+
+    await act(async () => {
+      selectCalls[0].resolve({ data: [childA1, childA2], error: null });
+    });
+
+    expect(screen.getByTestId('active-child-id').textContent).toBe('child-a-1');
+    expect(screen.getByTestId('active-child-grade').textContent).toBe('null');
+
+    // Explicit runtime function check for genuine Step 0 RED
+    expect(typeof capturedContextUpdateFn).toBe('function');
+
+    // 1. Category { ok: true, grade: 4, refreshed: true }
+    let pSuccess!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      pSuccess = capturedContextUpdateFn!('child-a-1', 4);
+    });
+
+    expect(updateCalls).toHaveLength(1);
+    expect(updateCalls[0].table).toBe('children');
+    expect(updateCalls[0].payload).toEqual({ grade: 4 });
+    expect(updateCalls[0].selectCols).toBe('id');
+    expect(updateCalls[0].filters).toEqual(
+      expect.arrayContaining([
+        { field: 'id', val: 'child-a-1' },
+        { field: 'parent_id', val: 'user-a' },
+      ])
+    );
+
+    // Resolve 1-row write proof; before refresh SELECT resolves, activeChild.grade is still null
+    await act(async () => {
+      updateCalls[0].resolve({ data: [{ id: 'child-a-1' }], error: null });
+    });
+    expect(screen.getByTestId('active-child-grade').textContent).toBe('null');
+
+    let resSuccess!: UpdateChildGradeResult;
+    await act(async () => {
+      selectCalls[1].resolve({
+        data: [{ ...childA1, grade: 4 }, childA2],
+        error: null,
+      });
+      resSuccess = await pSuccess;
+    });
+
+    expect(resSuccess).toEqual({ ok: true, grade: 4, refreshed: true });
+    expect(screen.getByTestId('active-child-id').textContent).toBe('child-a-1');
+    expect(screen.getByTestId('active-child-grade').textContent).toBe('4');
+    expect(screen.getByTestId('children-grades').textContent).toBe('child-a-1:4,child-a-2:3');
+
+    // 2. Category { ok: true, grade: 6, refreshed: false } when post-write refresh SELECT fails
+    let pPartial!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      pPartial = capturedContextUpdateFn!('child-a-1', 6);
+    });
+    await act(async () => {
+      updateCalls[1].resolve({ data: [{ id: 'child-a-1' }], error: null });
+    });
+    let resPartial!: UpdateChildGradeResult;
+    await act(async () => {
+      selectCalls[2].resolve({ data: null, error: { message: 'refresh failed' } });
+      resPartial = await pPartial;
+    });
+
+    expect(resPartial).toEqual({ ok: true, grade: 6, refreshed: false });
+    // Previous verified grade (4) and selected child ('child-a-1') are retained
+    expect(screen.getByTestId('active-child-id').textContent).toBe('child-a-1');
+    expect(screen.getByTestId('active-child-grade').textContent).toBe('4');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('child-a-1');
+
+    // 3. Category { ok: false, error } when UPDATE returns 0 rows
+    let pFail!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      pFail = capturedContextUpdateFn!('child-a-1', 2);
+    });
+    let resFail!: UpdateChildGradeResult;
+    await act(async () => {
+      updateCalls[2].resolve({ data: [], error: null });
+      resFail = await pFail;
+    });
+
+    expect(resFail.ok).toBe(false);
+    expect(screen.getByTestId('active-child-id').textContent).toBe('child-a-1');
+    expect(screen.getByTestId('active-child-grade').textContent).toBe('4');
+  });
+
+  it('7. G1a-3 MANDATORY real-Provider A -> B switch during in-flight updateChildGrade masks A on B first render and prevents A refresh from leaking into B', async () => {
+    const snapshots: ObservedContextRender[] = [];
+    let capturedContextUpdateFn:
+      | ((childId: string, grade: ChildGrade) => Promise<UpdateChildGradeResult>)
+      | undefined;
+
+    const Wrapper: React.FC<{ user: { id: string; email?: string } | null }> = ({ user }) => {
+      currentAuthUser = user;
+      return (
+        <ChildProvider>
+          < ConsumerWithUpdate />
+        </ChildProvider>
+      );
+    };
+
+    const ConsumerWithUpdate: React.FC = () => {
+      const ctx = useChild();
+      capturedContextUpdateFn = ctx.updateChildGrade;
+      return <ContextConsumerProbe onRenderSnapshot={(snap) => snapshots.push(snap)} />;
+    };
+
+    localStorage.setItem(STORAGE_KEY, 'child-a-1');
+    const { rerender } = render(<Wrapper user={{ id: 'user-a' }} />);
+
+    await act(async () => {
+      selectCalls[0].resolve({ data: [{ ...childA1, grade: 2 }], error: null });
+    });
+    expect(screen.getByTestId('active-child-id').textContent).toBe('child-a-1');
+    expect(screen.getByTestId('active-child-grade').textContent).toBe('2');
+    expect(typeof capturedContextUpdateFn).toBe('function');
+
+    // Start A's grade update to 5, confirm 1-row write so A's refresh SELECT (selectCalls[1]) is in flight
+    let pUpdateA!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      pUpdateA = capturedContextUpdateFn!('child-a-1', 5);
+    });
+    await act(async () => {
+      updateCalls[0].resolve({ data: [{ id: 'child-a-1' }], error: null });
+    });
+    expect(selectCalls).toHaveLength(2);
+    expect(selectCalls[1].parentId).toBe('user-a');
+
+    const snapshotCountBeforeSwitch = snapshots.length;
+
+    // Switch directly A -> B while A's post-write refresh SELECT is in flight
+    rerender(<Wrapper user={{ id: 'user-b' }} />);
+
+    const bSnapshots = snapshots
+      .slice(snapshotCountBeforeSwitch)
+      .filter((s) => s.authUserId === 'user-b');
+    expect(bSnapshots.length).toBeGreaterThanOrEqual(1);
+
+    // First B render is completely masked
+    const firstBSnapshot = bSnapshots[0];
+    expect(firstBSnapshot.childrenIds).toEqual([]);
+    expect(firstBSnapshot.activeChildId).toBeNull();
+    expect(firstBSnapshot.activeChildGrade).toBeUndefined();
+    expect(firstBSnapshot.childRewardImages).toBeNull();
+    expect(firstBSnapshot.hasFetchedOnce).toBe(false);
+
+    // Resolve B's initial SELECT
+    await act(async () => {
+      selectCalls[2].resolve({ data: [childB1], error: null });
+    });
+    expect(screen.getByTestId('children-grades').textContent).toBe('child-b-1:5');
+
+    // Resolve A's stale refresh SELECT late -> A's updateChildGrade returns refreshed:false and B remains intact
+    let resUpdateA!: UpdateChildGradeResult;
+    await act(async () => {
+      selectCalls[1].resolve({ data: [{ ...childA1, grade: 5 }], error: null });
+      resUpdateA = await pUpdateA;
+    });
+    expect(resUpdateA).toEqual({ ok: true, grade: 5, refreshed: false });
+    expect(screen.getByTestId('children-ids').textContent).toBe('child-b-1');
   });
 });

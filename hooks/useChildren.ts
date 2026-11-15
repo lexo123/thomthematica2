@@ -29,16 +29,32 @@ const extractErrorMessage = (err: unknown, fallback: string): string => {
   return fallback;
 };
 
-const isValidChildGrade = (value: unknown): value is ChildGrade | null => {
-  if (value === null) {
-    return true;
-  }
+export type UpdateChildGradeResult =
+  | { ok: true; grade: ChildGrade; refreshed: boolean }
+  | { ok: false; error: Error };
+
+const isStrictSelectableChildGrade = (value: unknown): value is ChildGrade => {
   return (
     typeof value === 'number' &&
     Number.isFinite(value) &&
     Number.isInteger(value) &&
     (value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6)
   );
+};
+
+const isConfirmedSingleChildUpdate = (data: unknown, expectedChildId: string): boolean => {
+  if (!Array.isArray(data) || data.length !== 1) {
+    return false;
+  }
+  const row = data[0];
+  return isPlainRecord(row) && typeof row.id === 'string' && row.id === expectedChildId;
+};
+
+const isValidChildGrade = (value: unknown): value is ChildGrade | null => {
+  if (value === null) {
+    return true;
+  }
+  return isStrictSelectableChildGrade(value);
 };
 
 const validateChildRow = (raw: unknown, expectedParentId: string): Child | null => {
@@ -139,6 +155,11 @@ interface OwnerChildrenState {
   appliedFetchSeq: number;
 }
 
+type RunChildrenFetchResult =
+  | { status: 'applied'; rows: Child[] }
+  | { status: 'failed' }
+  | { status: 'stale' };
+
 export const useChildren = () => {
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -156,15 +177,19 @@ export const useChildren = () => {
     appliedFetchSeq: 0,
   });
 
+  // C2 current-owner membership ref updated during render
+  const ownerStateRef = useRef<OwnerChildrenState>(ownerState);
+  ownerStateRef.current = ownerState;
+
   const requestIdRef = useRef<number>(0);
   const activeSelectRef = useRef<{ requestId: number; ownerId: string } | null>(null);
 
-  const fetchChildren = useCallback(async (): Promise<void> => {
+  const runChildrenFetch = useCallback(async (): Promise<RunChildrenFetchResult> => {
     const capturedUserId = userId;
 
     // Stale-callback guard: if invoked after parent identity changed, do nothing on current owner state
     if (capturedUserId !== currentUserIdRef.current) {
-      return;
+      return { status: 'stale' };
     }
 
     if (!capturedUserId) {
@@ -178,13 +203,13 @@ export const useChildren = () => {
         hasFetchedOnce: false,
         appliedFetchSeq: 0,
       });
-      return;
+      return { status: 'failed' };
     }
 
     const supabase = getSupabase();
     if (!supabase) {
       if (capturedUserId !== currentUserIdRef.current) {
-        return;
+        return { status: 'stale' };
       }
       requestIdRef.current += 1;
       activeSelectRef.current = null;
@@ -199,7 +224,7 @@ export const useChildren = () => {
           appliedFetchSeq: isSameOwner ? prev.appliedFetchSeq : 0,
         };
       });
-      return;
+      return { status: 'failed' };
     }
 
     const thisRequestId = ++requestIdRef.current;
@@ -234,7 +259,7 @@ export const useChildren = () => {
         .order('created_at', { ascending: true });
 
       if (!isStillCurrent()) {
-        return;
+        return { status: 'stale' };
       }
 
       if (fetchErr) {
@@ -244,7 +269,7 @@ export const useChildren = () => {
       const validatedChildren = validateChildrenList(data, capturedUserId);
 
       if (!isStillCurrent()) {
-        return;
+        return { status: 'stale' };
       }
 
       setOwnerState(prev => {
@@ -258,9 +283,11 @@ export const useChildren = () => {
           appliedFetchSeq: prevSeq + 1,
         };
       });
+
+      return { status: 'applied', rows: validatedChildren };
     } catch (err: unknown) {
       if (!isStillCurrent()) {
-        return;
+        return { status: 'stale' };
       }
       const errMsg = extractErrorMessage(err, 'ბავშვების სიის ჩატვირთვა ვერ მოხერხდა');
       setOwnerState(prev => {
@@ -274,6 +301,7 @@ export const useChildren = () => {
           appliedFetchSeq: isSameOwner ? prev.appliedFetchSeq : 0,
         };
       });
+      return { status: 'failed' };
     } finally {
       if (activeSelectRef.current?.requestId === thisRequestId) {
         activeSelectRef.current = null;
@@ -287,6 +315,10 @@ export const useChildren = () => {
       }
     }
   }, [userId]);
+
+  const fetchChildren = useCallback(async (): Promise<void> => {
+    await runChildrenFetch();
+  }, [runChildrenFetch]);
 
   useEffect(() => {
     void fetchChildren();
@@ -402,6 +434,101 @@ export const useChildren = () => {
     }
   };
 
+  const updateChildGrade = useCallback(
+    async (childId: string, grade: ChildGrade): Promise<UpdateChildGradeResult> => {
+      if (!user || !currentUserIdRef.current) {
+        return { ok: false, error: new Error('ავტორიზაცია აუცილებელია') };
+      }
+
+      const capturedParentId = userId;
+      if (!capturedParentId || capturedParentId !== currentUserIdRef.current) {
+        return {
+          ok: false,
+          error: new Error('აქტიური ანგარიში შეიცვალა. კლასის განახლება შეწყდა.'),
+        };
+      }
+
+      if (typeof childId !== 'string' || childId.trim().length === 0) {
+        return { ok: false, error: new Error('ბავშვის იდენტიფიკატორი არასწორია') };
+      }
+
+      if (!isStrictSelectableChildGrade(grade)) {
+        return {
+          ok: false,
+          error: new Error('კლასი უნდა იყოს მთელი რიცხვი 1-დან 6-მდე'),
+        };
+      }
+
+      if (
+        ownerStateRef.current.ownerId !== capturedParentId ||
+        !ownerStateRef.current.children.some(child => child.id === childId)
+      ) {
+        return {
+          ok: false,
+          error: new Error('ბავშვი ვერ მოიძებნა მიმდინარე ანგარიშის სიაში'),
+        };
+      }
+
+      const supabase = getSupabase();
+      if (!supabase) {
+        return { ok: false, error: new Error('Supabase არ არის კონფიგურირებული') };
+      }
+
+      try {
+        const { data, error: updateErr } = await supabase
+          .from('children')
+          .update({ grade })
+          .eq('id', childId)
+          .eq('parent_id', capturedParentId)
+          .select('id');
+
+        if (updateErr) {
+          return {
+            ok: false,
+            error: new Error(extractErrorMessage(updateErr, 'კლასის განახლება ვერ მოხერხდა')),
+          };
+        }
+
+        if (!isConfirmedSingleChildUpdate(data, childId)) {
+          return {
+            ok: false,
+            error: new Error('კლასის განახლება ვერ დადასტურდა'),
+          };
+        }
+      } catch (err: unknown) {
+        return {
+          ok: false,
+          error: new Error(extractErrorMessage(err, 'კლასის განახლება ვერ მოხერხდა')),
+        };
+      }
+
+      if (capturedParentId !== currentUserIdRef.current) {
+        return { ok: true, grade, refreshed: false };
+      }
+
+      try {
+        const refreshOutcome = await runChildrenFetch();
+
+        if (
+          capturedParentId !== currentUserIdRef.current ||
+          refreshOutcome.status !== 'applied'
+        ) {
+          return { ok: true, grade, refreshed: false };
+        }
+
+        const refreshedChild = refreshOutcome.rows.find(c => c.id === childId);
+        if (!refreshedChild || refreshedChild.grade !== grade) {
+          return { ok: true, grade, refreshed: false };
+        }
+
+        return { ok: true, grade, refreshed: true };
+      } catch {
+        return { ok: true, grade, refreshed: false };
+      }
+    },
+    [user, userId, runChildrenFetch]
+  );
+
   // Derive public output synchronously against current userId for first-render owner isolation
   const isCurrentOwnerState = userId !== null && ownerState.ownerId === userId;
   const exposedChildren = isCurrentOwnerState ? ownerState.children : [];
@@ -418,5 +545,6 @@ export const useChildren = () => {
     appliedFetchSeq: exposedAppliedFetchSeq,
     fetchChildren,
     addChild,
+    updateChildGrade,
   };
 };

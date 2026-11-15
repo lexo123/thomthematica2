@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Child, ChildRewardImagesState } from '../types';
+import { Child, ChildGrade, ChildRewardImagesState } from '../types';
 import { useAuth } from './AuthContext';
-import { useChildren } from '../hooks/useChildren';
+import { useChildren, UpdateChildGradeResult } from '../hooks/useChildren';
 import { useChildRewardImagesFetcher } from '../hooks/useChildRewardImagesFetcher';
 
 interface ChildContextType {
@@ -15,6 +15,7 @@ interface ChildContextType {
   setActiveChildId: (id: string | null) => void;
   setActiveChild: (child: Child | null) => void;
   addChild: (name: string, avatarId: string, gender: 'boy' | 'girl', pin: string) => Promise<{ child: Child | null; error: Error | null }>;
+  updateChildGrade: (childId: string, grade: ChildGrade) => Promise<UpdateChildGradeResult>;
   fetchChildren: () => Promise<void>;
   showChildSelector: boolean;
   setShowChildSelector: (show: boolean) => void;
@@ -41,6 +42,7 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     appliedFetchSeq,
     fetchChildren,
     addChild,
+    updateChildGrade,
   } = useChildren();
 
   const [rawActiveChildId, setRawActiveChildId] = useState<string | null>(() => {
@@ -176,6 +178,7 @@ export const ChildProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveChildId,
         setActiveChild,
         addChild,
+        updateChildGrade,
         fetchChildren,
         showChildSelector,
         setShowChildSelector,

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor, cleanup } from '@testing-library/react';
-import { useChildren } from './useChildren';
+import { useChildren, UpdateChildGradeResult } from './useChildren';
 import { Child, ChildGrade } from '../types';
 
 afterEach(() => {
@@ -1365,5 +1365,666 @@ describe('G1a-2 - Owner-scoped readiness, first-render isolation, stale-callback
     expect(result.current.hasFetchedOnce).toBe(false);
     expect(result.current.error).toBe('post-insert select failed');
     expect((result.current as HookSnapshot).appliedFetchSeq).toBe(0);
+  });
+});
+
+describe('G1a-3 - updateChildGrade strict 1-row proof, C2 membership, C1 read-after-write & race safety', () => {
+  type DeferredUpdateCall = {
+    table: string;
+    payload: Record<string, unknown>;
+    filters: Array<{ field: string; val: unknown }>;
+    selectCols: string;
+    resolve: (value: { data: unknown; error: unknown }) => void;
+    reject: (reason: unknown) => void;
+  };
+
+  let updateCalls: DeferredUpdateCall[] = [];
+
+  const createG1a3SupabaseMock = () => ({
+    from: vi.fn((table: string) => {
+      if (table === 'profiles') {
+        return {
+          upsert: vi.fn().mockResolvedValue({ error: null }),
+        };
+      }
+      return {
+        select: vi.fn((cols: string) => ({
+          eq: vi.fn((field: string, val: string) => ({
+            order: vi.fn((orderCol: string, opts: unknown) => {
+              querySpy(table, field, val, orderCol, opts);
+              if (table !== 'children' || field !== 'parent_id' || cols !== 'id, parent_id, name, avatar_id, gender, created_at, grade') {
+                return Promise.reject(new Error(`Unexpected SELECT chain: ${table}.${cols}`));
+              }
+              let resolveFn!: (v: { data: Child[] | null; error: unknown }) => void;
+              let rejectFn!: (e: unknown) => void;
+              const promise = new Promise<{ data: Child[] | null; error: unknown }>((res, rej) => {
+                resolveFn = res;
+                rejectFn = rej;
+              });
+              queryCalls.push({
+                parentId: val,
+                resolve: resolveFn,
+                reject: rejectFn,
+                promise,
+              });
+              return promise;
+            }),
+          })),
+        })),
+        update: vi.fn((payload: Record<string, unknown>) => {
+          const filters: Array<{ field: string; val: unknown }> = [];
+          const filterBuilder = {
+            eq: vi.fn((field: string, val: unknown) => {
+              filters.push({ field, val });
+              return filterBuilder;
+            }),
+            select: vi.fn((selectCols: string) => {
+              return new Promise<{ data: unknown; error: unknown }>((resolve, reject) => {
+                updateCalls.push({
+                  table,
+                  payload,
+                  filters: [...filters],
+                  selectCols,
+                  resolve,
+                  reject,
+                });
+              });
+            }),
+          };
+          return filterBuilder;
+        }),
+        insert: vi.fn((payload: Record<string, unknown>) => ({
+          select: vi.fn((cols: string) => ({
+            single: vi.fn(() => {
+              if (cols !== 'id, parent_id, name, avatar_id, gender, created_at, grade') {
+                return Promise.reject(new Error(`Unexpected INSERT select cols: ${cols}`));
+              }
+              return Promise.resolve({
+                data: {
+                  id: 'child-inserted-g1a3',
+                  parent_id: String(payload.parent_id ?? 'user-a'),
+                  name: String(payload.name ?? 'ახალი'),
+                  avatar_id: String(payload.avatar_id ?? 'avatar_1'),
+                  gender: (payload.gender as 'boy' | 'girl') ?? 'boy',
+                  created_at: '2026-01-07T00:00:00Z',
+                  grade: null,
+                },
+                error: null,
+              });
+            }),
+          })),
+        })),
+      };
+    }),
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryCalls = [];
+    updateCalls = [];
+    currentAuthUser = { id: 'user-a' };
+    mockSupabaseClient = createG1a3SupabaseMock();
+  });
+
+  it('G1a-3.A & C & E: exposes updateChildGrade, sends exact .update({ grade }).eq(id).eq(parent_id).select("id") query, does not optimistically mutate before refresh, and returns { ok: true, grade, refreshed: true } across grades 1..6', async () => {
+    const { result } = renderHook(() => useChildren());
+
+    await act(async () => {
+      queryCalls[0].resolve({ data: [mockChildA], error: null });
+    });
+    expect(result.current.children).toEqual([mockChildA]);
+    expect((result.current as HookSnapshot).appliedFetchSeq).toBe(1);
+
+    // Explicit method-existence check for genuine Step 0 RED
+    expect(typeof result.current.updateChildGrade).toBe('function');
+
+    const gradesToTest: ChildGrade[] = [1, 2, 3, 4, 5, 6];
+    let expectedSeq = 1;
+
+    for (const targetGrade of gradesToTest) {
+      const prevGrade = result.current.children[0].grade;
+      let updatePromise!: Promise<UpdateChildGradeResult>;
+
+      act(() => {
+        updatePromise = result.current.updateChildGrade('child-a', targetGrade);
+      });
+
+      const call = updateCalls[updateCalls.length - 1];
+      expect(call).toBeDefined();
+      expect(call.table).toBe('children');
+      expect(call.payload).toEqual({ grade: targetGrade });
+      expect(call.selectCols).toBe('id');
+      expect(call.selectCols).not.toContain('*');
+      expect(call.selectCols).not.toContain('pin_hash');
+      expect(call.filters).toEqual(
+        expect.arrayContaining([
+          { field: 'id', val: 'child-a' },
+          { field: 'parent_id', val: 'user-a' },
+        ])
+      );
+      expect(call.filters).toHaveLength(2);
+
+      // Resolve the 1-row UPDATE proof; refresh SELECT is now pending
+      await act(async () => {
+        call.resolve({ data: [{ id: 'child-a' }], error: null });
+      });
+
+      // Must NOT optimistically mutate grade before refresh SELECT resolves
+      expect(result.current.children[0].grade).toBe(prevGrade);
+
+      const refreshCall = queryCalls[queryCalls.length - 1];
+      let outcome!: UpdateChildGradeResult;
+      await act(async () => {
+        refreshCall.resolve({
+          data: [{ ...mockChildA, grade: targetGrade }],
+          error: null,
+        });
+        outcome = await updatePromise;
+      });
+
+      expectedSeq += 1;
+      expect(outcome).toEqual({
+        ok: true,
+        grade: targetGrade,
+        refreshed: true,
+      });
+      expect(result.current.children[0].grade).toBe(targetGrade);
+      expect((result.current as HookSnapshot).appliedFetchSeq).toBe(expectedSeq);
+    }
+  });
+
+  it('G1a-3.B: fails closed with { ok: false, error } and 0 network UPDATE calls on unauthenticated user, stale callback after account switch, invalid/blank/foreign/unverified childId, invalid grades, or missing Supabase client', async () => {
+    currentAuthUser = { id: 'user-a' };
+    const { result, rerender } = renderHook(
+      ({ user }: { user: { id: string } | null }) => {
+        currentAuthUser = user;
+        return useChildren();
+      },
+      { initialProps: { user: currentAuthUser } }
+    );
+
+    expect(typeof result.current.updateChildGrade).toBe('function');
+
+    // 1. Before initial SELECT has validated membership (hasFetchedOnce === false), reject C2 membership check
+    let resBeforeReady!: UpdateChildGradeResult;
+    await act(async () => {
+      resBeforeReady = await result.current.updateChildGrade('child-a', 2);
+    });
+    expect(resBeforeReady.ok).toBe(false);
+    expect(updateCalls).toHaveLength(0);
+
+    // Resolve initial SELECT for User A
+    await act(async () => {
+      queryCalls[0].resolve({ data: [mockChildA], error: null });
+    });
+    expect(result.current.hasFetchedOnce).toBe(true);
+
+    // 2. Invalid/blank/foreign childId values
+    const invalidChildIds: unknown[] = ['', '   ', 'unknown-child', 'child-b', null, undefined, 123];
+    for (const badId of invalidChildIds) {
+      let res!: UpdateChildGradeResult;
+      await act(async () => {
+        res = await result.current.updateChildGrade(badId as string, 3);
+      });
+      expect(res.ok).toBe(false);
+      if ('error' in res) {
+        expect(res.error).toBeInstanceOf(Error);
+      }
+    }
+    expect(updateCalls).toHaveLength(0);
+
+    // 3. Invalid grade values (including null, undefined, numeric strings, 0, 7, negative, fractional, NaN, Infinity, boolean, object)
+    const invalidGrades: unknown[] = [
+      null,
+      undefined,
+      '1',
+      '6',
+      0,
+      7,
+      -1,
+      3.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      true,
+      false,
+      {},
+      [1],
+    ];
+    for (const badGrade of invalidGrades) {
+      let res!: UpdateChildGradeResult;
+      await act(async () => {
+        res = await result.current.updateChildGrade('child-a', badGrade as ChildGrade);
+      });
+      expect(res.ok).toBe(false);
+      if ('error' in res) {
+        expect(res.error).toBeInstanceOf(Error);
+      }
+    }
+    expect(updateCalls).toHaveLength(0);
+
+    // 4. Missing Supabase client
+    const savedSupabase = mockSupabaseClient;
+    mockSupabaseClient = null;
+    let resNoSupabase!: UpdateChildGradeResult;
+    await act(async () => {
+      resNoSupabase = await result.current.updateChildGrade('child-a', 4);
+    });
+    mockSupabaseClient = savedSupabase;
+    expect(resNoSupabase.ok).toBe(false);
+    expect(updateCalls).toHaveLength(0);
+
+    // 5. Save stale callback under A, switch to B, invoke stale A callback -> 0 UPDATE calls, B state untouched
+    const staleUpdateFromA = result.current.updateChildGrade;
+    rerender({ user: { id: 'user-b' } });
+    await act(async () => {
+      queryCalls[1].resolve({ data: [mockChildB], error: null });
+    });
+
+    let resStaleCallback!: UpdateChildGradeResult;
+    await act(async () => {
+      resStaleCallback = await staleUpdateFromA('child-a', 5);
+    });
+    expect(resStaleCallback.ok).toBe(false);
+    expect(updateCalls).toHaveLength(0);
+    expect(result.current.children).toEqual([mockChildB]);
+
+    // 6. Logged out user -> 0 UPDATE calls
+    rerender({ user: null });
+    let resLoggedOut!: UpdateChildGradeResult;
+    await act(async () => {
+      resLoggedOut = await result.current.updateChildGrade('child-b', 2);
+    });
+    expect(resLoggedOut.ok).toBe(false);
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  it('G1a-3.D: requires strict 1-row matching id proof on UPDATE and rejects [], null, non-array, 2 rows, wrong/empty id, malformed row, Supabase error, or thrown exception with { ok: false, error } and no refresh', async () => {
+    const { result } = renderHook(() => useChildren());
+
+    await act(async () => {
+      queryCalls[0].resolve({ data: [mockChildA], error: null });
+    });
+    expect(typeof result.current.updateChildGrade).toBe('function');
+
+    const unconfirmedUpdateResponses: Array<{
+      mode: 'resolve' | 'reject';
+      value: { data: unknown; error: unknown } | Error;
+    }> = [
+      { mode: 'resolve', value: { data: [], error: null } },
+      { mode: 'resolve', value: { data: null, error: null } },
+      { mode: 'resolve', value: { data: { id: 'child-a' }, error: null } },
+      { mode: 'resolve', value: { data: [{ id: 'child-a' }, { id: 'child-a' }], error: null } },
+      { mode: 'resolve', value: { data: [{ id: 'wrong-child-id' }], error: null } },
+      { mode: 'resolve', value: { data: [{ id: '' }], error: null } },
+      { mode: 'resolve', value: { data: [null], error: null } },
+      { mode: 'resolve', value: { data: [['array-row']], error: null } },
+      { mode: 'resolve', value: { data: [{}], error: null } },
+      { mode: 'resolve', value: { data: null, error: { message: 'update blocked by policy' } } },
+      { mode: 'reject', value: new Error('network transport failure') },
+    ];
+
+    const selectCountBefore = queryCalls.length;
+
+    for (let i = 0; i < unconfirmedUpdateResponses.length; i++) {
+      const testCase = unconfirmedUpdateResponses[i];
+      let promise!: Promise<UpdateChildGradeResult>;
+      act(() => {
+        promise = result.current.updateChildGrade('child-a', 4);
+      });
+
+      expect(updateCalls).toHaveLength(i + 1);
+      const currentUpdateCall = updateCalls[i];
+
+      let res!: UpdateChildGradeResult;
+      await act(async () => {
+        if (testCase.mode === 'resolve') {
+          currentUpdateCall.resolve(testCase.value as { data: unknown; error: unknown });
+        } else {
+          currentUpdateCall.reject(testCase.value);
+        }
+        res = await promise;
+      });
+
+      expect(res.ok).toBe(false);
+      if ('error' in res) {
+        expect(res.error).toBeInstanceOf(Error);
+        expect(res.error.message.length).toBeGreaterThan(0);
+      }
+      // Must NOT trigger any post-write refresh SELECT or mutate children
+      expect(queryCalls).toHaveLength(selectCountBefore);
+      expect(result.current.children).toEqual([mockChildA]);
+      expect(result.current.children[0].grade).toBeNull();
+    }
+  });
+
+  it('G1a-3.F: returns { ok: true, grade, refreshed: false } when 1-row write is confirmed but read-after-write SELECT fails, rejects, returns null/malformed data, or client is missing, preserving prior verified state and readiness', async () => {
+    const { result } = renderHook(() => useChildren());
+
+    await act(async () => {
+      queryCalls[0].resolve({ data: [{ ...mockChildA, grade: 2 }], error: null });
+    });
+    expect(result.current.hasFetchedOnce).toBe(true);
+    expect(result.current.children[0].grade).toBe(2);
+    expect((result.current as HookSnapshot).appliedFetchSeq).toBe(1);
+    expect(typeof result.current.updateChildGrade).toBe('function');
+
+    // 1. Refresh SELECT returns Supabase error
+    let p1!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      p1 = result.current.updateChildGrade('child-a', 5);
+    });
+    await act(async () => {
+      updateCalls[0].resolve({ data: [{ id: 'child-a' }], error: null });
+    });
+    let r1!: UpdateChildGradeResult;
+    await act(async () => {
+      queryCalls[1].resolve({ data: null, error: { message: 'refresh select failed' } });
+      r1 = await p1;
+    });
+    expect(r1).toEqual({ ok: true, grade: 5, refreshed: false });
+    expect(result.current.children[0].grade).toBe(2);
+    expect(result.current.hasFetchedOnce).toBe(true);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.error).toBe('refresh select failed');
+    expect((result.current as HookSnapshot).appliedFetchSeq).toBe(1);
+    expect(updateCalls).toHaveLength(1);
+
+    // 2. Refresh SELECT rejects
+    let p2!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      p2 = result.current.updateChildGrade('child-a', 6);
+    });
+    await act(async () => {
+      updateCalls[1].resolve({ data: [{ id: 'child-a' }], error: null });
+    });
+    let r2!: UpdateChildGradeResult;
+    await act(async () => {
+      queryCalls[2].reject(new Error('refresh network rejected'));
+      r2 = await p2;
+    });
+    expect(r2).toEqual({ ok: true, grade: 6, refreshed: false });
+    expect(result.current.children[0].grade).toBe(2);
+    expect(result.current.hasFetchedOnce).toBe(true);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.error).toBe('refresh network rejected');
+    expect((result.current as HookSnapshot).appliedFetchSeq).toBe(1);
+
+    // 3. Refresh SELECT returns malformed grade row
+    let p3!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      p3 = result.current.updateChildGrade('child-a', 3);
+    });
+    await act(async () => {
+      updateCalls[2].resolve({ data: [{ id: 'child-a' }], error: null });
+    });
+    let r3!: UpdateChildGradeResult;
+    await act(async () => {
+      queryCalls[3].resolve({
+        data: [{ ...mockChildA, grade: 99 as unknown as ChildGrade }],
+        error: null,
+      });
+      r3 = await p3;
+    });
+    expect(r3).toEqual({ ok: true, grade: 3, refreshed: false });
+    expect(result.current.children[0].grade).toBe(2);
+    expect(result.current.hasFetchedOnce).toBe(true);
+    expect((result.current as HookSnapshot).appliedFetchSeq).toBe(1);
+
+    // 4. Refresh SELECT returns data: null, error: null
+    let p4!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      p4 = result.current.updateChildGrade('child-a', 4);
+    });
+    await act(async () => {
+      updateCalls[3].resolve({ data: [{ id: 'child-a' }], error: null });
+    });
+    let r4!: UpdateChildGradeResult;
+    await act(async () => {
+      queryCalls[4].resolve({ data: null, error: null });
+      r4 = await p4;
+    });
+    expect(r4).toEqual({ ok: true, grade: 4, refreshed: false });
+    expect(result.current.children[0].grade).toBe(2);
+    expect(result.current.hasFetchedOnce).toBe(true);
+    expect((result.current as HookSnapshot).appliedFetchSeq).toBe(1);
+    expect(updateCalls).toHaveLength(4);
+  });
+
+  it('G1a-3.G: returns { ok: true, grade, refreshed: false } when post-write validated SELECT has mismatched grade or omits the target child, keeping the authoritative SELECT list untouched', async () => {
+    const secondChildA: Child = {
+      id: 'child-a-2',
+      parent_id: 'user-a',
+      name: 'ელენე',
+      avatar_id: 'avatar_2',
+      gender: 'girl',
+      created_at: '2026-01-02T00:00:00Z',
+      grade: 1,
+    };
+
+    const { result } = renderHook(() => useChildren());
+
+    await act(async () => {
+      queryCalls[0].resolve({ data: [mockChildA, secondChildA], error: null });
+    });
+    expect(typeof result.current.updateChildGrade).toBe('function');
+
+    // Case 1: Refresh succeeds with valid list, but child-a has grade 2 instead of requested grade 5
+    let pMismatch!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      pMismatch = result.current.updateChildGrade('child-a', 5);
+    });
+    await act(async () => {
+      updateCalls[0].resolve({ data: [{ id: 'child-a' }], error: null });
+    });
+    let resMismatch!: UpdateChildGradeResult;
+    await act(async () => {
+      queryCalls[1].resolve({
+        data: [{ ...mockChildA, grade: 2 }, secondChildA],
+        error: null,
+      });
+      resMismatch = await pMismatch;
+    });
+
+    expect(resMismatch).toEqual({ ok: true, grade: 5, refreshed: false });
+    // Authoritative SELECT list must remain grade 2 (never overwritten with 5)
+    expect(result.current.children).toEqual([{ ...mockChildA, grade: 2 }, secondChildA]);
+    expect((result.current as HookSnapshot).appliedFetchSeq).toBe(2);
+
+    // Case 2: Refresh succeeds with valid list omitting child-a
+    let pMissing!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      pMissing = result.current.updateChildGrade('child-a', 6);
+    });
+    await act(async () => {
+      updateCalls[1].resolve({ data: [{ id: 'child-a' }], error: null });
+    });
+    let resMissing!: UpdateChildGradeResult;
+    await act(async () => {
+      queryCalls[2].resolve({
+        data: [secondChildA],
+        error: null,
+      });
+      resMissing = await pMissing;
+    });
+
+    expect(resMissing).toEqual({ ok: true, grade: 6, refreshed: false });
+    expect(result.current.children).toEqual([secondChildA]);
+    expect((result.current as HookSnapshot).appliedFetchSeq).toBe(3);
+  });
+
+  it('G1a-3.H: handles A -> B switch during in-flight UPDATE or during post-write refresh without leaking A into B or starting an A refresh under B', async () => {
+    currentAuthUser = { id: 'user-a' };
+    const { result, rerender } = renderHook(
+      ({ user }: { user: { id: string } | null }) => {
+        currentAuthUser = user;
+        return useChildren();
+      },
+      { initialProps: { user: currentAuthUser } }
+    );
+
+    await act(async () => {
+      queryCalls[0].resolve({ data: [mockChildA], error: null });
+    });
+    expect(typeof result.current.updateChildGrade).toBe('function');
+
+    // Part 1: Start A's UPDATE, then switch A -> B while UPDATE is in flight
+    let pInFlightUpdate!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      pInFlightUpdate = result.current.updateChildGrade('child-a', 3);
+    });
+    expect(updateCalls).toHaveLength(1);
+
+    rerender({ user: { id: 'user-b' } });
+    // First render of B is masked
+    expect(result.current.children).toEqual([]);
+    expect(result.current.hasFetchedOnce).toBe(false);
+    expect(queryCalls).toHaveLength(2);
+    expect(queryCalls[1].parentId).toBe('user-b');
+
+    // Resolve A's in-flight UPDATE while B is current -> must return refreshed:false and NOT start an A refresh SELECT
+    let resInFlightUpdate!: UpdateChildGradeResult;
+    await act(async () => {
+      updateCalls[0].resolve({ data: [{ id: 'child-a' }], error: null });
+      resInFlightUpdate = await pInFlightUpdate;
+    });
+    expect(resInFlightUpdate).toEqual({ ok: true, grade: 3, refreshed: false });
+    expect(queryCalls).toHaveLength(2);
+
+    // Resolve B's initial SELECT
+    await act(async () => {
+      queryCalls[1].resolve({ data: [mockChildB], error: null });
+    });
+    expect(result.current.children).toEqual([mockChildB]);
+
+    // Part 2: Start B's UPDATE, confirm B's UPDATE so B's post-write refresh SELECT starts, then switch B -> A while B's refresh is in flight
+    let pInFlightRefresh!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      pInFlightRefresh = result.current.updateChildGrade('child-b', 4);
+    });
+    expect(updateCalls).toHaveLength(2);
+
+    await act(async () => {
+      updateCalls[1].resolve({ data: [{ id: 'child-b' }], error: null });
+    });
+    // queryCalls[2] is B's post-write refresh SELECT
+    expect(queryCalls).toHaveLength(3);
+    expect(queryCalls[2].parentId).toBe('user-b');
+
+    // Switch B -> A while B's refresh SELECT is pending
+    rerender({ user: { id: 'user-a' } });
+    expect(result.current.children).toEqual([]);
+    expect(queryCalls).toHaveLength(4);
+    expect(queryCalls[3].parentId).toBe('user-a');
+
+    // Resolve A's SELECT first
+    await act(async () => {
+      queryCalls[3].resolve({ data: [mockChildA], error: null });
+    });
+    expect(result.current.children).toEqual([mockChildA]);
+
+    // Now resolve B's stale post-write refresh SELECT late
+    let resInFlightRefresh!: UpdateChildGradeResult;
+    await act(async () => {
+      queryCalls[2].resolve({ data: [{ ...mockChildB, grade: 4 }], error: null });
+      resInFlightRefresh = await pInFlightRefresh;
+    });
+    expect(resInFlightRefresh).toEqual({ ok: true, grade: 4, refreshed: false });
+    expect(result.current.children).toEqual([mockChildA]);
+  });
+
+  it('G1a-3.I: overlapping grade updates, superseding SELECTs, and concurrent addChild INSERT preserve request-generation ordering, never return false refreshed:true for superseded refresh, and settle loading=false (B3 liveness)', async () => {
+    const { result } = renderHook(() => useChildren());
+
+    await act(async () => {
+      queryCalls[0].resolve({ data: [mockChildA], error: null });
+    });
+    expect(typeof result.current.updateChildGrade).toBe('function');
+
+    // --- Part 1: Overlapping updateChildGrade #1 (grade 2) superseded by updateChildGrade #2 (grade 6) ---
+    let pUpdate1!: Promise<UpdateChildGradeResult>;
+    let pUpdate2!: Promise<UpdateChildGradeResult>;
+
+    act(() => {
+      pUpdate1 = result.current.updateChildGrade('child-a', 2);
+    });
+    await act(async () => {
+      updateCalls[0].resolve({ data: [{ id: 'child-a' }], error: null });
+    });
+    // queryCalls[1] is Update #1's refresh SELECT
+    expect(queryCalls).toHaveLength(2);
+
+    // Start Update #2 while Update #1's refresh SELECT is still pending
+    act(() => {
+      pUpdate2 = result.current.updateChildGrade('child-a', 6);
+    });
+    await act(async () => {
+      updateCalls[1].resolve({ data: [{ id: 'child-a' }], error: null });
+    });
+    // queryCalls[2] is Update #2's refresh SELECT (supersedes queryCalls[1])
+    expect(queryCalls).toHaveLength(3);
+
+    // Resolve superseded queryCalls[1] with grade 2 -> Update #1 must report refreshed: false and NOT overwrite state
+    let resUpdate1!: UpdateChildGradeResult;
+    await act(async () => {
+      queryCalls[1].resolve({ data: [{ ...mockChildA, grade: 2 }], error: null });
+      resUpdate1 = await pUpdate1;
+    });
+    expect(resUpdate1).toEqual({ ok: true, grade: 2, refreshed: false });
+    expect(result.current.loading).toBe(true);
+
+    // Resolve current queryCalls[2] with grade 6 -> Update #2 reports refreshed: true and loading settles to false
+    let resUpdate2!: UpdateChildGradeResult;
+    await act(async () => {
+      queryCalls[2].resolve({ data: [{ ...mockChildA, grade: 6 }], error: null });
+      resUpdate2 = await pUpdate2;
+    });
+    expect(resUpdate2).toEqual({ ok: true, grade: 6, refreshed: true });
+    expect(result.current.children).toEqual([{ ...mockChildA, grade: 6 }]);
+    expect(result.current.loading).toBe(false);
+
+    // --- Part 2: updateChildGrade refresh SELECT in flight when addChild INSERT completes ---
+    let pUpdate3!: Promise<UpdateChildGradeResult>;
+    act(() => {
+      pUpdate3 = result.current.updateChildGrade('child-a', 4);
+    });
+    await act(async () => {
+      updateCalls[2].resolve({ data: [{ id: 'child-a' }], error: null });
+    });
+    // queryCalls[3] is Update #3's in-flight refresh SELECT
+    expect(queryCalls).toHaveLength(4);
+
+    // While queryCalls[3] is pending, addChild completes a valid INSERT -> triggers superseding queryCalls[4]
+    let addRes!: { child: Child | null; error: Error | null };
+    await act(async () => {
+      addRes = await result.current.addChild('ახალი', 'avatar_1', 'boy', 'pin-999');
+    });
+    expect(addRes.error).toBeNull();
+    expect(queryCalls).toHaveLength(5);
+
+    // Stale queryCalls[3] resolves late without the inserted child -> Update #3 gets refreshed: false, inserted child is preserved
+    let resUpdate3!: UpdateChildGradeResult;
+    await act(async () => {
+      queryCalls[3].resolve({ data: [{ ...mockChildA, grade: 4 }], error: null });
+      resUpdate3 = await pUpdate3;
+    });
+    expect(resUpdate3).toEqual({ ok: true, grade: 4, refreshed: false });
+    expect(result.current.children.some((c) => c.id === 'child-inserted-g1a3')).toBe(true);
+
+    // Superseding post-INSERT queryCalls[4] resolves with both children -> loading settles to false, no duplicates
+    await act(async () => {
+      queryCalls[4].resolve({
+        data: [
+          { ...mockChildA, grade: 4 },
+          addRes.child!,
+        ],
+        error: null,
+      });
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.children).toEqual([
+      { ...mockChildA, grade: 4 },
+      addRes.child!,
+    ]);
   });
 });
