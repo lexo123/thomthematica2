@@ -10,6 +10,7 @@ describe('personalizeMessage', () => {
     avatar_id: 'avatar_1',
     gender: 'boy',
     created_at: '2026-01-01T00:00:00Z',
+    grade: null,
   };
 
   const girlChild: Child = {
@@ -19,6 +20,7 @@ describe('personalizeMessage', () => {
     avatar_id: 'avatar_2',
     gender: 'girl',
     created_at: '2026-01-01T00:00:00Z',
+    grade: null,
   };
 
   it('replaces {name} and {gender} for a boy child', () => {
@@ -56,6 +58,7 @@ describe('personalizeMessage', () => {
       avatar_id: 'avatar_3',
       gender: 'boy',
       created_at: '2026-01-01T00:00:00Z',
+      grade: null,
     };
     const phrase = 'ყოჩაღ, {vocative}, კაი {gender} ხარ!';
     expect(personalize(phrase, davitChild)).toBe('ყოჩაღ, დავით, კაი ბიჭი ხარ!');
@@ -69,6 +72,7 @@ describe('personalizeMessage', () => {
       avatar_id: 'avatar_4',
       gender: 'boy',
       created_at: '2026-01-01T00:00:00Z',
+      grade: null,
     };
     const phrase = 'ბრავო, {vocative}!';
     expect(personalize(phrase, sandroChild)).toBe('ბრავო, სანდრო!');
@@ -87,6 +91,7 @@ describe('personalizeMessage', () => {
       avatar_id: 'avatar_3',
       gender: 'boy',
       created_at: '2026-01-01T00:00:00Z',
+      grade: null,
     };
     const phrase = 'გაიცანით {name}. ყოჩაღ, {vocative}, ნამდვილი {gender} ხარ!';
     expect(personalize(phrase, davitChild)).toBe('გაიცანით დავითი. ყოჩაღ, დავით, ნამდვილი ბიჭი ხარ!');

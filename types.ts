@@ -62,6 +62,8 @@ export type ColMultState = {
   res: string[];
 };
 
+export type ChildGrade = 1 | 2 | 3 | 4 | 5 | 6;
+
 export interface Child {
   id: string;
   parent_id: string;
@@ -69,6 +71,7 @@ export interface Child {
   avatar_id: string;
   gender: 'boy' | 'girl';
   created_at: string;
+  grade: ChildGrade | null;
 }
 
 export interface GameSession {

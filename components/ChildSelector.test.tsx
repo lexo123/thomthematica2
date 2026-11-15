@@ -19,6 +19,7 @@ describe('ChildSelector - first mode race condition fixes', () => {
     avatar_id: 'avatar_1',
     gender: 'boy',
     created_at: '2026-01-01T00:00:00Z',
+    grade: null,
   };
 
   const mockChild2: Child = {
@@ -28,6 +29,7 @@ describe('ChildSelector - first mode race condition fixes', () => {
     avatar_id: 'avatar_2',
     gender: 'girl',
     created_at: '2026-01-02T00:00:00Z',
+    grade: null,
   };
 
   // Single-purpose add-child form tests (FIX C)
