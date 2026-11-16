@@ -1,6 +1,6 @@
 # thomthematica2 — Project State
 
-> **CURRENT CHECKPOINT — 2026-11-16: G1a-1 / G1a-2 / G1a-3 APPROVED, PR #2 MERGED INTO `main`, GitHub Pages deployment SUCCESS, production smoke test 6/6 PASS.** Latest GitHub `main` commit independently verified: `7a7387ae6b7763aa3cd4c58e04cd9df980ba8f0d` (two-parent merge commit). This checkpoint documents an already completed deployment; it does **not** authorize any new wave, schema change, test-data creation, or grade UI. **DRAFT for Claude review and Lexo approval — not yet committed to GitHub.** Historical entries below are preserved for provenance; their older “current checkpoint” and next-step directions are superseded by this section.
+> **CURRENT CHECKPOINT — 2026-11-16: G1a-1 / G1a-2 / G1a-3 APPROVED, PR #2 MERGED INTO `main`, GitHub Pages deployment SUCCESS, production smoke test 6/6 PASS.** Latest GitHub `main` commit independently verified: `7a7387ae6b7763aa3cd4c58e04cd9df980ba8f0d` (two-parent merge commit). This checkpoint documents an already completed deployment; it does **not** authorize any new wave, schema change, test-data creation, or grade UI. **Reviewed by Claude (D1–D4) and approved by Lexo as a docs-only update to main.** Historical entries below are preserved for provenance; their older “current checkpoint” and next-step directions are superseded by this section.
 
 ## Wave G1a — implementation, deployment and smoke-test checkpoint (2026-11-16)
 
