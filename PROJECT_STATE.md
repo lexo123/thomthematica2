@@ -1,6 +1,62 @@
 # thomthematica2 — Project State
 
-> **CURRENT CHECKPOINT — 2026-10-25: Wave G1a production DB migration COMPLETED; Preflight B 7/7 REPORTED PASS; G1a TypeScript implementation NOT STARTED.** This is a database/documentation checkpoint, **not** an application-code checkpoint or authorization to implement. Production observations below are attributed to Lexo's Supabase screenshots and terminal output shared with ChatGPT; neither ChatGPT nor Claude independently connected to production. The latest repository `main` HEAD checked for this documentation was `115e8d6499fbbe94303a5b5f5adca299b68e56f5` (G0 docs commit). The verified earlier application-code checkpoint remains `096fb463c6a9e48250199589a31946927f1f1519` (historical 411 tests / TypeScript 0 errors / build passed, **not** rerun for this G1a DB migration).
+> **CURRENT CHECKPOINT — 2026-11-16: G1a-1 / G1a-2 / G1a-3 APPROVED, PR #2 MERGED INTO `main`, GitHub Pages deployment SUCCESS, production smoke test 6/6 PASS.** Latest GitHub `main` commit independently verified: `7a7387ae6b7763aa3cd4c58e04cd9df980ba8f0d` (two-parent merge commit). This checkpoint documents an already completed deployment; it does **not** authorize any new wave, schema change, test-data creation, or grade UI. **DRAFT for Claude review and Lexo approval — not yet committed to GitHub.** Historical entries below are preserved for provenance; their older “current checkpoint” and next-step directions are superseded by this section.
+
+## Wave G1a — implementation, deployment and smoke-test checkpoint (2026-11-16)
+
+### Authoritative Git history and scope
+
+- Repository: `lexo123/thomthematica2`; PR **#2**: <https://github.com/lexo123/thomthematica2/pull/2>, `feature/g1a-grade` → `main`, **merged** on `2026-11-15T19:59:38Z`.
+- Pre-G1a `main`: `92cd6525520f154f2788b25b2c5b66c66bd8d901`.
+- G1a-1: `1d4dec7097cdc1ad7bb1d3f4ed9cf42d3cdec341` — grade type/nullable domain, explicit read/INSERT projections, strict validation, tests.
+- G1a-2: `3daff3b0f4bea05d29425827b8c2f0bb0ddea1cb` — owner-scoped children state, success-only readiness/reconciliation, first-render isolation, stale callback/INSERT/SELECT race safety, reward-masking barrier and real Provider tests.
+- G1a-3: `aa255eb80fc29d0c16fb9b3b35cd1d44c63a6fc2` — verified `updateChildGrade` API, UPDATE ownership/membership/read-after-write checks, direct ChildProvider wiring, regression tests.
+- Merge commit: **`7a7387ae6b7763aa3cd4c58e04cd9df980ba8f0d`**; parents are `92cd6525520f154f2788b25b2c5b66c66bd8d901` and `aa255eb80fc29d0c16fb9b3b35cd1d44c63a6fc2`. **Merge method: Create a merge commit**, not squash/rebase. Original three commit SHAs are preserved.
+- GitHub compare verified **exactly 3 feature commits, 9 changed paths** relative to pre-G1a `main`:
+  `types.ts`; `hooks/useChildren.ts`; `hooks/useChildren.test.ts`; `contexts/ChildContext.tsx`; new `contexts/ChildContext.grade.test.tsx`; fixture-only `components/ChildSelector.test.tsx`, `components/ParentWishInbox.test.tsx`, `tests/KveshdivisionFlow.test.tsx`, `utils/personalizeMessage.test.ts`.
+- **No schema, RLS, Supabase sync, session queue, 40/20 rolling-window, 39/19 qualifying threshold, Google Sheets guest mode, service worker, reward service, grade UI, app routing or math generator changes** in the G1a code wave. `utils/columnDivision.oracle.test.ts` canonical SHA-256: `ecf26a7aa60beb7ae49d7c9ec68a7df6ffb20d5c1e5ea92f9738a5e153bcdd08` (Lexo and Claude checked).
+
+### Verification evidence and production deployment
+
+- G1a-1, G1a-2 and G1a-3 independently reviewed by Claude with fresh-clone diff/allowlist, RED → GREEN validation, typecheck/build and mutation checks; Lexo explicitly approved **each checkpoint** before advancing.
+- Final G1a-3 local independent results: `npm run typecheck` **0 errors**, targeted Vitest **37/37**, full Vitest **50 files / 442/442 tests**, `npm run build` **PASS**. Claude reproduced these results on a fresh clone. Isolated Vitest execution with the **exact sentinel** Supabase environment values below **also passed 442/442**; see safety rule below.
+- GitHub Actions Deploy to GitHub Pages workflow run **`43755482414`**, commit `7a7387ae...`, completed with **success** on 2026-11-15 UTC, **verified by ChatGPT via GitHub connector** (run metadata and job-step conclusions); Lexo separately confirmed the deployed website through the smoke test below. **Claude reported HTTP 403 for Actions API and did not independently verify this run**. Recorded successful steps: `Install dependencies`, `Typecheck & Test`, `Build`, `Upload artifact` and `Deploy to GitHub Pages` all reported success. Details: <https://github.com/lexo123/thomthematica2/actions/runs/43755482414>. The workflow is triggered by pushes to `main`, so future docs-only commits on `main` also start the workflow.
+- Supabase pre-merge **read-only** query, Lexo-provided screenshot: `COUNT(*) FROM public.children = 6`, `COUNT(*) FILTER (WHERE grade IS NOT NULL) = 0`. No new grade was assigned and no DB migration was needed in this code wave: the nullable `SMALLINT` grade column and CHECK 1–6 were already migrated in the earlier 2026-10-25 DB checkpoint.
+- Production smoke test reported directly by Lexo on 2026-11-16: **6/6 PASS** — site loads without visible errors; `Ctrl+Shift+R` hard refresh works; parent sign-in works; six existing children appear; child-selection / PIN screen works; Parent Dashboard opens normally. This is user-observed functional coverage, **not** automated browser security or comprehensive production regression testing.
+- **Not performed:** production UPDATE grade/PATCH smoke (no grade UI/caller), controlled production child INSERT (requires Lexo's separate approval and cleanup plan), cross-account negative RLS penetration test, game/wish end-to-end writes, independent Supabase database connection by ChatGPT or Claude, backup restore drill. Do **not** mark these as PASS without separate evidence.
+
+### Critical safety discovery — local tests must not contact production Supabase
+
+- During Ubuntu G1a-3 test runs, Supabase Postgres logs around **2026-11-15 22:55:48–50** showed multiple `22P02 invalid input syntax for type uuid` errors with test IDs such as `child-division-test-1`, `child-roll-1`, `child-kvesh-test-1`. API Gateway logs at the same time showed **25 warnings** including `400` for `/rest/v1/game_sessions` / `/rest/v1/wishes` and `401` for `/rest/v1/game_sessions`. Exact test IDs occur in repository test files. This is strong evidence of unintended live Supabase requests by local tests using `.env.local`. **Earlier plain `npm test` / Vitest executions on the same Ubuntu checkout may also have sent live requests** while that configuration was present; neither the start date nor the full scope is established. These 22P02/400/401 failures show that particular requests failed, **not** that no other test-originated database write succeeded. No data-integrity audit or proof of zero side effects was performed.
+- Lexo confirmed the local `.env.local` defines `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (actual secret values were **not** supplied). Repeating full Vitest with the **exact sentinel placeholder values** shown below returned **50 files / 442/442 PASS**, exit code 0.
+- **MANDATORY TEMPORARY RULE for every assistant and future test instruction** until permanent isolation is implemented: NEVER instruct Lexo to run plain `npm test` or plain `npx vitest` on this Ubuntu checkout. Instead, provide the exact safe environment-override commands directly and explain that they prevent `lib/supabase.ts` from initializing the normal configured Supabase client **only because this module recognizes these exact sentinel strings**:
+
+  ```bash
+  VITE_SUPABASE_URL='https://your-project.supabase.co' \
+  VITE_SUPABASE_ANON_KEY='your-anon-key' \
+  npm test
+  ```
+
+  **Exact-match rule:** the `lib/supabase.ts` `isSupabaseConfigured` guard rejects URLs containing the literal `your-project.supabase.co` and keys exactly equal to `your-anon-key`. **Use the two strings above verbatim**, not arbitrary “invalid” values such as `localhost`, `invalid`, or a plausible test project URL/key: other values can initialize a Supabase client and may allow network requests. Shell environment variables take precedence over Vite `.env.local` values for these keys. For targeted Vitest, the same two exact `VITE_...` overrides must precede `npx vitest run <test paths>`. Do **not** ask Lexo to memorize this, and do not assume that conversational Memory will persist it. **The override is an interim mitigation, not a guaranteed network sandbox** (code can bypass `getSupabase()` or directly invoke `fetch`); permanent test-process isolation/no-live-endpoint guard must be planned, reviewed and explicitly approved as its own bounded change. Do not change the already approved G1a implementation or protected sync service under the pretext of this fix.
+- **Separate pending approval gate:** conduct a **read-only production data-integrity audit** for potentially created test IDs/test records across relevant tables (including `children`, `game_sessions`, `wishes`) and relevant time periods. Define queries, access scope and interpretation in a separate reviewed plan; **no production changes, cleanup, deletion or writes without Lexo’s explicit approval**. Absence of 22P02 after isolation is not proof that prior writes never occurred.
+- Do not include real Supabase URLs, tokens, credentials, production personal records, or database backups in public repo/docs or troubleshooting screenshots. No test accounts/children, live DB writes, or data cleanup without specific Lexo approval.
+
+### Current limitations and next workflow gates
+
+- G1a is a **foundation**: `ChildGrade` is `1|2|3|4|5|6`, `Child.grade` is required in TypeScript but nullable in DB/rows. `updateChildGrade(childId, grade)` exists and is wired into `ChildProvider`, but **there is no Grade UI or production caller yet**; no grade-based game difficulty or rolling-window reset was activated. Reset rules are deferred to the approved later G2c path after corresponding grade/version-aware planning gates.
+- If the initial children SELECT fails, fail-closed `hasFetchedOnce:false` and exposed `activeChildId:null` can block game entry even after a PIN challenge until a successful reload/refetch; no new retry UI exists. This is a documented G1a-2 limitation, not a newly discovered smoke-test regression.
+- `supabase/schema.sql` is **not a faithful reflection of production schema** (existing drift, documented below). Do not use it to rebuild production or silently synchronize it. A separate reviewed schema-documentation/migration effort is needed.
+- The permanent **Vitest isolation guard**, the **read-only historical test-data audit**, security regression testing for M2 owner's first-render membership edge case, cross-account RLS behavioral check, post-merge controlled INSERT/update smoke and any cleanup remain separate tasks subject to architecture review/authorization. The M2 mutation uncovered a coverage gap, **not a demonstrated production defect**; owner check and `.eq('parent_id')` remain in implementation.
+- **Next step is documentation-only:** ChatGPT prepares this updated `PROJECT_STATE.md`; Claude independently reviews this exact full document/diff; Lexo approves. Then a separate **docs-only commit changing `PROJECT_STATE.md` alone** can be created on up-to-date `main` after checking clean worktree and `git diff`. Do not touch any other file or start the next phase automatically. After that, synchronize the approved document to the Google AI Studio workspace and verify its source against `main` before new planning.
+- G1b/G2c/Type Hygiene or test-isolation implementation requires a **new, explicit, phase-by-phase plan and authorization**. Production merge/deploy alone is not authorization for these changes. Reassess remaining launch gates separately.
+
+---
+
+## Historical checkpoints and archived handoff notes (superseded by current section above)
+
+The material below is retained byte-for-byte from the GitHub `main` baseline except for the two explicit `HISTORICAL` labels. It documents what was known and approved at those earlier dates; statements such as “G1a TypeScript implementation NOT STARTED” are **no longer current** and must not be used to decide future work.
+
+> **HISTORICAL CHECKPOINT — 2026-10-25: Wave G1a production DB migration COMPLETED; Preflight B 7/7 REPORTED PASS; G1a TypeScript implementation NOT STARTED.** This is a database/documentation checkpoint, **not** an application-code checkpoint or authorization to implement. Production observations below are attributed to Lexo's Supabase screenshots and terminal output shared with ChatGPT; neither ChatGPT nor Claude independently connected to production. The latest repository `main` HEAD checked for this documentation was `115e8d6499fbbe94303a5b5f5adca299b68e56f5` (G0 docs commit). The verified earlier application-code checkpoint remains `096fb463c6a9e48250199589a31946927f1f1519` (historical 411 tests / TypeScript 0 errors / build passed, **not** rerun for this G1a DB migration).
 
 ## Wave G1a — 2026-10-25 Production DB checkpoint
 
@@ -670,7 +726,7 @@ Wave Y-ის ტესტირებისას Lexo-მ თავად ა�
 
 **Lexo-ს სამუშაო კონტექსტი:** არ იცნობს SQL-ს ან Supabase-ის dashboard-ს — ყოველი ტექნიკური ნაბიჯი დეტალურად, ეტაპ-ეტაპად აღსაწერია.
 
-## შემდეგი ნაბიჯი — 2026-10-21 handoff
+## HISTORICAL — შემდეგი ნაბიჯი — 2026-10-21 handoff
 
 **ძველი კოდის checkpoint:** `096fb463` (2026-10-15); docs `main` HEAD `c988a56` (ამ draft-ის GitHub-ში შეტანამდე); 49 test-files / 411 tests + TS/build/deploy წარმატება ისტორიული დადასტურებაა და 2026-10-21-ს არ განმეორებულა.
 
